@@ -4,13 +4,16 @@ import { ChatInput } from './components/ChatInput';
 import { Sidebar } from './components/Sidebar';
 import { useChat } from './hooks/useChat';
 import { useSessions } from './hooks/useSessions';
+import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
 
-function App() {
+function ChatInterface() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+  const { id: routeSessionId } = useParams();
+  const location = useLocation();
+
   const {
     sessions,
-    activeSessionId,
-    setActiveSessionId,
     createSession,
     removeSession,
     updateSessionTitle
@@ -26,20 +29,47 @@ function App() {
     setConversationId
   } = useChat();
 
-  // 当外部 session 切换时重新加载内容
+  // 与路由同步状态
   useEffect(() => {
-    if (activeSessionId) {
-      loadHistory(activeSessionId);
+    if (routeSessionId) {
+      loadHistory(routeSessionId).then(() => {
+        // 如果是从首页携带 initialMessage 进来，则在加载完（空）历史后自动发送
+        if (location.state?.initialMessage) {
+          const msg = location.state.initialMessage;
+          // 清空 state，避免刷新页面重复发送
+          window.history.replaceState({}, document.title);
+          originalSendMessage(msg);
+        }
+      });
     } else {
       clearMessages();
     }
-  }, [activeSessionId, loadHistory, clearMessages]);
+  }, [routeSessionId, loadHistory, clearMessages, location.state, originalSendMessage]);
+
+  const handleSelectSession = (id: string) => {
+    navigate(`/chat/${id}`);
+  };
+
+  const handleNewSession = () => {
+    navigate('/');
+  };
+
+  const handleDeleteSession = (id: string) => {
+    removeSession(id);
+    if (routeSessionId === id) {
+      navigate('/');
+    }
+  };
 
   const handleSendMessage = async (content: string) => {
-    let currentSessionId = activeSessionId;
+    let currentSessionId = routeSessionId;
+    
     if (!currentSessionId) {
       currentSessionId = createSession(content.slice(0, 15) + (content.length > 15 ? '...' : ''));
       setConversationId(currentSessionId);
+      // 利用 replace 防止新开对话破坏后退历史记录队列，这里需要加上原始消息内容避免被清空
+      navigate(`/chat/${currentSessionId}`, { replace: true, state: { initialMessage: content } });
+      return; // 阻止后续发送，交由 useEffect 接管触发，或者在此处传参调用
     } else if (messages.length === 0) {
       updateSessionTitle(currentSessionId, content.slice(0, 15) + (content.length > 15 ? '...' : ''));
     }
@@ -51,10 +81,10 @@ function App() {
     <div className="flex h-screen bg-white">
       <Sidebar 
         sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
-        onNewSession={() => setActiveSessionId(undefined)}
-        onDeleteSession={removeSession}
+        activeSessionId={routeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewSession={handleNewSession}
+        onDeleteSession={handleDeleteSession}
         isMobileOpen={isMobileSidebarOpen}
         setMobileOpen={setIsMobileSidebarOpen}
       />
@@ -70,14 +100,14 @@ function App() {
             </svg>
           </button>
           <h1 className="text-xl font-semibold text-gray-800">
-            {activeSessionId ? sessions.find(s => s.id === activeSessionId)?.title || 'AI Chat' : '新对话'}
+            {routeSessionId ? sessions.find(s => s.id === routeSessionId)?.title || 'AI Chat' : '新对话'}
           </h1>
           {messages.length > 0 && (
             <button
-              onClick={() => setActiveSessionId(undefined)}
+              onClick={handleNewSession}
               className="ml-auto text-sm text-gray-500 hover:text-gray-800 transition-colors"
             >
-              清空对话
+              清空/新对话
             </button>
           )}
         </header>
@@ -102,6 +132,15 @@ function App() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<ChatInterface />} />
+      <Route path="/chat/:id" element={<ChatInterface />} />
+    </Routes>
   );
 }
 
