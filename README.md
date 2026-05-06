@@ -12,10 +12,10 @@
 
 ### 方式一：Docker Compose (推荐)
 
-1. 配置环境变量（可选）:
+1. 配置环境变量:
 ```bash
 cp .env.example .env
-# 编辑 .env 文件，设置 LLM_API_KEY
+# 编辑 .env 文件，设置 API_KEY、BASE_URL、MODEL
 ```
 
 2. 启动所有服务:
@@ -25,7 +25,24 @@ docker-compose up --build
 
 3. 访问前端：http://localhost:3000
 
-### 方式二：本地开发
+### 方式三：一键启动脚本
+
+```bash
+# 设置环境变量
+export API_KEY=your-api-key
+export BASE_URL=https://api.openai.com/v1
+export MODEL=gpt-4
+
+# 启动所有服务（前端、后端、AI 服务）
+./start-dev.sh
+```
+
+服务会自动启动在：
+- 前端：http://localhost:3000
+- 后端：http://localhost:8080
+- AI 服务：http://localhost:8000
+
+### 方式二：本地分别启动
 
 #### 前端
 
@@ -50,11 +67,15 @@ cd backend
 
 ```bash
 cd ai_service
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-export LLM_API_KEY=your-api-key
-uvicorn main:app --reload
+
+# 设置环境变量（任选一种）
+export API_KEY=your-api-key
+# 或使用 .env 文件：cp .env.example .env 并编辑
+
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 服务运行在 http://localhost:8000
