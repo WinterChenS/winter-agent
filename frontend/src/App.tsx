@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MessageList } from './components/MessageList';
 import { ChatInput } from './components/ChatInput';
 import { Sidebar } from './components/Sidebar';
 import { useChat } from './hooks/useChat';
 import { useSessions } from './hooks/useSessions';
-import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
 
 function ChatInterface() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { id: routeSessionId } = useParams();
-  const location = useLocation();
+  const isNewSessionRef = useRef(false);
 
   const {
     sessions,
@@ -32,19 +32,16 @@ function ChatInterface() {
   // 与路由同步状态
   useEffect(() => {
     if (routeSessionId) {
-      loadHistory(routeSessionId).then(() => {
-        // 如果是从首页携带 initialMessage 进来，则在加载完（空）历史后自动发送
-        if (location.state?.initialMessage) {
-          const msg = location.state.initialMessage;
-          // 清空 state，避免刷新页面重复发送
-          window.history.replaceState({}, document.title);
-          originalSendMessage(msg);
-        }
-      });
+      if (isNewSessionRef.current) {
+        // 如果是刚刚手动创建的新会话，本地已经是最新对话界面，直接跳过从服务器拉取空历史，防止覆盖刚才发送的消息
+        isNewSessionRef.current = false;
+      } else {
+        loadHistory(routeSessionId);
+      }
     } else {
       clearMessages();
     }
-  }, [routeSessionId, loadHistory, clearMessages, location.state, originalSendMessage]);
+  }, [routeSessionId, loadHistory, clearMessages]);
 
   const handleSelectSession = (id: string) => {
     navigate(`/chat/${id}`);
@@ -65,11 +62,11 @@ function ChatInterface() {
     let currentSessionId = routeSessionId;
     
     if (!currentSessionId) {
+      isNewSessionRef.current = true;
       currentSessionId = createSession(content.slice(0, 15) + (content.length > 15 ? '...' : ''));
       setConversationId(currentSessionId);
-      // 利用 replace 防止新开对话破坏后退历史记录队列，这里需要加上原始消息内容避免被清空
-      navigate(`/chat/${currentSessionId}`, { replace: true, state: { initialMessage: content } });
-      return; // 阻止后续发送，交由 useEffect 接管触发，或者在此处传参调用
+      // 利用 replace 防止新开对话破坏后退历史记录队列
+      navigate(`/chat/${currentSessionId}`, { replace: true });
     } else if (messages.length === 0) {
       updateSessionTitle(currentSessionId, content.slice(0, 15) + (content.length > 15 ? '...' : ''));
     }
