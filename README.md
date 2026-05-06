@@ -1,12 +1,12 @@
-# AI Chat V0.1
+# AI Chat V0.2
 
-智能对话系统原型，实现前端 - 后端-AI 服务的全链路流式对话功能。
+智能对话系统原型，实现前端 - 后端 - AI 服务的全链路流式对话与历史会话能力。
 
 ## 技术栈
 
 - **前端**: React 18 + Vite + TypeScript + Tailwind CSS
-- **后端**: Spring Boot 3 + WebFlux + Kotlin
-- **AI 服务**: Python + FastAPI + LangGraph
+- **后端**: Spring Boot 3 + WebFlux + Java + Maven
+- **AI 服务**: Python + FastAPI + LangChain + LangGraph + PostgreSQL Checkpointer
 
 ## 快速开始
 
@@ -58,7 +58,7 @@ npm run dev
 
 ```bash
 cd backend
-./gradlew bootRun
+mvn spring-boot:run
 ```
 
 服务运行在 http://localhost:8080
@@ -82,20 +82,28 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ## 环境变量
 
+### AI 服务核心配置
+
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| API_KEY | LLM API 密钥（优先使用） | 空 |
-| BASE_URL | LLM API 基础 URL（优先使用） | https://api.openai.com/v1 |
-| MODEL | 模型名称（优先使用） | gpt-3.5-turbo |
-| LLM_API_KEY | LLM API 密钥（兼容旧配置） | 空 |
-| LLM_BASE_URL | LLM API 基础 URL（兼容旧配置） | https://api.openai.com/v1 |
-| MODEL_NAME | 模型名称（兼容旧配置） | gpt-3.5-turbo |
+| API_KEY | LLM API 密钥 | 空 |
+| BASE_URL | LLM API 基础 URL | https://api.openai.com/v1 |
+| MODEL | 模型名称 | gpt-3.5-turbo |
+| POSTGRES_URI | LangGraph 持久化数据库连接串 | postgresql://postgres:postgres@localhost:5432/aichat |
+
+### LangSmith（可选）
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| LANGCHAIN_API_KEY | LangSmith API Key | 空 |
+| LANGCHAIN_PROJECT | 追踪项目名 | default |
+| LANGCHAIN_ENDPOINT | LangSmith 地址 | https://api.smith.langchain.com |
 
 ## API 接口
 
-### POST /api/chat/stream
+### POST `/api/chat/stream`
 
-流式对话接口
+流式对话接口（SSE）
 
 **请求**:
 ```json
@@ -105,16 +113,18 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 }
 ```
 
-**响应** (SSE):
-```
-event: token
-data: {"content": "你"}
+### GET `/api/chat/history/{conversationId}`
 
-event: token
-data: {"content": "好"}
+查询指定会话历史（后端透传 AI 服务返回值）
 
-event: done
-data: {}
+**响应**:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "你好" },
+    { "role": "assistant", "content": "你好，我是 AI 助手。" }
+  ]
+}
 ```
 
 ## 功能特性
@@ -125,6 +135,10 @@ data: {}
 - ✅ 自动滚动
 - ✅ 错误处理
 - ✅ 响应式设计
+- ✅ 多轮对话历史记忆（PostgreSQL + LangGraph）
+- ✅ 本地历史会话侧边栏列表
+- ✅ 代码块自动深浅色语法高亮与“一键复制”
+- ✅ LangSmith 全链路观测追踪
 
 ## 项目结构
 
@@ -132,29 +146,30 @@ data: {}
 .
 ├── frontend/           # React 前端
 │   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── services/
+│   │   ├── components/ # ChatInput, ChatMessage, Sidebar等
+│   │   ├── hooks/      # useChat, useSessions等
+│   │   ├── services/   # 流式与历史API抓取
 │   │   └── types/
 │   └── ...
-├── backend/            # Spring Boot 后端
-│   └── src/main/kotlin/com/example/aichat/
-│       ├── controller/
-│       ├── service/
-│       ├── client/
-│       └── model/
-├── ai_service/         # Python AI 服务
+├── backend/            # Spring Boot 后端 (BFF 代理)
+│   └── src/main/java/com/example/aichat/
+│       ├── controller/ # 暴露流式调用和历史聊天记录查询接口
+│       ├── service/    # 非阻塞式跨服务 HTTP 请求
+│       └── ...
+├── ai_service/         # Python AI 服务 (LangGraph 核心大脑)
 │   ├── graph/
-│   │   ├── state.py
-│   │   ├── nodes.py
-│   │   └── graph.py
-│   └── main.py
+│   │   ├── state.py    # 图流转结构状态
+│   │   ├── nodes.py    # 思考和决策节点
+│   │   └── graph.py    # 构建拓扑图、引入 PostgresSaver
+│   ├── config.py       # 环境变量与LangSmith挂载
+│   └── main.py         # HTTP端点及 PostgreSQL 连接池生命周期
 └── docker-compose.yml
 ```
 
 ## 开发计划
 
-- [ ] V0.2: 对话历史管理
+- [x] V0.1: 基础对话与流式框架
+- [x] V0.2: 多轮对话历史管理沉淀（PostgreSQL + Sidebar）
 - [ ] V0.3: 多工具集成（搜索、数据库查询）
 - [ ] V0.4: 用户认证和权限
 - [ ] V0.5: 多模型切换

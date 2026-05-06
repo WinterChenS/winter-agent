@@ -1,11 +1,29 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Message } from '../types/chat';
+import { getChatHistory } from '../services/api';
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<string>();
+
+  const loadHistory = useCallback(async (existingId: string) => {
+    try {
+      const history = await getChatHistory(existingId);
+      const formatted = history.map((msg: any) => ({
+        id: crypto.randomUUID(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: Date.now()
+      }));
+      setMessages(formatted);
+      setConversationId(existingId);
+      setTimeout(scrollToBottom, 100);
+    } catch (e) {
+      console.error('加载历史记录失败', e);
+    }
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -67,17 +85,24 @@ export function useChat() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantContent = '';
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // 保留最后一行（可能是不完整的）在 buffer 中
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          if (trimmedLine.startsWith('data:')) {
+            const data = trimmedLine.startsWith('data: ') ? trimmedLine.slice(6) : trimmedLine.slice(5);
             
             if (data === '[DONE]') {
               continue;
@@ -120,5 +145,7 @@ export function useChat() {
     messagesEndRef,
     sendMessage,
     clearMessages,
+    loadHistory,
+    setConversationId,
   };
 }

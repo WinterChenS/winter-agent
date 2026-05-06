@@ -25,18 +25,25 @@ export async function streamChat(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let finalConversationId: string | undefined;
+  let buffer = '';
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.trim());
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      
+      // 保留最后一行（可能是不完整的）在 buffer 中
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        if (trimmedLine.startsWith('data:')) {
+          const data = trimmedLine.startsWith('data: ') ? trimmedLine.slice(6) : trimmedLine.slice(5);
           
           if (data === '[DONE]') {
             continue;
@@ -64,4 +71,13 @@ export async function streamChat(
   }
 
   return finalConversationId;
+}
+
+export async function getChatHistory(conversationId: string): Promise<any[]> {
+  const response = await fetch(`/api/chat/history/${conversationId}`);
+  if (!response.ok) {
+    throw new Error('获取历史记录失败');
+  }
+  const data = await response.json();
+  return data.messages || [];
 }

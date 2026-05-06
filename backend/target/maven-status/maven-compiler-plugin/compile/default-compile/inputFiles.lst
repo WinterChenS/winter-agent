@@ -1,0 +1,9 @@
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/AiChatBackendApplication.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/client/AIClient.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/WebFluxConfig.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/ChatController.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/ChatRequest.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/ChatResponse.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/GenerateRequest.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/GenerateResponse.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/service/ChatService.java

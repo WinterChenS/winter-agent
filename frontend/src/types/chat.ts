@@ -19,3 +19,9 @@ export interface StreamEvent {
   type: 'token' | 'done' | 'error';
   data: string;
 }
+
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+}

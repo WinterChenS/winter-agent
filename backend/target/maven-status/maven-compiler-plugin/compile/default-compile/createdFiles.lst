@@ -1,0 +1,9 @@
+com/example/aichat/model/GenerateRequest.class
+com/example/aichat/model/ChatResponse.class
+com/example/aichat/AiChatBackendApplication.class
+com/example/aichat/model/GenerateResponse.class
+com/example/aichat/config/WebFluxConfig.class
+com/example/aichat/client/AIClient.class
+com/example/aichat/controller/ChatController.class
+com/example/aichat/model/ChatRequest.class
+com/example/aichat/service/ChatService.class

@@ -1,18 +1,22 @@
-FROM gradle:8.5-jdk17 AS builder
+# ---- Build stage ----
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-COPY build.gradle.kts settings.gradle.kts ./
-COPY gradle/ ./gradle/
+# Copy pom.xml and download dependencies (layer cache)
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+# Copy source and build
 COPY src/ ./src/
+RUN mvn package -DskipTests -q
 
-RUN gradle bootJar --no-daemon
-
-FROM eclipse-temurin:17-jre-alpine
+# ---- Runtime stage ----
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-COPY --from=builder /app/build/libs/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8080
 
