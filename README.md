@@ -63,9 +63,12 @@ uvicorn main:app --reload
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| LLM_API_KEY | LLM API 密钥 | 空 |
-| LLM_BASE_URL | LLM API 基础 URL | https://api.openai.com/v1 |
-| MODEL_NAME | 模型名称 | gpt-3.5-turbo |
+| API_KEY | LLM API 密钥（优先使用） | 空 |
+| BASE_URL | LLM API 基础 URL（优先使用） | https://api.openai.com/v1 |
+| MODEL | 模型名称（优先使用） | gpt-3.5-turbo |
+| LLM_API_KEY | LLM API 密钥（兼容旧配置） | 空 |
+| LLM_BASE_URL | LLM API 基础 URL（兼容旧配置） | https://api.openai.com/v1 |
+| MODEL_NAME | 模型名称（兼容旧配置） | gpt-3.5-turbo |
 
 ## API 接口
 

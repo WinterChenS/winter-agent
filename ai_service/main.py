@@ -5,8 +5,9 @@ from sse_starlette.sse import EventSourceResponse
 import asyncio
 import random
 import json
+from config import settings
 
-app = FastAPI(title="AI Chat Service Mock", version="0.1.0")
+app = FastAPI(title="AI Chat Service", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,13 +36,38 @@ class GenerateRequest(BaseModel):
 async def stream_generate(request: GenerateRequest):
     async def event_generator():
         try:
-            response = random.choice(MOCK_RESPONSES)
+            api_key = settings.get_api_key()
             
-            for char in response:
-                yield {
-                    "data": json.dumps({"token": char, "conversation_id": request.conversation_id})
-                }
-                await asyncio.sleep(0.05)
+            if not api_key:
+            # Mock 模式
+                response = random.choice(MOCK_RESPONSES)
+                for char in response:
+                    yield {
+                        "data": json.dumps({"token": char, "conversation_id": request.conversation_id})
+                    }
+                    await asyncio.sleep(0.05)
+            else:
+                # 真实 LLM 模式
+                from langchain_openai import ChatOpenAI
+                
+                llm = ChatOpenAI(
+                    model=settings.get_model(),
+                    temperature=settings.temperature,
+                    streaming=True,
+                    api_key=api_key,
+                    base_url=settings.get_base_url(),
+                )
+                
+                messages = [("user", request.message)]
+                
+                async for chunk in llm.astream(messages):
+                    if chunk.content:
+                        yield {
+                            "data": json.dumps({
+                                "token": chunk.content,
+                                "conversation_id": request.conversation_id
+                            })
+                        }
                 
         except Exception as e:
             yield {"data": json.dumps({"error": str(e)})}
@@ -51,7 +77,13 @@ async def stream_generate(request: GenerateRequest):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "mode": "mock"}
+    api_key = settings.get_api_key()
+    mode = "llm" if api_key else "mock"
+    return {
+        "status": "healthy",
+        "mode": mode,
+        "model": settings.get_model() if api_key else None
+    }
 
 
 @app.get("/")

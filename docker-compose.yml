@@ -32,6 +32,11 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # 用户自定义环境变量（优先使用）
+      - API_KEY=${API_KEY:-}
+      - BASE_URL=${BASE_URL:-https://api.openai.com/v1}
+      - MODEL=${MODEL:-gpt-3.5-turbo}
+      # 兼容旧配置
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
       - MODEL_NAME=${MODEL_NAME:-gpt-3.5-turbo}
