@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 启动 AI Chat V0.1 开发环境..."
+echo "🚀 启动 AI Chat V0.2 开发环境..."
 echo ""
 
 # 检查 Node.js
@@ -17,7 +17,13 @@ fi
 
 # 检查 Java
 if ! command -v java &> /dev/null; then
-    echo "❌ 错误：未找到 Java 17+"
+    echo "❌ 错误：未找到 Java 21+"
+    exit 1
+fi
+
+# 检查 Maven
+if ! command -v mvn &> /dev/null; then
+    echo "❌ 错误：未找到 Maven (mvn)，请先安装"
     exit 1
 fi
 
@@ -34,8 +40,11 @@ fi
 source venv/bin/activate
 pip install -q -r requirements.txt
 
-if [ -z "$LLM_API_KEY" ]; then
-    echo "⚠️  警告：LLM_API_KEY 未设置，请在 .env 文件中配置"
+if [ -z "$API_KEY" ]; then
+    echo "⚠️  警告：API_KEY 未设置，请确认已在 .env 中配置以启用大模型"
+fi
+if [ -z "$POSTGRES_URI" ]; then
+    echo "⚠️  注意：未探测到 POSTGRES_URI，请确保 AI 服务能连接到默认或配置的 DB"
 fi
 
 uvicorn main:app --reload --port 8000 &
@@ -47,7 +56,7 @@ echo ""
 # 启动后端服务
 echo "📦 启动后端服务 (端口 8080)..."
 cd backend
-./gradlew bootRun &
+mvn spring-boot:run &
 BACKEND_PID=$!
 cd ..
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
