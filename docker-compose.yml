@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - ai-chat-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - AICHAT_AI_SERVICE_URL=http://ai-service:8000
+    depends_on:
+      - ai-service
+    networks:
+      - ai-chat-network
+
+  ai-service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+      - MODEL_NAME=${MODEL_NAME:-gpt-3.5-turbo}
+    networks:
+      - ai-chat-network
+
+networks:
+  ai-chat-network:
+    driver: bridge
