@@ -14,6 +14,7 @@ from config import settings
 pg_pool: AsyncConnectionPool = None
 checkpointer: AsyncPostgresSaver = None
 
+# FastApi 生命周期的钩子，使用@asynccontextmanager注解
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global pg_pool, checkpointer
