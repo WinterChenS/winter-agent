@@ -3,14 +3,24 @@ import React, { useState, useRef, useEffect } from 'react';
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  disableInput?: boolean;
+  disableSend?: boolean;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  onSend,
+  disabled = false,
+  disableInput,
+  disableSend,
+}) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const inputIsDisabled = disableInput ?? disabled;
+  const sendIsDisabled = disableSend ?? disabled;
+
   const handleSubmit = () => {
-    if (input.trim() && !disabled) {
+    if (input.trim() && !sendIsDisabled) {
       onSend(input.trim());
       setInput('');
       if (textareaRef.current) {
@@ -46,14 +56,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }
         onChange={handleInput}
         onKeyDown={handleKeyDown}
         placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
-        disabled={disabled}
+        disabled={inputIsDisabled}
         rows={1}
         className="flex-1 resize-none border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
         style={{ maxHeight: '200px', minHeight: '44px' }}
       />
       <button
         onClick={handleSubmit}
-        disabled={!input.trim() || disabled}
+        disabled={!input.trim() || sendIsDisabled}
         className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         发送

@@ -7,6 +7,7 @@ import 'highlight.js/styles/github.css';
 interface ChatMessageProps {
   role: 'user' | 'assistant';
   content: string;
+  isLoading?: boolean;
 }
 
 const PreBlock = ({ children, ...props }: any) => {
@@ -35,7 +36,7 @@ const PreBlock = ({ children, ...props }: any) => {
   );
 };
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLoading = false }) => {
   const isUser = role === 'user';
 
   return (
@@ -51,6 +52,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content }) => {
       >
         {isUser ? (
           <div className="whitespace-pre-wrap">{content}</div>
+        ) : isLoading && !content ? (
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="inline-flex gap-1">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-gray-400 [animation-delay:0ms]" />
+              <span className="h-2 w-2 animate-pulse rounded-full bg-gray-400 [animation-delay:150ms]" />
+              <span className="h-2 w-2 animate-pulse rounded-full bg-gray-400 [animation-delay:300ms]" />
+            </span>
+            <span className="text-sm">AI 正在思考...</span>
+          </div>
         ) : (
           <div className="prose prose-sm max-w-none prose-pre:bg-white prose-pre:text-gray-800">
             <ReactMarkdown

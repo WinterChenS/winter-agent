@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Message } from '../types/chat';
 import { getChatHistory } from '../services/api';
 
@@ -8,6 +8,10 @@ export function useChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<string>();
 
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
   const loadHistory = useCallback(async (existingId: string) => {
     try {
       const history = await getChatHistory(existingId);
@@ -15,7 +19,7 @@ export function useChat() {
         id: crypto.randomUUID(),
         role: msg.role,
         content: msg.content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }));
       setMessages(formatted);
       setConversationId(existingId);
@@ -23,11 +27,7 @@ export function useChat() {
     } catch (e) {
       console.error('加载历史记录失败', e);
     }
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+  }, [scrollToBottom]);
 
   const addMessage = useCallback((message: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = {
@@ -87,6 +87,27 @@ export function useChat() {
       let assistantContent = '';
       let buffer = '';
 
+      // 打字机队列：把后端 chunk（可能是词/短句）拆成字符后逐步渲染
+      let pendingText = '';
+      let isDraining = false;
+      const charDelayMs = 14;
+
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const drainPendingText = async () => {
+        if (isDraining) return;
+        isDraining = true;
+
+        while (pendingText.length > 0) {
+          assistantContent += pendingText[0];
+          pendingText = pendingText.slice(1);
+          updateMessageContent(assistantMessageId, assistantContent);
+          await sleep(charDelayMs);
+        }
+
+        isDraining = false;
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -111,8 +132,8 @@ export function useChat() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                assistantContent += parsed.content;
-                updateMessageContent(assistantMessageId, assistantContent);
+                pendingText += parsed.content;
+                void drainPendingText();
               }
               if (parsed.conversationId) {
                 setConversationId(parsed.conversationId);
@@ -125,6 +146,11 @@ export function useChat() {
             }
           }
         }
+      }
+
+      // 等待最后一段队列渲染完成，防止尾巴被截断
+      while (pendingText.length > 0 || isDraining) {
+        await sleep(10);
       }
     } catch (err) {
       updateMessageContent(assistantMessageId, '抱歉，AI 服务暂时不可用，请稍后再试。');
