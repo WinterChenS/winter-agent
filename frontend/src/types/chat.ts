@@ -1,8 +1,15 @@
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool_summary';
   content: string;
   timestamp: number;
+  toolSteps?: Array<{
+    tool: string;
+    input: string;
+    status: 'completed' | 'error';
+    elapsed_ms: number;
+    error?: string;
+  }>;
 }
 
 export interface ChatRequest {

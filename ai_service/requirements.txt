@@ -11,3 +11,5 @@ python-dotenv>=1.0.0
 langsmith>=0.1.0
 langgraph-checkpoint-postgres>=2.0.0
 psycopg[binary,pool]>=3.0.0
+tavily-python>=0.7.24
+pytz>=2026.2

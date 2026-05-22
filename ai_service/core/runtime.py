@@ -24,9 +24,9 @@ def get_pool() -> Optional[AsyncConnectionPool]:
 def get_checkpointer() -> Optional[AsyncPostgresSaver]:
     return _checkpointer
 
-def set_tool_registry(registry: ToolRegistry) -> None:
+def set_tool_registry(registry: ToolRegistry | None) -> None:
     global _tool_registry
     _tool_registry = registry
 
-def get_tool_registry() -> ToolRegistry:
+def get_tool_registry() -> ToolRegistry | None:
     return _tool_registry
