@@ -8,7 +8,11 @@ from psycopg_pool import AsyncConnectionPool
 from api.routes.chat import router as chat_router
 from api.routes.system import router as system_router
 from config import settings
-from core.runtime import set_runtime
+from core.runtime import set_runtime, set_tool_registry
+from tools import ToolRegistry
+from tools.echo import EchoTool
+from tools.search import SearchTool
+from tools.time.tool import TimeTool
 
 
 # FastApi 生命周期的钩子，使用@asynccontextmanager注解
@@ -17,6 +21,7 @@ async def lifespan(app: FastAPI):
     pg_pool: AsyncConnectionPool | None = None
     checkpointer: AsyncPostgresSaver | None = None
 
+    # ── 启动时初始化 ──────────────────────────────────────────────────────────
     if settings.api_key:
         print("Initializing PostgreSQL pool for LangGraph...")
         pg_pool = AsyncConnectionPool(
@@ -31,12 +36,24 @@ async def lifespan(app: FastAPI):
         await checkpointer.setup()
         print("PostgreSQL checkpointer is ready.")
 
-    set_runtime(pg_pool, checkpointer)
-    yield
+    # 初始化 ToolRegistry（全局单例，整个应用生命周期共用）
+    tool_registry = ToolRegistry()
+    tool_registry.register(SearchTool())
+    tool_registry.register(TimeTool())
+    # tool_registry.register(EchoTool())
+    print(f"ToolRegistry ready: {[t['name'] for t in tool_registry.list_tools()]}")
 
+    set_runtime(pg_pool, checkpointer)
+    set_tool_registry(tool_registry)
+
+    yield  # ← 应用正常运行中
+
+    # ── 关闭时清理 ────────────────────────────────────────────────────────────
     if pg_pool:
         await pg_pool.close()
     set_runtime(None, None)
+    set_tool_registry(None)
+
 
 
 # 初始化 FastAPI 应用程序实例，这里挂载 lifespan 用于启动和关闭时的生命周期钩子

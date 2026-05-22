@@ -2,6 +2,47 @@ import { useState, useRef, useCallback } from 'react';
 import { Message } from '../types/chat';
 import { getChatHistory } from '../services/api';
 
+interface StreamPayload {
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'error';
+  token?: string;
+  content?: string;
+  conversationId?: string;
+  error?: string;
+  toolName?: string;
+  steps?: Array<{
+    tool: string;
+    input: string;
+    status: 'completed' | 'error';
+    elapsed_ms: number;
+    error?: string;
+  }>;
+}
+
+interface ToolActionPayload {
+  action?: string;
+  tool?: string;
+  query?: string;
+}
+
+function parseToolActionJson(raw: string): { toolName: string; query?: string } | null {
+  const text = raw.trim();
+  if (!text.startsWith('{') || !text.endsWith('}')) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as ToolActionPayload;
+    const action = (parsed.action || '').trim();
+    const toolName = action === 'tool' ? (parsed.tool || '').trim() : action;
+    if (!toolName) {
+      return null;
+    }
+    return { toolName, query: parsed.query };
+  } catch {
+    return null;
+  }
+}
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -87,12 +128,65 @@ export function useChat() {
       let assistantContent = '';
       let buffer = '';
 
-      // 打字机队列：把后端 chunk（可能是词/短句）拆成字符后逐步渲染
-      let pendingText = '';
-      let isDraining = false;
-      const charDelayMs = 14;
+       // 打字机队列：把后端 chunk（可能是词/短句）拆成字符后逐步渲染
+       let pendingText = '';
+       let isDraining = false;
+       const charDelayMs = 14;
+
+       // 控制类 JSON（如 {"action":"search"...}）缓冲，避免先展示原始 JSON 再转换
+       let isCollectingControlJson = false;
+       let controlJsonBuffer = '';
+       let pendingToolStartName: string | null = null;
+       
+       // 工具步骤缓冲：用于处理 tool_summary 事件中的完整步骤列表
+       let toolSummarySteps: Array<any> = [];
 
       const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const appendText = (text: string) => {
+        if (!text) return;
+        pendingText += text;
+        void drainPendingText();
+      };
+
+      const tryConsumeAsControlJson = (chunk: string): boolean => {
+        const canStartCollecting =
+          !isCollectingControlJson &&
+          assistantContent.trim() === '' &&
+          pendingText.trim() === '' &&
+          chunk.trimStart().startsWith('{');
+
+        if (canStartCollecting) {
+          isCollectingControlJson = true;
+          controlJsonBuffer = '';
+        }
+
+        if (!isCollectingControlJson) {
+          return false;
+        }
+
+        controlJsonBuffer += chunk;
+
+        // 只有完整 JSON 结束时再判定，避免中间闪烁
+        if (!controlJsonBuffer.includes('}')) {
+          return true;
+        }
+
+        const parsed = parseToolActionJson(controlJsonBuffer);
+        if (parsed) {
+          pendingToolStartName = parsed.toolName;
+          appendText(`\n\n🛠️ 正在调用工具：${parsed.toolName}...\n`);
+          isCollectingControlJson = false;
+          controlJsonBuffer = '';
+          return true;
+        }
+
+        // 不是工具规划 JSON，按普通文本落回去
+        appendText(controlJsonBuffer);
+        isCollectingControlJson = false;
+        controlJsonBuffer = '';
+        return true;
+      };
 
       const drainPendingText = async () => {
         if (isDraining) return;
@@ -130,16 +224,39 @@ export function useChat() {
             }
 
             try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                pendingText += parsed.content;
-                void drainPendingText();
+              const parsed: StreamPayload = JSON.parse(data);
+
+              // 兼容后端字段：token/content 都支持
+              const textChunk = parsed.content ?? parsed.token;
+
+              if (parsed.type === 'tool_start') {
+                const incomingTool = parsed.toolName ?? 'unknown';
+                // 去重：如果前面已由 action JSON 转成“正在调用工具”提示，则忽略重复 tool_start
+                if (pendingToolStartName && incomingTool === pendingToolStartName) {
+                  pendingToolStartName = null;
+                } else {
+                  appendText(parsed.content ?? `\n\n🛠️ 正在调用工具：${incomingTool}...\n`);
+                }
+               } else if (parsed.type === 'tool_result') {
+                 pendingToolStartName = null;
+                 appendText(parsed.content ?? `\n工具 ${parsed.toolName ?? 'unknown'} 执行完成。\n`);
+               } else if (parsed.type === 'tool_summary') {
+                 // 工具摘要事件：包含所有工具步骤的完整列表
+                 if (parsed.steps && Array.isArray(parsed.steps)) {
+                   toolSummarySteps = parsed.steps;
+                 }
+               } else if (parsed.type === 'error' || parsed.error) {
+                throw new Error(parsed.error || '流式响应异常');
+              } else if (textChunk) {
+                // 先尝试识别并拦截规划 JSON，避免前端闪出原始 action JSON
+                const consumed = tryConsumeAsControlJson(textChunk);
+                if (!consumed) {
+                  appendText(textChunk);
+                }
               }
+
               if (parsed.conversationId) {
                 setConversationId(parsed.conversationId);
-              }
-              if (parsed.error) {
-                throw new Error(parsed.error);
               }
             } catch (e) {
               console.warn('解析 SSE 数据失败:', data);
@@ -151,6 +268,23 @@ export function useChat() {
       // 等待最后一段队列渲染完成，防止尾巴被截断
       while (pendingText.length > 0 || isDraining) {
         await sleep(10);
+      }
+
+      // 如果结束时还有未消费的 JSON 缓冲，作为普通文本输出
+      if (controlJsonBuffer) {
+        appendText(controlJsonBuffer);
+        while (pendingText.length > 0 || isDraining) {
+          await sleep(10);
+        }
+      }
+
+      // 如果收到了 tool_summary 事件且有工具步骤，创建独立的工具摘要消息
+      if (toolSummarySteps && toolSummarySteps.length > 0) {
+        addMessage({
+          role: 'tool_summary',
+          content: '工具执行步骤',
+          toolSteps: toolSummarySteps,
+        });
       }
     } catch (err) {
       updateMessageContent(assistantMessageId, '抱歉，AI 服务暂时不可用，请稍后再试。');
