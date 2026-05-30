@@ -102,8 +102,8 @@ def process_stream_token_event(
         release_text = preamble_buffer + raw_token_content
         return _stream_event_with_content(release_text), False, "", "", ""
 
-    # Filter model thinking/reasoning tags
-    if "[Thought]" in raw_token_content or "[/Thought]" in raw_token_content:
+    # Filter model thinking/reasoning tags and XML function call leaks
+    if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
     # Buffer as potential reasoning preamble

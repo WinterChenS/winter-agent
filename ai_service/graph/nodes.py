@@ -55,7 +55,8 @@ Do NOT:
 - Call the same tool with the same query twice
 - Give up early — keep going until you have enough info
 - If you cannot find enough data after searching, provide a brief Final Answer stating so
-- Your response must NEVER contain [Thought], [Action], or [Observation] tags\
+- Your response must NEVER contain [Thought], [Action], or [Observation] tags
+- NEVER use XML/HTML tags like <function>, <query>, <action> — ONLY use JSON format\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
