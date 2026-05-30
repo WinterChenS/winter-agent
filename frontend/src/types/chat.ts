@@ -24,13 +24,13 @@ export interface ChartSpecData {
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
   content: string;
   timestamp: number;
   toolSteps?: Array<{
     tool: string;
     input: string;
-    status: 'completed' | 'error';
+    status: 'completed' | 'error' | 'running';
     elapsed_ms: number;
     error?: string;
   }>;

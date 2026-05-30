@@ -6,13 +6,13 @@ import 'highlight.js/styles/github.css';
 import { ChartRenderer } from './ChartRenderer';
 
 interface ChatMessageProps {
-  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
   content: string;
   isLoading?: boolean;
   toolSteps?: Array<{
     tool: string;
     input: string;
-    status: 'completed' | 'error';
+    status: 'completed' | 'error' | 'running';
     elapsed_ms: number;
     error?: string;
   }>;
@@ -174,7 +174,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   guardReason,
   chartData,
 }) => {
-  // Chart message (kept for backward compatibility)
+  // Chart message (backward compatibility)
   if (role === 'chart' && chartData) {
     return (
       <div className="flex justify-start mb-4">
@@ -188,11 +188,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     );
   }
 
+  // Thinking pane: real-time agent process display
+  if (role === 'thinking') {
+    return <ThinkingPane toolSteps={toolSteps || []} isDone={content === 'done'} />;
+  }
+
   const isUser = role === 'user';
   const isToolSummary = role === 'tool_summary';
   const isAgentStep = role === 'agent_step';
 
-  const { toolSteps: extractedSteps, answer } = useMemo<{ toolSteps: ToolStep[]; answer: string }>(() => {
+  const { answer } = useMemo<{ toolSteps: ToolStep[]; answer: string }>(() => {
     if (isUser || isToolSummary || isAgentStep) {
       return { toolSteps: [], answer: content };
     }
@@ -201,7 +206,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const [showThinking, setShowThinking] = useState(true);
   const summarySteps: SummaryToolStep[] = toolSteps;
-  const assistantSteps: ToolStep[] = extractedSteps;
 
   // Build thinking steps from summary tool data (tool_summary SSE event)
   const hasThinking = summarySteps.length > 0;
@@ -409,6 +413,78 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </div>
             )}
           </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// ThinkingPane: real-time agent process display (Claude Code-style)
+// ────────────────────────────────────────────────────────────────────────────
+const ThinkingPane: React.FC<{
+  toolSteps: Array<{ tool: string; input: string; status: string; elapsed_ms?: number; error?: string }>;
+  isDone: boolean;
+}> = ({ toolSteps, isDone }) => {
+  const [expanded, setExpanded] = useState(!isDone);
+  const allDone = toolSteps.every(s => s.status !== 'running');
+
+  React.useEffect(() => {
+    if (allDone) {
+      const timer = setTimeout(() => setExpanded(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [allDone]);
+
+  const runningCount = toolSteps.filter(s => s.status === 'running').length;
+  const title = runningCount > 0
+    ? `正在思考... (${runningCount} 个工具运行中)`
+    : `已完成 ${toolSteps.length} 个步骤`;
+
+  return (
+    <div className="flex justify-start mb-1">
+      <div className="max-w-[85%] rounded-xl overflow-hidden border border-blue-100 bg-blue-50/50 min-w-[280px]">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-500 hover:bg-blue-100/50 transition-colors"
+        >
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${allDone ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
+          <span className="font-medium text-gray-700">{title}</span>
+          <span className="ml-auto text-gray-400">{expanded ? '收起 ▲' : '展开 ▼'}</span>
+        </button>
+
+        {expanded && (
+          <div className="px-3 pb-2 max-h-60 overflow-y-auto">
+            <div className="space-y-0.5 border-l-2 border-blue-200 pl-2">
+              {toolSteps.map((step, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-xs py-0.5">
+                  <span className="text-sm flex-shrink-0">{getToolIcon(step.tool)}</span>
+                  <span className="font-medium text-gray-700 flex-shrink-0">{step.tool}</span>
+                  {step.input && (
+                    <span className="text-gray-400 truncate" title={step.input}>
+                      {step.input.length > 50 ? step.input.slice(0, 50) + '...' : step.input}
+                    </span>
+                  )}
+                  <span className="ml-auto flex items-center gap-1 flex-shrink-0">
+                    {step.status === 'running' ? (
+                      <span className="flex items-center gap-1 text-blue-500">
+                        <span className="inline-block w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      </span>
+                    ) : step.status === 'error' ? (
+                      <span className="text-red-500 text-xs" title={step.error}>✗</span>
+                    ) : (
+                      <span className="text-green-600 text-xs flex items-center gap-0.5">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {step.elapsed_ms ? `${(step.elapsed_ms / 1000).toFixed(1)}s` : ''}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
