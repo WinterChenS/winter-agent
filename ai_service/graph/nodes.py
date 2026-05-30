@@ -28,43 +28,27 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct agent. Follow this internal cycle:
+You are a ReAct agent. EVERY response must be EXACTLY ONE of:
+  a) A JSON tool call: {"action": "tool", "tool": "<name>", "query": "<query>"}
+  b) A Final Answer in the user's language
 
-  [Thought] → [Action] → [Observation] → (repeat) → [Final Answer]
+That is ALL you output. NO "Let me", NO "Step 1:", NO reasoning, NO prefixes, NO XML.
+JUST the JSON tool call OR the Final Answer. Nothing else. Ever.
 
-CRITICAL RULES:
-1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output it as text
-2. Your response must be EXACTLY ONE of:
-   a) A tool-call JSON: {"action": "tool", "tool": "<name>", "query": "<query>"}
-   b) A Final Answer in natural language (the user's language)
-3. NEVER output both — each response is either JSON OR Final Answer, never both
+Available tools: search, browser, generate_chart
 
-Tool chaining:
-- After search results → OPEN at least one result with browser for full details
-- After reading a page → if info is enough, give Final Answer; if not, refine and search again
-- **IMPORTANT**: Call `generate_chart` tool IMMEDIATELY when you have numerical data — do NOT wait until the end. Generate charts inline as you analyze. Continue analysis AFTER the chart.
-
-When to give Final Answer:
-- You have enough information to answer the user comprehensively
-- Include ALL relevant data, numbers, and analysis
-- Call `generate_chart` BEFORE giving the Final Answer if the user asked for charts
-
-Do NOT:
-- Output [Thought] tags or any thinking/reasoning text (keep ALL thoughts internal)
-- Output JSON and text in the same response — each response is JSON-only OR text-only
-- Call the same tool with the same query twice
-- Give up early — keep going until you have enough info
-- If you cannot find enough data after searching, provide a brief Final Answer stating so
-- Your response must NEVER contain [Thought], [Action], or [Observation] tags
-- NEVER use XML/HTML tags like <function>, <query>, <action> — ONLY use JSON format\
+When you have numerical data → call generate_chart IMMEDIATELY.
+generate_chart query format: {"chart_type":"bar","title":"Chart","data":[{"name":"X","value":10}]}
+LIMIT: 5-8 total tool calls, then MUST give Final Answer.\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
 _TOOL_FORMAT_HINT = _REACT_SYSTEM_PROMPT
 
-# Maximum number of tool calls in one turn — configurable via MAX_TOOL_ITERATIONS env var
+
 def _max_iterations() -> int:
     return max(1, int(getattr(settings, "max_tool_iterations", 5) or 5))
+
 
 MAX_ITERATIONS = _max_iterations()
 
@@ -676,49 +660,11 @@ def _build_observation_message(tool_name: str, result_str: str) -> str:
 # chart_node：图表规划 + 生成 + 内容编排节点
 # ────────────────────────────────────────────────────────────────────────────
 async def chart_node(state: State) -> dict:
-    """Analyze tool results, generate charts, and compose ordered content blocks."""
-    user_message = _latest_user_text(state)
-    tool_result = state.get("tool_result") or ""
-
-    # Extract the final assistant answer from messages
-    final_answer = ""
-    raw_messages = list(state.get("messages") or [])
-    for msg in reversed(raw_messages):
-        msg_type = getattr(msg, "type", None)
-        msg_content = getattr(msg, "content", None)
-        if msg_type == "ai" and isinstance(msg_content, str) and msg_content.strip():
-            if not msg_content.startswith("Action:") and not msg_content.startswith("Observation"):
-                final_answer = msg_content
-                break
-
-    analysis_parts = []
-    if tool_result:
-        analysis_parts.append(f"=== Raw tool data ===\n{tool_result[:3000]}")
-    if final_answer:
-        analysis_parts.append(f"=== Agent's final answer ===\n{final_answer[:3000]}")
-    analysis_text = "\n\n".join(analysis_parts) if analysis_parts else ""
-
-    llm = _build_llm(streaming=False)
-
-    from graph.chart_planner import plan_charts
-    from graph.chart_generator import generate_chart_spec
-
-    chart_intents = await plan_charts(llm, user_message, analysis_text)
-    logger.info("Chart intents: %s", chart_intents)
-
-    chart_specs = []
-    for intent in chart_intents:
-        spec = await generate_chart_spec(llm, user_message, tool_result, intent)
-        if spec:
-            chart_specs.append(spec)
-    logger.info("Chart specs generated: %d", len(chart_specs))
-
-    # Compose answer + charts into ordered content blocks
-    from graph.content_composer import compose_blocks
-
-    blocks = await compose_blocks(llm, user_message, final_answer, chart_specs)
-    logger.info("Content blocks composed: %d blocks", len(blocks))
-
+    """Pass-through: chart_specs generated inline by generate_chart tool during loop."""
+    chart_specs = state.get("chart_specs", [])
+    blocks = []
+    for cs in chart_specs:
+        blocks.append({"type": "chart", "chart_spec": cs})
     return {
         "chart_specs": chart_specs,
         "blocks": blocks,
