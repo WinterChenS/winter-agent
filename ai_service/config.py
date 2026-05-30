@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     policy_tool_whitelist: str = ""
     policy_max_query_len: int = 500
     policy_timeout_override_ms: int = 0
-    max_consecutive_search_calls: int = 2
+    max_consecutive_search_calls: int = 5
     max_tool_iterations: int = 5
     trace_enabled: bool = True
 
