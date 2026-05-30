@@ -58,6 +58,9 @@ public class ChatController {
         if (response.steps() != null && !response.steps().isEmpty()) {
             payload.put("steps", response.steps());
         }
+        if (response.reason() != null) {
+            payload.put("reason", response.reason());
+        }
 
         if (payload.isEmpty()) {
             return "{}";

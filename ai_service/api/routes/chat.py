@@ -91,6 +91,8 @@ async def stream_generate(request: GenerateRequest):
                 collecting_control_json = False
                 control_json_buffer = ""
                 assistant_text_emitted = False
+                saw_tool_event = False
+                assistant_text_emitted_after_tool = False
                 active_tool_span_id: str | None = None
 
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
@@ -112,8 +114,14 @@ async def stream_generate(request: GenerateRequest):
                         final_state = captured_final_state
 
                     for envelope in mapped:
-                        if envelope.get("type") == "token":
+                        envelope_type = envelope.get("type")
+                        if envelope_type in {"tool_start", "tool_result"}:
+                            saw_tool_event = True
+                            assistant_text_emitted_after_tool = False
+                        if envelope_type == "token":
                             assistant_text_emitted = True
+                            if saw_tool_event:
+                                assistant_text_emitted_after_tool = True
                         yield to_sse_data(envelope)
 
                 if collecting_control_json and control_json_buffer and not is_tool_action_json(
@@ -123,8 +131,9 @@ async def stream_generate(request: GenerateRequest):
                     yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
 
-                # 无 token 流时（例如 fallback AIMessage），兜底发一次最终文本
-                if not assistant_text_emitted:
+                # 如果仅出现了工具过程 token（如“我先搜索一下”）但工具后没有最终回答 token，
+                # 兜底补发 final_state 中的最后一条 assistant 文本，避免前端只看到工具步骤。
+                if (not assistant_text_emitted) or (saw_tool_event and not assistant_text_emitted_after_tool):
                     fallback_text = extract_last_assistant_text(final_state)
                     if fallback_text:
                         yield to_sse_data(envelope_token(trace_ctx, fallback_text))

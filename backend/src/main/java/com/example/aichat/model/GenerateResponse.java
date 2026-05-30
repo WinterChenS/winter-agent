@@ -10,6 +10,7 @@ public record GenerateResponse(
         @JsonProperty("toolName") String toolName,
         String error,
         @JsonAlias({"conversationId", "conversation_id"}) String conversationId,
-        @JsonProperty("steps") java.util.List<java.util.Map<String, Object>> steps
+        @JsonProperty("steps") java.util.List<java.util.Map<String, Object>> steps,
+        @JsonProperty("reason") java.util.Map<String, Object> reason
 ) {
 }

@@ -51,8 +51,12 @@ export async function streamChat(
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.content) {
-              onToken(parsed.content);
+            const textChunk = parsed.content ?? parsed.token;
+            const isLegacyPlainTextEvent = !parsed.type;
+            const isAssistantAnswerToken = parsed.type === 'token' || isLegacyPlainTextEvent;
+
+            if (isAssistantAnswerToken && textChunk) {
+              onToken(textChunk);
             }
             if (parsed.conversationId) {
               finalConversationId = parsed.conversationId;

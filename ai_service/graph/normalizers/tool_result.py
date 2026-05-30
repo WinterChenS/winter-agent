@@ -29,6 +29,22 @@ def normalize_tool_result_for_prompt(tool_result: str | None) -> str:
         return f"time: {compact}" if compact else "time: (available)"
 
     data = data if isinstance(data, dict) else {}
+
+    # Browser tool result: {url, title, text, length}
+    if "url" in data and "text" in data:
+        url = str(data.get("url", ""))[:120]
+        title = str(data.get("title", "Untitled"))[:200]
+        text = str(data.get("text", ""))
+        length = int(data.get("length", len(text)))
+        # System prompt: keep it short — full content goes into the ReAct Observation message
+        return (
+            f"browser: {url}\n"
+            f"title: {title}\n"
+            f"length: {length} chars\n"
+            f"preview: {text[:200]}{'...' if len(text) > 200 else ''}"
+        )
+
+    # Search tool result: {query, count, results}
     query = str(data.get("query") or "").strip()
     results = data.get("results") if isinstance(data.get("results"), list) else []
 
@@ -37,19 +53,25 @@ def normalize_tool_result_for_prompt(tool_result: str | None) -> str:
         lines.append(f"query: {query[:120]}")
     lines.append(f"result_count: {len(results)}")
 
-    for idx, item in enumerate(results[:3], start=1):
+    for idx, item in enumerate(results[:5], start=1):
         if not isinstance(item, dict):
             continue
         title = str(item.get("title") or "").strip()[:120]
         url = str(item.get("url") or "").strip()
+        content_snippet = str(item.get("content") or "").strip()[:200]
         domain = ""
         if url:
             try:
                 domain = urlparse(url).netloc[:80]
             except Exception:
                 domain = ""
-        if title or domain:
-            lines.append(f"{idx}. title={title or '-'}; source={domain or '-'}")
+        entry_parts = [f"  title: {title or '-'}"]
+        if content_snippet:
+            entry_parts.append(f"  snippet: {content_snippet}")
+        if domain:
+            entry_parts.append(f"  source: {domain}")
+        lines.append(f"{idx}.")
+        lines.extend(entry_parts)
 
     return "\n".join(lines) if lines else "Tool returned structured data (sanitized)."
 

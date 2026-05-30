@@ -124,6 +124,47 @@ export function useChat() {
         updateMessageContent(assistantMessageId, assistantContent);
       };
 
+      const handleParsedEvent = (parsed: StreamPayload) => {
+        const incomingSteps = parsed.payload?.steps ?? parsed.steps;
+        const incomingReason = parsed.payload?.reason ?? parsed.reason;
+        const textChunk = parsed.content ?? parsed.token ?? '';
+
+        if (parsed.type === 'tool_summary' && Array.isArray(incomingSteps)) {
+          toolSummarySteps = incomingSteps;
+          return;
+        }
+
+        if (parsed.type === 'agent_step' && incomingReason) {
+          guardReason = incomingReason;
+          return;
+        }
+
+        if (parsed.type === 'error' || parsed.error) {
+          throw new Error(parsed.error || '流式响应异常');
+        }
+
+        // Inline tool events: show tool start/result in the assistant bubble
+        if (parsed.type === 'tool_start' || parsed.type === 'tool_result') {
+          if (parsed.type === 'tool_start') {
+            appendText(`\n\n🛠️ 正在调用工具：${parsed.toolName ?? 'unknown'}...\n`);
+          } else {
+            appendText(textChunk || `\n工具 ${parsed.toolName ?? 'unknown'} 执行完成。\n`);
+          }
+          return;
+        }
+
+        // Token events and legacy plain-text events → assistant answer text
+        const isLegacyPlainTextEvent = !parsed.type;
+        const isAssistantAnswerToken = parsed.type === 'token' || isLegacyPlainTextEvent;
+        if (isAssistantAnswerToken && textChunk) {
+          appendText(textChunk);
+        }
+
+        if (parsed.conversationId) {
+          setConversationId(parsed.conversationId);
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -145,32 +186,7 @@ export function useChat() {
             continue;
           }
 
-          const textChunk = parsed.content ?? parsed.token;
-
-          if (parsed.type === 'tool_start') {
-            const incomingTool = parsed.toolName ?? 'unknown';
-            appendText(parsed.content ?? `\n\n🛠️ 正在调用工具：${incomingTool}...\n`);
-          } else if (parsed.type === 'tool_result') {
-            appendText(parsed.content ?? `\n工具 ${parsed.toolName ?? 'unknown'} 执行完成。\n`);
-          } else if (parsed.type === 'tool_summary') {
-            const incomingSteps = parsed.payload?.steps ?? parsed.steps;
-            if (Array.isArray(incomingSteps)) {
-              toolSummarySteps = incomingSteps;
-            }
-          } else if (parsed.type === 'agent_step') {
-            const incomingReason = parsed.payload?.reason ?? parsed.reason;
-            if (incomingReason) {
-              guardReason = incomingReason;
-            }
-          } else if (parsed.type === 'error' || parsed.error) {
-            throw new Error(parsed.error || '流式响应异常');
-          } else if (textChunk) {
-            appendText(textChunk);
-          }
-
-          if (parsed.conversationId) {
-            setConversationId(parsed.conversationId);
-          }
+          handleParsedEvent(parsed);
         }
       }
 
@@ -188,24 +204,7 @@ export function useChat() {
             continue;
           }
 
-          if (parsed.type === 'tool_summary' && Array.isArray(parsed.steps)) {
-            toolSummarySteps = parsed.steps;
-          } else if (parsed.type === 'tool_summary' && Array.isArray(parsed.payload?.steps)) {
-            toolSummarySteps = parsed.payload.steps;
-          } else if (parsed.type === 'agent_step') {
-            const incomingReason = parsed.payload?.reason ?? parsed.reason;
-            if (incomingReason) {
-              guardReason = incomingReason;
-            }
-          } else if (parsed.type === 'error' || parsed.error) {
-            throw new Error(parsed.error || '流式响应异常');
-          } else {
-            appendText(parsed.content ?? parsed.token ?? '');
-          }
-
-          if (parsed.conversationId) {
-            setConversationId(parsed.conversationId);
-          }
+          handleParsedEvent(parsed);
         }
       }
 

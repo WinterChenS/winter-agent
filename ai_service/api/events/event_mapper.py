@@ -113,6 +113,13 @@ def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
         return f"工具 `{tool_name}` 执行失败：{err}"
 
     data = parsed.get("data") or {}
+
+    # Browser tool result: {url, title, text, length}
+    if "url" in data and "text" in data:
+        title = str(data.get("title", "Untitled"))[:80]
+        length = int(data.get("length", 0))
+        return f"工具 `{tool_name}` 执行完成，读取 {length} 字符（{title}）。"
+
     query = data.get("query") if isinstance(data, dict) else None
     results = data.get("results") if isinstance(data, dict) else None
     if isinstance(results, list):

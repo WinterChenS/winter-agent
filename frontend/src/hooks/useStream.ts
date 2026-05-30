@@ -54,9 +54,13 @@ export function useStream() {
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.content) {
-              setContent(prev => prev + parsed.content);
-              onToken(parsed.content);
+            const textChunk = parsed.content ?? parsed.token;
+            const isLegacyPlainTextEvent = !parsed.type;
+            const isAssistantAnswerToken = parsed.type === 'token' || isLegacyPlainTextEvent;
+
+            if (isAssistantAnswerToken && textChunk) {
+              setContent(prev => prev + textChunk);
+              onToken(textChunk);
             }
             if (parsed.error) {
               throw new Error(parsed.error);
