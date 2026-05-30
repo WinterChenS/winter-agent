@@ -44,6 +44,9 @@ def _is_internal_react_message(content: str) -> bool:
 from decorator.timeit import timeit
 from domain.event_envelope import (
     envelope_block,
+    envelope_block_start,
+    envelope_block_chunk,
+    envelope_block_end,
     envelope_chart_placeholder,
     envelope_chart_ready,
     envelope_error,
@@ -123,6 +126,8 @@ async def stream_generate(request: GenerateRequest):
                 saw_tool_event = False
                 assistant_text_emitted_after_tool = False
                 active_tool_span_id: str | None = None
+                # Block streaming state
+                current_block_id: str | None = None
 
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
                     event, collecting_control_json, control_json_buffer, preamble_buffer, thought_text = process_stream_token_event(
@@ -150,10 +155,20 @@ async def stream_generate(request: GenerateRequest):
                         if envelope_type in {"tool_start", "tool_result"}:
                             saw_tool_event = True
                             assistant_text_emitted_after_tool = False
+                            # End current markdown block before tool execution
+                            if current_block_id:
+                                yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))
+                                current_block_id = None
                         if envelope_type == "token":
                             assistant_text_emitted = True
                             if saw_tool_event:
                                 assistant_text_emitted_after_tool = True
+                            # Wrap token in block_start/chunk protocol
+                            if not current_block_id:
+                                current_block_id = f"block-{trace_ctx.turn_id}"
+                                yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
+                            yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, envelope.get("content", "")))
+                            continue  # Skip emitting the raw token envelope
                         yield to_sse_data(envelope)
 
                     # Emit chart events inline when chart tool produces a spec during the loop
@@ -172,7 +187,12 @@ async def stream_generate(request: GenerateRequest):
                     yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
 
-                # 如果仅出现了工具过程 token（如“我先搜索一下”）但工具后没有最终回答 token，
+                # End any open markdown block at stream completion
+                if current_block_id:
+                    yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))
+                    current_block_id = None
+
+                # 如果仅出现了工具过程 token（如”我先搜索一下”）但工具后没有最终回答 token，
                 # 兜底补发 final_state 中的最后一条 assistant 文本，避免前端只看到工具步骤。
                 if (not assistant_text_emitted) or (saw_tool_event and not assistant_text_emitted_after_tool):
                     fallback_text = extract_last_assistant_text(final_state)

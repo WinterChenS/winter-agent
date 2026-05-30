@@ -4,7 +4,7 @@ import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'block' | 'chart_placeholder' | 'chart_ready';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'block' | 'block_start' | 'block_chunk' | 'block_end' | 'chart_placeholder' | 'chart_ready';
   schemaVersion?: string;
   payload?: {
     reason?: GuardReason;
@@ -170,7 +170,23 @@ export function useChat() {
       const handleParsedEvent = (parsed: StreamPayload) => {
         const textChunk = parsed.content ?? parsed.token ?? '';
 
-        // Block event: markdown blocks append to answer, charts etc.
+        // Block streaming: block_start → block_chunk → block_end
+        if (parsed.type === 'block_start') {
+          // Start of a new markdown block — nothing to do until chunks arrive
+          return;
+        }
+        if (parsed.type === 'block_chunk') {
+          const chunkContent = (parsed as any).content || '';
+          if (chunkContent) appendText(chunkContent);
+          return;
+        }
+        if (parsed.type === 'block_end') {
+          // Markdown block complete — append newline for spacing
+          appendText('\n\n');
+          return;
+        }
+
+        // Legacy monolithic block event
         if (parsed.type === 'block') {
           const block = (parsed as any).block;
           if (block?.type === 'markdown' && block?.content) {
