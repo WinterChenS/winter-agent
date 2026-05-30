@@ -153,13 +153,8 @@ export function useChat() {
           throw new Error(parsed.error || '流式响应异常');
         }
 
-        // Inline tool events: show tool start/result in the assistant bubble
+        // Tool events: do NOT append inline text — thinking process is shown separately
         if (parsed.type === 'tool_start' || parsed.type === 'tool_result') {
-          if (parsed.type === 'tool_start') {
-            appendText(`\n\n🛠️ 正在调用工具：${parsed.toolName ?? 'unknown'}...\n`);
-          } else {
-            appendText(textChunk || `\n工具 ${parsed.toolName ?? 'unknown'} 执行完成。\n`);
-          }
           return;
         }
 

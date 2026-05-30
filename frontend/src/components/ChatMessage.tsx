@@ -203,8 +203,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   const summarySteps: SummaryToolStep[] = toolSteps;
   const assistantSteps: ToolStep[] = extractedSteps;
 
-  // Build combined thinking steps from both inline and summary tool data
-  const hasThinking = summarySteps.length > 0 || assistantSteps.length > 0;
+  // Build thinking steps from summary tool data (tool_summary SSE event)
+  const hasThinking = summarySteps.length > 0;
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -322,30 +322,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 {showThinking && (
                   <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white">
                     <div className="p-2 space-y-1.5">
-                      {summarySteps.length > 0 ? (
-                        summarySteps.map((step, idx) => (
-                          <div key={`think-${idx}`} className="flex items-center gap-2 text-xs text-gray-600">
-                            <span>{getToolIcon(step.tool)}</span>
-                            <span className="font-medium text-gray-700">{step.tool}</span>
-                            <span className="text-gray-400">·</span>
-                            <span className={step.status === 'completed' ? 'text-green-600' : 'text-red-600'}>
-                              {step.status === 'completed' ? '完成' : '失败'}
-                            </span>
-                            {step.elapsed_ms > 0 && (
-                              <span className="text-gray-400 ml-auto">{step.elapsed_ms}ms</span>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        assistantSteps.map((step, idx) => (
-                          <div key={`think-inline-${idx}`} className="flex items-center gap-2 text-xs text-gray-600">
-                            <span>{getToolIcon(step.toolName)}</span>
-                            <span className="font-medium text-gray-700">{step.toolName}</span>
-                            <span className="text-gray-400">·</span>
-                            <span>{step.kind === 'start' ? '开始执行' : '执行完成'}</span>
-                          </div>
-                        ))
-                      )}
+                      {summarySteps.map((step, idx) => (
+                        <div key={`think-${idx}`} className="flex items-center gap-2 text-xs text-gray-600">
+                          <span>{getToolIcon(step.tool)}</span>
+                          <span className="font-medium text-gray-700">{step.tool}</span>
+                          {step.input && (
+                            <span className="text-gray-400 truncate max-w-[200px]">{step.input}</span>
+                          )}
+                          <span className="text-gray-400">·</span>
+                          <span className={step.status === 'completed' ? 'text-green-600' : 'text-red-600'}>
+                            {step.status === 'completed' ? '完成' : '失败'}
+                          </span>
+                          {step.elapsed_ms > 0 && (
+                            <span className="text-gray-400 ml-auto">{step.elapsed_ms}ms</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

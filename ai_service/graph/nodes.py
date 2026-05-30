@@ -337,9 +337,7 @@ async def agent_node(state: State) -> dict:
             max_consecutive_search_calls = _max_consecutive_search_calls()
 
             if current_iteration >= MAX_ITERATIONS:
-                fallback = "我已完成多次工具检索，下面基于现有结果给出最终结论。"
-                if tool_result_sanitized:
-                    fallback += f"\n\n（最新工具结果）\n{tool_result_sanitized}"
+                fallback = "抱歉，已达到本轮工具调用上限。基于已获取的信息，我无法给出完整的最终回答，请重试或缩小问题范围。"
                 reason = _reason_record(
                     node="agent_node",
                     code="MAX_ITERATIONS_REACHED",
@@ -618,12 +616,8 @@ def _normalize_query(text: str) -> str:
 def _build_local_final_fallback(tool_result: str | None) -> str:
     safe_ctx = normalize_tool_result_for_prompt(tool_result)
     if not safe_ctx:
-        return "我已经完成工具调用，但暂时无法生成稳定的最终文本。请重试一次，或换一个更具体的问题。"
-    return (
-        "我已完成工具查询。下面基于工具结果给出简要结论：\n\n"
-        f"{safe_ctx}\n\n"
-        "如果你愿意，我可以继续基于该结果输出更详细的结构化总结。"
-    )
+        return "抱歉，我已完成工具调用但暂时无法生成最终回答，请重试或换一个更具体的问题。"
+    return "抱歉，我已收集到相关信息但无法生成完整总结。请重试一次，或缩小问题范围。"
 
 
 def _build_observation_message(tool_name: str, result_str: str) -> str:
