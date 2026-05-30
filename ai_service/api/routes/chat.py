@@ -169,15 +169,8 @@ async def stream_generate(request: GenerateRequest):
                     control_json_buffer,
                     event_ctx.known_tools,
                 ):
-                    release_text = preamble_buffer + control_json_buffer
-                    yield to_sse_data(envelope_token(trace_ctx, release_text))
+                    yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
-                    preamble_buffer = ""
-                elif preamble_buffer:
-                    # Leftover preamble that was never followed by JSON — release as text
-                    yield to_sse_data(envelope_token(trace_ctx, preamble_buffer))
-                    assistant_text_emitted = True
-                    preamble_buffer = ""
 
                 # 如果仅出现了工具过程 token（如“我先搜索一下”）但工具后没有最终回答 token，
                 # 兜底补发 final_state 中的最后一条 assistant 文本，避免前端只看到工具步骤。

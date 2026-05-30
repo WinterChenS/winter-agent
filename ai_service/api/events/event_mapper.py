@@ -65,14 +65,15 @@ def process_stream_token_event(
     known_tools: set[str],
     preamble_buffer: str = "",
 ) -> tuple[dict[str, Any] | None, bool, str, str, str]:
-    """Filter tool-control JSON from model stream. Capture reasoning preamble.
+    """Filter tool-control JSON from model stream.
 
+    Text tokens stream freely. JSON tool calls are filtered.
     Returns:
       - rewritten event (or None when chunk should be swallowed)
       - updated collecting_control_json
       - updated control_json_buffer
-      - updated preamble_buffer
-      - thought_text (non-empty when a tool call follows reasoning preamble)
+      - updated preamble_buffer (unused, kept for compat)
+      - thought_text (non-empty when reasoning text precedes a tool call)
     """
     if event.get("event") != "on_chat_model_stream":
         return event, collecting_control_json, control_json_buffer, preamble_buffer, ""
@@ -87,27 +88,22 @@ def process_stream_token_event(
         if "}" not in merged:
             return None, True, merged, preamble_buffer, ""
         if is_tool_action_json(merged, known_tools):
-            # Emit preamble as thought, drop JSON
-            thought = preamble_buffer.strip()
-            return None, False, "", "", thought
-        release_text = preamble_buffer + merged
-        return _stream_event_with_content(release_text), False, "", "", ""
+            return None, False, "", "", ""
+        return _stream_event_with_content(merged), False, "", "", ""
 
     if raw_token_content.lstrip().startswith("{"):
         if "}" not in raw_token_content:
             return None, True, raw_token_content, preamble_buffer, ""
         if is_tool_action_json(raw_token_content, known_tools):
-            thought = preamble_buffer.strip()
-            return None, False, "", "", thought
-        release_text = preamble_buffer + raw_token_content
-        return _stream_event_with_content(release_text), False, "", "", ""
+            return None, False, "", "", ""
+        return _stream_event_with_content(raw_token_content), False, "", "", ""
 
-    # Filter model thinking/reasoning tags and XML function call leaks
+    # Filter thinking tags and XML function call leaks
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Buffer as potential reasoning preamble
-    return None, False, "", preamble_buffer + raw_token_content, ""
+    # Stream text freely — don't buffer as preamble (enables typewriter effect)
+    return event, False, "", "", ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
