@@ -36,6 +36,7 @@ services:
       - API_KEY=${API_KEY:-}
       - BASE_URL=${BASE_URL:-https://api.openai.com/v1}
       - MODEL=${MODEL:-gpt-3.5-turbo}
+      - MAX_CONSECUTIVE_SEARCH_CALLS=${MAX_CONSECUTIVE_SEARCH_CALLS:-2}
       # 兼容旧配置
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}

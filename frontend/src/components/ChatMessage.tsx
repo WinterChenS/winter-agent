@@ -5,7 +5,7 @@ import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css';
 
 interface ChatMessageProps {
-  role: 'user' | 'assistant' | 'tool_summary';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step';
   content: string;
   isLoading?: boolean;
   toolSteps?: Array<{
@@ -15,6 +15,13 @@ interface ChatMessageProps {
     elapsed_ms: number;
     error?: string;
   }>;
+  guardReason?: {
+    node?: string;
+    code?: string;
+    message?: string;
+    timestamp?: number;
+    extra?: Record<string, unknown>;
+  };
 }
 
 type ToolStepKind = 'start' | 'result';
@@ -24,6 +31,8 @@ interface ToolStep {
   toolName: string;
   kind: ToolStepKind;
 }
+
+type SummaryToolStep = NonNullable<ChatMessageProps['toolSteps']>[number];
 
 const TOOL_LINE_PREFIXES = ['🛠️ 正在调用工具：', '工具 `'];
 
@@ -73,6 +82,25 @@ function getToolIcon(toolName: string): string {
   if (normalized.includes('file')) return '📄';
   if (normalized.includes('echo')) return '🗣️';
   return '🛠️';
+}
+
+function getGuardReasonLabel(code?: string): string {
+  switch (code) {
+    case 'MAX_CONSECUTIVE_SEARCH_REACHED':
+      return '已触发连续检索上限，转为直接总结';
+    case 'SEARCH_RESULTS_ALREADY_AVAILABLE':
+      return '已有检索结果，停止重复检索';
+    case 'DUPLICATE_TOOL_CALL_BLOCKED':
+      return '检测到重复工具调用，已自动收敛';
+    case 'MAX_ITERATIONS_REACHED':
+      return '达到本轮工具调用上限，停止继续调用';
+    case 'TIME_REPEAT_AUTOSWITCH_SEARCH':
+      return '检测到重复时间查询，已自动改为检索';
+    case 'TIME_REPEAT_FINALIZED':
+      return '检测到重复时间查询，已直接给出结果';
+    default:
+      return 'Agent 策略触发';
+  }
 }
 
 function splitToolLines(content: string): { toolSteps: ToolStep[]; answer: string } {
@@ -136,31 +164,60 @@ const PreBlock = ({ children, ...props }: any) => {
   );
 };
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLoading = false, toolSteps = [] }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  role,
+  content,
+  isLoading = false,
+  toolSteps = [],
+  guardReason,
+}) => {
   const isUser = role === 'user';
   const isToolSummary = role === 'tool_summary';
+  const isAgentStep = role === 'agent_step';
 
-  const { toolSteps: extractedSteps, answer } = useMemo(() => {
-    if (isUser || isToolSummary) {
+  const { toolSteps: extractedSteps, answer } = useMemo<{ toolSteps: ToolStep[]; answer: string }>(() => {
+    if (isUser || isToolSummary || isAgentStep) {
       return { toolSteps: [], answer: content };
     }
     return splitToolLines(content);
-  }, [isUser, isToolSummary, content]);
+  }, [isUser, isToolSummary, isAgentStep, content]);
 
   const [showToolSteps, setShowToolSteps] = useState(false);
 
-  // 对于 tool_summary 消息，直接使用传入的 toolSteps，否则使用从 content 中解析的
-  const displaySteps = isToolSummary ? toolSteps : extractedSteps;
+  // 分开处理两类步骤，避免联合类型在渲染分支中互相污染
+  const summarySteps: SummaryToolStep[] = toolSteps;
+  const assistantSteps: ToolStep[] = extractedSteps;
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-          isUser ? 'bg-blue-500 text-white' : isToolSummary ? 'bg-purple-50 text-gray-800 border border-purple-200' : 'bg-gray-100 text-gray-800'
+          isUser
+            ? 'bg-blue-500 text-white'
+            : isToolSummary
+              ? 'bg-purple-50 text-gray-800 border border-purple-200'
+              : isAgentStep
+                ? 'bg-amber-50 text-gray-800 border border-amber-200'
+                : 'bg-gray-100 text-gray-800'
         }`}
       >
         {isUser ? (
           <div className="whitespace-pre-wrap">{content}</div>
+        ) : isAgentStep ? (
+          <div className="space-y-2 text-sm">
+            <div className="font-semibold text-amber-900">⚙️ {getGuardReasonLabel(guardReason?.code)}</div>
+            <div className="text-amber-900">{guardReason?.message || content}</div>
+            {guardReason?.code && (
+              <div className="text-xs text-amber-800">
+                <span className="opacity-70">code:</span> <span className="font-mono">{guardReason.code}</span>
+              </div>
+            )}
+            {guardReason?.extra && Object.keys(guardReason.extra).length > 0 && (
+              <pre className="mt-2 overflow-x-auto rounded bg-amber-100 p-2 text-xs text-amber-900">
+                {JSON.stringify(guardReason.extra, null, 2)}
+              </pre>
+            )}
+          </div>
         ) : isToolSummary ? (
           // 工具摘要消息：完整分离的工具步骤展示
           <div>
@@ -169,44 +226,47 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLoadi
                 onClick={() => setShowToolSteps(prev => !prev)}
                 className="flex items-center justify-between text-sm font-semibold text-purple-900 hover:text-purple-700 w-full"
               >
-                <span>🔍 Agent 工具执行步骤 ({displaySteps.length})</span>
+                <span>🔍 Agent 工具执行步骤 ({summarySteps.length})</span>
                 <span className="text-xs">{showToolSteps ? '▼' : '▶'}</span>
               </button>
             </div>
 
-            {showToolSteps && displaySteps.length > 0 && (
+            {showToolSteps && summarySteps.length > 0 && (
               <div className="space-y-3">
-                {displaySteps.map((step, idx) => (
-                  <div
-                    key={`step-${idx}`}
-                    className={`rounded border px-3 py-2 text-sm ${
-                      step.status === 'completed'
-                        ? 'border-green-200 bg-green-50 text-green-900'
-                        : 'border-red-200 bg-red-50 text-red-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{getToolIcon(step.tool)}</span>
-                      <span className="font-semibold">{step.tool}</span>
-                      <span className="text-xs opacity-70">
-                        {step.status === 'completed' ? '✓ 成功' : '✗ 失败'}
-                      </span>
-                      {step.elapsed_ms > 0 && (
-                        <span className="text-xs opacity-60 ml-auto">{step.elapsed_ms}ms</span>
+                {summarySteps.map((rawStep, idx) => {
+                  const step = rawStep as SummaryToolStep;
+                  return (
+                    <div
+                      key={`step-${idx}`}
+                      className={`rounded border px-3 py-2 text-sm ${
+                        step.status === 'completed'
+                          ? 'border-green-200 bg-green-50 text-green-900'
+                          : 'border-red-200 bg-red-50 text-red-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{getToolIcon(step.tool)}</span>
+                        <span className="font-semibold">{step.tool}</span>
+                        <span className="text-xs opacity-70">
+                          {step.status === 'completed' ? '✓ 成功' : '✗ 失败'}
+                        </span>
+                        {step.elapsed_ms > 0 && (
+                          <span className="text-xs opacity-60 ml-auto">{step.elapsed_ms}ms</span>
+                        )}
+                      </div>
+                      {step.input && (
+                        <div className="text-xs opacity-80 mt-1 break-words">
+                          <span className="opacity-60">输入：</span>{step.input}
+                        </div>
+                      )}
+                      {step.error && (
+                        <div className="text-xs opacity-80 mt-1 break-words font-mono">
+                          <span className="opacity-60">错误：</span>{step.error}
+                        </div>
                       )}
                     </div>
-                    {step.input && (
-                      <div className="text-xs opacity-80 mt-1 break-words">
-                        <span className="opacity-60">输入：</span>{step.input}
-                      </div>
-                    )}
-                    {step.error && (
-                      <div className="text-xs opacity-80 mt-1 break-words font-mono">
-                        <span className="opacity-60">错误：</span>{step.error}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -221,28 +281,31 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isLoadi
           </div>
         ) : (
           <>
-            {displaySteps.length > 0 && (
+            {assistantSteps.length > 0 && (
               <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50">
                 <button
                   onClick={() => setShowToolSteps(prev => !prev)}
                   className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-blue-900 hover:bg-blue-100"
                 >
-                  <span>Agent 执行过程（{displaySteps.length} 步）</span>
+                  <span>Agent 执行过程（{assistantSteps.length} 步）</span>
                   <span>{showToolSteps ? '收起 ▲' : '展开 ▼'}</span>
                 </button>
 
                 {showToolSteps && (
                   <div className="px-3 pb-3">
                     <div className="space-y-2 border-l-2 border-blue-200 pl-3">
-                      {displaySteps.map((step, idx) => (
-                        <div key={`${step.raw || step.tool}-${idx}`} className="relative text-sm text-blue-800">
-                          <span className="absolute -left-[1.12rem] top-1 inline-block h-2 w-2 rounded-full bg-blue-400" />
-                          <span className="mr-2">{getToolIcon(step.toolName || step.tool)}</span>
-                          <span className="font-medium">{step.toolName || step.tool}</span>
-                          <span className="mx-2 text-blue-500">·</span>
-                          <span>{step.kind === 'start' ? '开始执行' : '执行完成'}</span>
-                        </div>
-                      ))}
+                      {assistantSteps.map((rawStep, idx) => {
+                        const step = rawStep as ToolStep;
+                        return (
+                          <div key={`${step.raw}-${idx}`} className="relative text-sm text-blue-800">
+                            <span className="absolute -left-[1.12rem] top-1 inline-block h-2 w-2 rounded-full bg-blue-400" />
+                            <span className="mr-2">{getToolIcon(step.toolName)}</span>
+                            <span className="font-medium">{step.toolName}</span>
+                            <span className="mx-2 text-blue-500">·</span>
+                            <span>{step.kind === 'start' ? '开始执行' : '执行完成'}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

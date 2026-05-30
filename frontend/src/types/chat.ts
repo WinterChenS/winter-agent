@@ -1,6 +1,14 @@
+export interface GuardReason {
+  node?: string;
+  code?: string;
+  message?: string;
+  timestamp?: number;
+  extra?: Record<string, unknown>;
+}
+
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'tool_summary';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step';
   content: string;
   timestamp: number;
   toolSteps?: Array<{
@@ -10,6 +18,7 @@ export interface Message {
     elapsed_ms: number;
     error?: string;
   }>;
+  guardReason?: GuardReason;
 }
 
 export interface ChatRequest {

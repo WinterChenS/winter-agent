@@ -2,3 +2,5 @@
 .idea/
 **/.idea/
 
+# pre-commit
+.pre-commit-cache/

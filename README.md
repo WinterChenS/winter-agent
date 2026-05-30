@@ -90,6 +90,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | BASE_URL | LLM API 基础 URL | https://api.openai.com/v1 |
 | MODEL | 模型名称 | gpt-3.5-turbo |
 | POSTGRES_URI | LangGraph 持久化数据库连接串 | postgresql://postgres:postgres@localhost:5432/aichat |
+| MAX_CONSECUTIVE_SEARCH_CALLS | 单轮最多连续 search 次数（防循环） | 2 |
 
 ### LangSmith（可选）
 
@@ -164,6 +165,16 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 │   ├── config.py       # 环境变量与LangSmith挂载
 │   └── main.py         # HTTP端点及 PostgreSQL 连接池生命周期
 └── docker-compose.yml
+```
+
+## 开发工具（pre-commit）
+
+建议在本地启用提交前检查，自动拦截常见问题（空白字符、冲突标记、大文件、私钥）并对 `ai_service` 的 Python 代码执行 `ruff` 检查与格式化。
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
 ```
 
 ## 开发计划

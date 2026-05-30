@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { parseSseChunk } from '../services/sse';
 
 export function useStream() {
   const [content, setContent] = useState('');
@@ -36,34 +37,32 @@ export function useStream() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
+        buffer += decoder.decode(value, { stream: true });
+        const { events, rest } = parseSseChunk(buffer);
+        buffer = rest;
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            
-            if (data === '[DONE]') {
-              continue;
-            }
+        for (const data of events) {
+          if (data === '[DONE]') {
+            continue;
+          }
 
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                setContent(prev => prev + parsed.content);
-                onToken(parsed.content);
-              }
-              if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-            } catch (e) {
-              console.warn('解析 SSE 数据失败:', data);
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              setContent(prev => prev + parsed.content);
+              onToken(parsed.content);
             }
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            console.warn('解析 SSE 数据失败:', data);
           }
         }
       }

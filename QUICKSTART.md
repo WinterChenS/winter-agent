@@ -40,6 +40,7 @@ export API_KEY=your-api-key
 export BASE_URL=https://api.openai.com/v1
 export MODEL=gpt-4o-mini
 export POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/aichat
+export MAX_CONSECUTIVE_SEARCH_CALLS=2
 # 可选 LangSmith
 # export LANGCHAIN_API_KEY=ls__xxx
 # export LANGCHAIN_PROJECT=winter-agent

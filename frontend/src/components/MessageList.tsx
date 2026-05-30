@@ -31,6 +31,8 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, isSending = 
               key={message.id}
               role={message.role}
               content={message.content}
+              toolSteps={message.toolSteps}
+              guardReason={message.guardReason}
               isLoading={
                 isSending &&
                 index === lastIndex &&

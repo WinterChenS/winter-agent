@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import time
 from datetime import datetime
-from urllib.parse import urlparse
 
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from config import settings
 from core.runtime import get_tool_registry
+from domain.capability import CapabilityCall
+from graph.normalizers.tool_result import (
+    normalize_tool_result_for_prompt,
+    normalize_tool_step_record,
+)
 from graph.state import State
+from policy.gate import PolicyGate
+from policy.models import PolicyContext
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +32,10 @@ You can call ONE tool per response. To call a tool respond with ONLY this JSON (
 {"action": "tool", "tool": "<tool_name>", "query": "<your query>"}
 
 Rules for tool use:
-- For ANY question about current time or date → call the "time" tool first.
-- For news, weather, events, or anything with "latest / today / recent / now" →
-  first confirm today's date using the "time" tool (unless today's date is already
-  known from a previous tool result), then search with the exact date in the query
-  (e.g. "2026-05-20 今日大新闻").
+- For direct current time/date questions, call the "time" tool.
+- For news, weather, events, or anything with "latest / today / recent / now":
+  prefer calling "search" directly with explicit date if date context is already available.
+  Call "time" only when date is truly missing.
 - Never call the same tool repeatedly with the same intent in one turn.
 - If the time has already been obtained in this turn, DO NOT call "time" again.
 - You may chain tool calls: each response either calls one tool OR gives a final answer.
@@ -40,6 +46,63 @@ Rules for tool use:
 MAX_ITERATIONS = 5
 
 
+def _max_consecutive_search_calls() -> int:
+    return max(1, int(getattr(settings, "max_consecutive_search_calls", 2) or 2))
+
+
+def _build_policy_gate() -> PolicyGate:
+    raw = (settings.policy_tool_whitelist or "").strip()
+    whitelist = {x.strip() for x in raw.split(",") if x.strip()} if raw else set()
+    max_query_len = max(1, int(settings.policy_max_query_len or 500))
+    timeout_override_ms = int(settings.policy_timeout_override_ms or 0) or None
+    return PolicyGate(
+        tool_whitelist=whitelist,
+        max_query_len=max_query_len,
+        timeout_override_ms=timeout_override_ms,
+    )
+
+
+def _error_text(error: object) -> str:
+    if isinstance(error, dict):
+        message = error.get("message") or error.get("error") or error.get("code")
+        return str(message or "unknown error")
+    if error is None:
+        return "unknown error"
+    return str(error)
+
+
+def _tool_result_has_search_hits(tool_result: str | None) -> bool:
+    if not tool_result:
+        return False
+    try:
+        parsed = json.loads(tool_result)
+    except Exception:
+        return False
+    if not isinstance(parsed, dict) or not parsed.get("ok", False):
+        return False
+    data = parsed.get("data")
+    if not isinstance(data, dict):
+        return False
+    results = data.get("results")
+    return isinstance(results, list) and len(results) > 0
+
+
+def _reason_record(node: str, code: str, message: str, extra: dict | None = None) -> dict:
+    record = {
+        "node": node,
+        "code": code,
+        "message": message,
+        "timestamp": int(time.time() * 1000),
+    }
+    if extra:
+        record["extra"] = extra
+    return record
+
+
+def _append_reason(state: State, record: dict) -> list:
+    return list(state.get("reasoning_steps", [])) + [record]
+
+
 def _build_llm() -> ChatOpenAI:
     """创建并返回 ChatOpenAI 实例（集中在一处，方便统一修改参数）。"""
     return ChatOpenAI(
@@ -48,6 +111,9 @@ def _build_llm() -> ChatOpenAI:
         streaming=True,
         api_key=settings.api_key,
         base_url=settings.base_url,
+        extra_body={
+            "enable_thinking": False
+        }
     )
 
 
@@ -70,61 +136,6 @@ def _parse_tool_call(content: str) -> tuple[str, str] | None:
     return tool_name, query
 
 
-def _sanitize_tool_result_for_prompt(tool_result: str | None) -> str:
-    """Build a safe, compact tool context to avoid sending raw tool payload to provider."""
-    if not tool_result:
-        return ""
-
-    try:
-        parsed = json.loads(tool_result)
-    except Exception:
-        # Raw text may trigger provider inspection; keep only short neutral prefix.
-        return "Tool returned data (sanitized)."
-
-    if not isinstance(parsed, dict):
-        return "Tool returned structured data (sanitized)."
-
-    ok = bool(parsed.get("ok", False))
-    if not ok:
-        err = str(parsed.get("error") or parsed.get("message") or "unknown error")[:200]
-        return f"Tool execution failed: {err}"
-
-    data = parsed.get("data")
-
-    # time 工具常见返回：data 是时间字符串
-    if isinstance(data, str):
-        compact = " ".join(data.split())[:120]
-        if compact:
-            return f"time: {compact}"
-        return "time: (available)"
-
-    data = data if isinstance(data, dict) else {}
-    query = str(data.get("query") or "").strip()
-    results = data.get("results") if isinstance(data.get("results"), list) else []
-
-    lines: list[str] = []
-    if query:
-        lines.append(f"query: {query[:120]}")
-    lines.append(f"result_count: {len(results)}")
-
-    # Only keep title + domain; drop full snippet content to reduce inspection risk.
-    for idx, item in enumerate(results[:3], start=1):
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title") or "").strip()[:120]
-        url = str(item.get("url") or "").strip()
-        domain = ""
-        if url:
-            try:
-                domain = urlparse(url).netloc[:80]
-            except Exception:
-                domain = ""
-        if title or domain:
-            lines.append(f"{idx}. title={title or '-'}; source={domain or '-'}")
-
-    return "\n".join(lines) if lines else "Tool returned structured data (sanitized)."
-
-
 def _extract_iso_date(text: str) -> str | None:
     m = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
     return m.group(0) if m else None
@@ -143,6 +154,30 @@ def _latest_user_text(state: State) -> str:
             if role in {"user", "human"} and isinstance(content, str):
                 return content.strip()
     return ""
+
+
+async def _generate_forced_final_answer(
+    llm: ChatOpenAI,
+    state: State,
+    now_str: str,
+    tool_result_sanitized: str,
+) -> str:
+    guidance = [
+        "You are a helpful AI assistant.",
+        f"Current date and time (server): {now_str}",
+        "You already have enough tool evidence.",
+        "Now provide a concise final answer based ONLY on the provided tool result context.",
+        "Do NOT call any tool.",
+        "Do NOT output JSON.",
+    ]
+    if tool_result_sanitized:
+        guidance.append(f"Tool result context (sanitized):\n{tool_result_sanitized}")
+    forced_messages = [SystemMessage(content="\n".join(guidance))] + list(state["messages"])
+    response = await llm.ainvoke(forced_messages)
+    text = (response.content or "").strip()
+    if text:
+        return text
+    return _build_local_final_fallback(state.get("tool_result"))
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -169,7 +204,7 @@ async def agent_node(state: State) -> dict:
 
     # 3. 把上一轮工具结果告知 LLM
     tool_result = state.get("tool_result")
-    tool_result_sanitized = _sanitize_tool_result_for_prompt(tool_result)
+    tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
     current_iteration = int(state.get("iteration_count", 0) or 0)
     if tool_result_sanitized:
         if current_iteration < MAX_ITERATIONS:
@@ -198,12 +233,19 @@ async def agent_node(state: State) -> dict:
     except Exception as exc:
         logger.warning("agent_node ainvoke failed, fallback to local final answer: %s", exc)
         fallback = _build_local_final_fallback(tool_result)
-        step = "[agent_node] LLM invoke failed; returned local fallback final answer."
+        reason = _reason_record(
+            node="agent_node",
+            code="LLM_INVOKE_FAILED",
+            message="LLM invoke failed; returned local fallback final answer.",
+            extra={"error": str(exc)[:200]},
+        )
         return {
             "messages": [AIMessage(content=fallback)],
             "current_tool": None,
             "tool_input": None,
-            "reasoning_steps": state.get("reasoning_steps", []) + [step],
+            "last_guard_reason": reason,
+            "consecutive_search_count": 0,
+            "reasoning_steps": _append_reason(state, reason),
         }
 
     # 5. 尝试解析是否要调工具
@@ -213,35 +255,120 @@ async def agent_node(state: State) -> dict:
         if parsed:
             tool_name, query = parsed
             normalized_query = _normalize_query(query)
+            consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+            next_consecutive_search_count = (
+                consecutive_search_count + 1 if tool_name.lower() == "search" else 0
+            )
+            max_consecutive_search_calls = _max_consecutive_search_calls()
 
             if current_iteration >= MAX_ITERATIONS:
                 fallback = "我已完成多次工具检索，下面基于现有结果给出最终结论。"
                 if tool_result_sanitized:
                     fallback += f"\n\n（最新工具结果）\n{tool_result_sanitized}"
-                step = (
-                    f"[agent_node] Tool call limit reached ({MAX_ITERATIONS}), "
-                    "forced final answer generation."
+                reason = _reason_record(
+                    node="agent_node",
+                    code="MAX_ITERATIONS_REACHED",
+                    message=(
+                        f"Tool call limit reached ({MAX_ITERATIONS}); forced final answer generation."
+                    ),
                 )
                 return {
                     "messages": [AIMessage(content=fallback)],
                     "current_tool": None,
                     "tool_input": None,
-                    "reasoning_steps": state.get("reasoning_steps", []) + [step],
+                    "last_guard_reason": reason,
+                    "consecutive_search_count": 0,
+                    "reasoning_steps": _append_reason(state, reason),
                 }
 
             # 通用去重：同一轮里如果重复同一工具同一query，直接收敛
             last_tool_name = (state.get("last_tool_name") or "").strip().lower()
             last_tool_query = _normalize_query(str(state.get("last_tool_query") or ""))
             if last_tool_name == tool_name.lower() and last_tool_query == normalized_query:
-                step = (
-                    f"[agent_node] Prevented duplicate tool call: tool='{tool_name}', query='{query}'."
+                reason = _reason_record(
+                    node="agent_node",
+                    code="DUPLICATE_TOOL_CALL_BLOCKED",
+                    message=f"Prevented duplicate tool call: tool='{tool_name}', query='{query}'.",
+                    extra={"tool": tool_name, "query": query},
                 )
-                fallback = _build_local_final_fallback(tool_result)
+                try:
+                    forced = await _generate_forced_final_answer(
+                        llm=llm,
+                        state=state,
+                        now_str=now_str,
+                        tool_result_sanitized=tool_result_sanitized,
+                    )
+                except Exception as exc:
+                    logger.warning("agent_node forced final answer failed, fallback to local answer: %s", exc)
+                    forced = _build_local_final_fallback(tool_result)
                 return {
-                    "messages": [AIMessage(content=fallback)],
+                    "messages": [AIMessage(content=forced)],
                     "current_tool": None,
                     "tool_input": None,
-                    "reasoning_steps": state.get("reasoning_steps", []) + [step],
+                    "last_tool_name": None,
+                    "last_tool_query": None,
+                    "last_guard_reason": reason,
+                    "consecutive_search_count": 0,
+                    "reasoning_steps": _append_reason(state, reason),
+                }
+
+            # Stop unhelpful search loops: if search already returned hits, force final answer.
+            if tool_name.lower() == "search" and _tool_result_has_search_hits(tool_result):
+                reason = _reason_record(
+                    node="agent_node",
+                    code="SEARCH_RESULTS_ALREADY_AVAILABLE",
+                    message="Search already has results; forced final answer instead of another search.",
+                )
+                try:
+                    forced = await _generate_forced_final_answer(
+                        llm=llm,
+                        state=state,
+                        now_str=now_str,
+                        tool_result_sanitized=tool_result_sanitized,
+                    )
+                except Exception as exc:
+                    logger.warning("agent_node search-loop break finalization failed: %s", exc)
+                    forced = _build_local_final_fallback(tool_result)
+                return {
+                    "messages": [AIMessage(content=forced)],
+                    "current_tool": None,
+                    "tool_input": None,
+                    "last_tool_name": None,
+                    "last_tool_query": None,
+                    "last_guard_reason": reason,
+                    "consecutive_search_count": 0,
+                    "reasoning_steps": _append_reason(state, reason),
+                }
+
+            if tool_name.lower() == "search" and next_consecutive_search_count > max_consecutive_search_calls:
+                reason = _reason_record(
+                    node="agent_node",
+                    code="MAX_CONSECUTIVE_SEARCH_REACHED",
+                    message="Consecutive search call limit reached; forced final answer.",
+                    extra={
+                        "count": next_consecutive_search_count,
+                        "limit": max_consecutive_search_calls,
+                    },
+                )
+                try:
+                    forced = await _generate_forced_final_answer(
+                        llm=llm,
+                        state=state,
+                        now_str=now_str,
+                        tool_result_sanitized=tool_result_sanitized,
+                    )
+                except Exception as exc:
+                    logger.warning("agent_node max-consecutive-search finalization failed: %s", exc)
+                    forced = _build_local_final_fallback(tool_result)
+                return {
+                    "messages": [AIMessage(content=forced)],
+                    "current_tool": None,
+                    "tool_input": None,
+                    "last_tool_name": None,
+                    "last_tool_query": None,
+                    "last_guard_reason": reason,
+                    "consecutive_search_count": 0,
+                    "reasoning_steps": _append_reason(state, reason),
                 }
 
             # 避免在单轮里重复调用 time（常见卡死点）
@@ -254,9 +381,11 @@ async def agent_node(state: State) -> dict:
                 date_hint = _extract_iso_date(tool_result_sanitized) or now_str.split(" ")[0]
 
                 if needs_fresh_search:
-                    step = (
-                        "[agent_node] Prevented repeated time tool call; "
-                        f"auto-switched to search with date {date_hint}."
+                    reason = _reason_record(
+                        node="agent_node",
+                        code="TIME_REPEAT_AUTOSWITCH_SEARCH",
+                        message=f"Prevented repeated time tool call; auto-switched to search with date {date_hint}.",
+                        extra={"date_hint": date_hint},
                     )
                     auto_query = f"{date_hint} {latest_user}".strip()
                     return {
@@ -266,19 +395,33 @@ async def agent_node(state: State) -> dict:
                         "iteration_count": current_iteration + 1,
                         "last_tool_name": "search",
                         "last_tool_query": auto_query,
-                        "reasoning_steps": state.get("reasoning_steps", []) + [step],
+                        "consecutive_search_count": consecutive_search_count + 1,
+                        "reasoning_steps": _append_reason(state, reason),
                     }
 
                 # 非时效检索场景：直接结束，避免无意义 time 循环
-                step = "[agent_node] Prevented repeated time tool call; returned final answer."
+                reason = _reason_record(
+                    node="agent_node",
+                    code="TIME_REPEAT_FINALIZED",
+                    message="Prevented repeated time tool call; returned final answer.",
+                )
                 return {
                     "messages": [AIMessage(content=f"当前时间已获取：{tool_result_sanitized.replace('time: ', '', 1)}")],
                     "current_tool": None,
                     "tool_input": None,
-                    "reasoning_steps": state.get("reasoning_steps", []) + [step],
+                    "last_tool_name": None,
+                    "last_tool_query": None,
+                    "last_guard_reason": reason,
+                    "consecutive_search_count": 0,
+                    "reasoning_steps": _append_reason(state, reason),
                 }
 
-            step = f"[agent_node] Decided to call tool '{tool_name}' with query: '{query}'"
+            reason = _reason_record(
+                node="agent_node",
+                code="TOOL_CALL_DECIDED",
+                message=f"Decided to call tool '{tool_name}' with query: '{query}'",
+                extra={"tool": tool_name},
+            )
             return {
                 "current_tool": tool_name,
                 "tool_input": {"query": query},
@@ -286,20 +429,27 @@ async def agent_node(state: State) -> dict:
                 "iteration_count": current_iteration + 1,
                 "last_tool_name": tool_name,
                 "last_tool_query": query,
-                "reasoning_steps": state.get("reasoning_steps", []) + [step],
+                "consecutive_search_count": next_consecutive_search_count,
+                "reasoning_steps": _append_reason(state, reason),
             }
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         pass
 
     # 6. 普通文本回答
-    step = "[agent_node] Generated direct answer (no tool needed)."
+    reason = _reason_record(
+        node="agent_node",
+        code="DIRECT_ANSWER",
+        message="Generated direct answer (no tool needed).",
+    )
     return {
         "messages": [response],
         "current_tool": None,
         "tool_input": None,
         "last_tool_name": None,
         "last_tool_query": None,
-        "reasoning_steps": state.get("reasoning_steps", []) + [step],
+        "last_guard_reason": reason,
+        "consecutive_search_count": 0,
+        "reasoning_steps": _append_reason(state, reason),
     }
 
 
@@ -310,45 +460,87 @@ async def tool_node(state: State) -> dict:
     tool_name = state.get("current_tool") or ""
     tool_input = state.get("tool_input") or {}
     start_time = time.time()
+    gate = _build_policy_gate()
+    call = CapabilityCall(capability_name=tool_name, input_payload=tool_input)
 
-    registry = get_tool_registry()
-    if not registry:
-        result = {"ok": False, "error": "ToolRegistry not initialized", "code": "REGISTRY_NOT_READY"}
+    decision = gate.evaluate(
+        call,
+        context=PolicyContext(
+            conversation_id=str(state.get("conversation_id") or ""),
+            agent_id=str(state.get("active_agent") or "agent.main"),
+        ),
+    )
+
+    if decision.action != "allow":
+        result = {
+            "ok": False,
+            "error": {
+                "code": decision.code or "POLICY_DENIED",
+                "message": decision.reason or "Blocked by policy gate",
+                "retryable": False,
+            },
+        }
         result_str = json.dumps(result, ensure_ascii=False)
-        step = f"[tool_node] ERROR: registry not available, skipped '{tool_name}'"
+        step = f"[tool_node] Policy denied capability '{tool_name}': {decision.reason or decision.code}"
         status = "error"
-        error_msg = "ToolRegistry not initialized"
+        error_msg = _error_text(result.get("error"))
     else:
-        try:
-            result = await registry.invoke(tool_name, tool_input)
-        except Exception as exc:
-            logger.exception("tool_node invoke failed for tool=%s", tool_name)
-            result = {
-                "ok": False,
-                "error": f"tool invoke exception: {str(exc)[:200]}",
-                "code": "TOOL_INVOKE_EXCEPTION",
-            }
+        registry = get_tool_registry()
+        if not registry:
+            result = {"ok": False, "error": "ToolRegistry not initialized", "code": "REGISTRY_NOT_READY"}
+            result_str = json.dumps(result, ensure_ascii=False)
+            step = f"[tool_node] ERROR: registry not available, skipped '{tool_name}'"
+            status = "error"
+            error_msg = "ToolRegistry not initialized"
+        else:
+            try:
+                timeout_ms = gate.timeout_override_ms
+                if timeout_ms and timeout_ms > 0:
+                    result = await asyncio.wait_for(
+                        registry.invoke_capability(call),
+                        timeout=timeout_ms / 1000,
+                    )
+                else:
+                    result = await registry.invoke_capability(call)
+            except asyncio.TimeoutError:
+                result = {
+                    "ok": False,
+                    "error": {
+                        "code": "TOOL_TIMEOUT",
+                        "message": "tool invocation timeout",
+                        "retryable": True,
+                    },
+                }
+            except Exception as exc:
+                logger.exception("tool_node invoke failed for tool=%s", tool_name)
+                result = {
+                    "ok": False,
+                    "error": {
+                        "code": "TOOL_INVOKE_EXCEPTION",
+                        "message": f"tool invoke exception: {str(exc)[:200]}",
+                        "retryable": False,
+                    },
+                }
 
-        result_str = json.dumps(result, ensure_ascii=False)
-        ok = result.get("ok", False)
-        status = "completed" if ok else "error"
-        error_msg = result.get("error") if not ok else None
-        step = (
-            f"[tool_node] Tool '{tool_name}' executed successfully."
-            if ok
-            else f"[tool_node] Tool '{tool_name}' returned error: {error_msg}"
-        )
+            result_str = json.dumps(result, ensure_ascii=False)
+            ok = bool(result.get("ok", False))
+            status = "completed" if ok else "error"
+            error_msg = _error_text(result.get("error")) if not ok else None
+            step = (
+                f"[tool_node] Tool '{tool_name}' executed successfully."
+                if ok
+                else f"[tool_node] Tool '{tool_name}' returned error: {error_msg}"
+            )
 
     elapsed_time = time.time() - start_time
-    tool_step_record = {
-        "tool": tool_name,
-        "input": tool_input.get("query", "") if isinstance(tool_input, dict) else str(tool_input),
-        "status": status,
-        "elapsed_ms": int(elapsed_time * 1000),
-        "timestamp": start_time,
-    }
-    if status == "error" and error_msg:
-        tool_step_record["error"] = error_msg
+    tool_step_record = normalize_tool_step_record(
+        tool_name=tool_name,
+        tool_input=tool_input,
+        status=status,
+        elapsed_ms=int(elapsed_time * 1000),
+        timestamp=start_time,
+        error=error_msg,
+    )
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
 
@@ -375,11 +567,11 @@ def _normalize_query(text: str) -> str:
 
 
 def _build_local_final_fallback(tool_result: str | None) -> str:
-    safe_ctx = _sanitize_tool_result_for_prompt(tool_result)
+    safe_ctx = normalize_tool_result_for_prompt(tool_result)
     if not safe_ctx:
-        return "我已经完成工具调用，但生成最终回答时遇到策略限制。请重试一次，或换一个更具体的问题。"
+        return "我已经完成工具调用，但暂时无法生成稳定的最终文本。请重试一次，或换一个更具体的问题。"
     return (
-        "我已完成工具查询。由于模型安全审查或策略限制，我先给出基于工具结果的简要结论：\n\n"
+        "我已完成工具查询。下面基于工具结果给出简要结论：\n\n"
         f"{safe_ctx}\n\n"
         "如果你愿意，我可以继续基于该结果输出更详细的结构化总结。"
     )
