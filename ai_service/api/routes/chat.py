@@ -107,7 +107,7 @@ async def stream_generate(request: GenerateRequest):
                 }
 
                 thread_id = trace_ctx.conversation_id
-                config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+                config: RunnableConfig = {"configurable": {"thread_id": thread_id}, "recursion_limit": 256}
 
                 # 用于判断工具摘要是否已发送
                 tool_summary_sent = False
