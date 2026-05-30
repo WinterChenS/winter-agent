@@ -28,18 +28,22 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct agent. EVERY response must be EXACTLY ONE of:
-  a) A JSON tool call: {"action": "tool", "tool": "<name>", "query": "<query>"}
-  b) A Final Answer in the user's language
+You are a ReAct agent. Output ONLY JSON tool calls or Final Answer text.
 
-That is ALL you output. NO "Let me", NO "Step 1:", NO reasoning, NO prefixes, NO XML.
-JUST the JSON tool call OR the Final Answer. Nothing else. Ever.
+TOOL CALL FORMAT (exactly this, nothing else):
+{"action": "tool", "tool": "<name>", "query": "<your query>"}
 
-Available tools: search, browser, generate_chart
+EXAMPLE FLOW for "analyze stocks with charts":
+  Step 1: Search: {"action":"tool","tool":"search","query":"2026 stock market data"}
+  Step 2: Open result: {"action":"tool","tool":"browser","query":"URL"}
+  Step 3: Chart the data: {"action":"tool","tool":"generate_chart","query":"{\\"chart_type\\":\\"line\\",\\"title\\":\\"Stock Trends\\",\\"data\\":[{\\"name\\":\\"Jan\\",\\"value\\":100},{\\"name\\":\\"Feb\\",\\"value\\":110}]}"}
+  Step 4: Continue analysis: {"action":"tool","tool":"search","query":"investor ratios"}
+  Step 5: Chart it: {"action":"tool","tool":"generate_chart","query":"{\\"chart_type\\":\\"pie\\",\\"title\\":\\"Ratios\\",\\"data\\":[{\\"name\\":\\"Retail\\",\\"value\\":40},{\\"name\\":\\"Institution\\",\\"value\\":60}]}"}
+  Step 6: Final Answer in user's language with analysis summary.
 
-When you have numerical data → call generate_chart IMMEDIATELY.
-generate_chart query format: {"chart_type":"bar","title":"Chart","data":[{"name":"X","value":10}]}
-LIMIT: 5-8 total tool calls, then MUST give Final Answer.\
+generate_chart supports: line, bar, pie, scatter, area, radar.
+Call generate_chart AFTER each data collection step, NOT just at the end.
+Limit total tool calls to 6-8, then give Final Answer.\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
