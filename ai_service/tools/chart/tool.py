@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Mapping
 
@@ -62,6 +63,17 @@ class ChartTool(BaseTool):
 
     async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
         try:
+            # Agent passes tool params in the "query" field as a JSON string.
+            # Parse query if direct fields are missing.
+            query_str = input_payload.get("query", "")
+            if isinstance(query_str, str) and query_str.strip().startswith("{"):
+                try:
+                    parsed = json.loads(query_str)
+                    if isinstance(parsed, dict):
+                        input_payload = {**parsed, **input_payload}
+                except json.JSONDecodeError:
+                    pass
+
             chart_type = str(input_payload.get("chart_type", "bar"))
             title = str(input_payload.get("title", ""))
             description = str(input_payload.get("description", ""))
