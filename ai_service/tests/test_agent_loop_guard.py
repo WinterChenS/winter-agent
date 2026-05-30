@@ -67,10 +67,12 @@ async def test_search_with_existing_hits_skips_new_search(monkeypatch):
 
     out = await nodes.agent_node(state)
 
-    assert out["current_tool"] is None
-    assert out["tool_input"] is None
-    assert "整理" in out["messages"][0].content
-    assert llm.calls == 2
+    # Guard SEARCH_RESULTS_ALREADY_AVAILABLE was intentionally removed
+    # to allow the ReAct loop to continue with different search queries.
+    # The LLM can now proceed with a new search even when previous search had hits.
+    assert out["current_tool"] == "search"
+    assert out["tool_input"] == {"query": "2026-05-24 A股新闻"}
+    assert llm.calls == 1
 
 
 @pytest.mark.asyncio

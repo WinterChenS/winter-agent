@@ -28,7 +28,7 @@ def test_search_result_compaction():
     text = normalize_tool_result_for_prompt(raw)
     assert "query: 杭州天气" in text
     assert "result_count: 2" in text
-    assert "source=www.weather.com.cn" in text
+    assert "source: www.weather.com.cn" in text
 
 
 def test_error_result_normalization():
