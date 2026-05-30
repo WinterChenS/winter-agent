@@ -63,42 +63,56 @@ def process_stream_token_event(
     collecting_control_json: bool,
     control_json_buffer: str,
     known_tools: set[str],
-) -> tuple[dict[str, Any] | None, bool, str]:
-    """Filter tool-control JSON from model stream while preserving normal JSON/plain text.
+    preamble_buffer: str = "",
+) -> tuple[dict[str, Any] | None, bool, str, str]:
+    """Filter tool-control JSON and reasoning preamble from model stream.
+
+    Buffers text before the first '{' as potential reasoning preamble.
+    If the response ends up being a tool call, preamble is dropped.
 
     Returns:
       - rewritten event (or None when chunk should be swallowed)
       - updated collecting_control_json
       - updated control_json_buffer
+      - updated preamble_buffer
     """
     if event.get("event") != "on_chat_model_stream":
-        return event, collecting_control_json, control_json_buffer
+        return event, collecting_control_json, control_json_buffer, preamble_buffer
 
     chunk = event.get("data", {}).get("chunk")
     raw_token_content = getattr(chunk, "content", "")
     if not raw_token_content:
-        return event, collecting_control_json, control_json_buffer
+        return event, collecting_control_json, control_json_buffer, preamble_buffer
 
     if collecting_control_json:
         merged = control_json_buffer + raw_token_content
         if "}" not in merged:
-            return None, True, merged
+            return None, True, merged, preamble_buffer
+        # JSON block complete — check if it's a tool call
         if is_tool_action_json(merged, known_tools):
-            return None, False, ""
-        return _stream_event_with_content(merged), False, ""
+            # Drop preamble + JSON (tool call)
+            return None, False, "", ""
+        # Not a tool call — release preamble + JSON as normal text
+        release_text = preamble_buffer + merged
+        return _stream_event_with_content(release_text), False, "", ""
 
+    # New token that starts with '{' — start JSON buffering
     if raw_token_content.lstrip().startswith("{"):
         if "}" not in raw_token_content:
-            return None, True, raw_token_content
+            return None, True, raw_token_content, preamble_buffer
         if is_tool_action_json(raw_token_content, known_tools):
-            return None, False, ""
-        return _stream_event_with_content(raw_token_content), False, ""
+            # Drop preamble + JSON (tool call in single token)
+            return None, False, "", ""
+        # Not a tool call — release preamble + JSON
+        release_text = preamble_buffer + raw_token_content
+        return _stream_event_with_content(release_text), False, "", ""
 
-    # Filter model thinking/reasoning tokens (DeepSeek may output [Thought] tags)
+    # Filter model thinking/reasoning tokens
     if "[Thought]" in raw_token_content or "[/Thought]" in raw_token_content:
-        return None, collecting_control_json, control_json_buffer
+        return None, collecting_control_json, control_json_buffer, preamble_buffer
 
-    return event, False, ""
+    # Buffer as potential preamble (reasoning before tool call JSON)
+    return None, False, "", preamble_buffer + raw_token_content
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:

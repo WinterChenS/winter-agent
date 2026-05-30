@@ -114,17 +114,19 @@ async def stream_generate(request: GenerateRequest):
                 final_state = None
                 collecting_control_json = False
                 control_json_buffer = ""
+                preamble_buffer = ""
                 assistant_text_emitted = False
                 saw_tool_event = False
                 assistant_text_emitted_after_tool = False
                 active_tool_span_id: str | None = None
 
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
-                    event, collecting_control_json, control_json_buffer = process_stream_token_event(
+                    event, collecting_control_json, control_json_buffer, preamble_buffer = process_stream_token_event(
                         event,
                         collecting_control_json,
                         control_json_buffer,
                         event_ctx.known_tools,
+                        preamble_buffer,
                     )
                     if event is None:
                         continue
@@ -152,8 +154,15 @@ async def stream_generate(request: GenerateRequest):
                     control_json_buffer,
                     event_ctx.known_tools,
                 ):
-                    yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
+                    release_text = preamble_buffer + control_json_buffer
+                    yield to_sse_data(envelope_token(trace_ctx, release_text))
                     assistant_text_emitted = True
+                    preamble_buffer = ""
+                elif preamble_buffer:
+                    # Leftover preamble that was never followed by JSON — release as text
+                    yield to_sse_data(envelope_token(trace_ctx, preamble_buffer))
+                    assistant_text_emitted = True
+                    preamble_buffer = ""
 
                 # 如果仅出现了工具过程 token（如“我先搜索一下”）但工具后没有最终回答 token，
                 # 兜底补发 final_state 中的最后一条 assistant 文本，避免前端只看到工具步骤。
