@@ -650,3 +650,34 @@ def _build_observation_message(tool_name: str, result_str: str) -> str:
 
     sanitized = normalize_tool_result_for_prompt(result_str)
     return f"Observation ({tool_name}):\n{sanitized}" if sanitized else f"Observation ({tool_name}): completed."
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# chart_node：图表规划 + 生成节点
+# ────────────────────────────────────────────────────────────────────────────
+async def chart_node(state: State) -> dict:
+    """Analyze tool results, decide if a chart is needed, and generate ChartSpec."""
+    user_message = _latest_user_text(state)
+    tool_result = state.get("tool_result") or ""
+
+    llm = _build_llm()
+
+    from graph.chart_planner import plan_chart
+    from graph.chart_generator import generate_chart_spec
+
+    chart_intent = await plan_chart(llm, user_message, tool_result)
+    logger.info("Chart intent: %s", chart_intent)
+
+    if not chart_intent.get("need_chart"):
+        return {
+            "chart_intent": chart_intent,
+            "chart_spec": None,
+        }
+
+    chart_spec = await generate_chart_spec(llm, user_message, tool_result, chart_intent)
+    logger.info("Chart spec generated: %s", "yes" if chart_spec else "no")
+
+    return {
+        "chart_intent": chart_intent,
+        "chart_spec": chart_spec,
+    }

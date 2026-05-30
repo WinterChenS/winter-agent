@@ -90,6 +90,16 @@ def envelope_agent_step(trace_ctx: TraceContext, reason: dict[str, Any]) -> dict
     )
 
 
+def envelope_chart(trace_ctx: TraceContext, chart_spec: dict[str, Any]) -> EventEnvelope:
+    """Build a 'chart' event envelope carrying ChartSpec to the frontend."""
+    return build_envelope(
+        event_type="chart",
+        trace_ctx=trace_ctx,
+        payload={"chartSpec": chart_spec},
+        compat_fields={"chartSpec": chart_spec},
+    )
+
+
 def envelope_error(trace_ctx: TraceContext, message: str) -> dict[str, Any]:
     return build_envelope(
         "error",

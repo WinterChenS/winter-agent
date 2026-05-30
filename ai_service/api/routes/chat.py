@@ -9,6 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 from api.schemas import GenerateRequest
 from api.events.event_mapper import (
     EventMapContext,
+    emit_chart_envelope,
     emit_guard_reason_envelope,
     emit_final_summary_envelope,
     extract_last_assistant_text,
@@ -148,6 +149,12 @@ async def stream_generate(request: GenerateRequest):
                     if summary_envelope:
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
+
+                # 6) 发送图表事件（如果 chart_node 生成了 ChartSpec）
+                if final_state:
+                    chart_envelope = emit_chart_envelope(final_state, event_ctx)
+                    if chart_envelope:
+                        yield to_sse_data(chart_envelope)
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))

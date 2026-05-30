@@ -6,6 +6,7 @@ from typing import Any
 
 from domain.event_envelope import (
     envelope_agent_step,
+    envelope_chart,
     envelope_token,
     envelope_tool_result,
     envelope_tool_start,
@@ -228,5 +229,17 @@ def emit_guard_reason_envelope(final_state: dict[str, Any] | None, ctx: EventMap
     if not isinstance(reason, dict) or not reason:
         return None
     return envelope_agent_step(ctx.trace_ctx, reason)
+
+
+def emit_chart_envelope(
+    final_state: dict[str, Any] | None,
+    ctx: EventMapContext,
+) -> dict[str, Any] | None:
+    if not isinstance(final_state, dict):
+        return None
+    chart_spec = final_state.get("chart_spec")
+    if not isinstance(chart_spec, dict) or not chart_spec:
+        return None
+    return envelope_chart(ctx.trace_ctx, chart_spec)
 
 
