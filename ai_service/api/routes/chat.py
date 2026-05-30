@@ -9,7 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 from api.schemas import GenerateRequest
 from api.events.event_mapper import (
     EventMapContext,
-    emit_chart_envelope,
+    emit_chart_envelopes,
     emit_guard_reason_envelope,
     emit_final_summary_envelope,
     extract_last_assistant_text,
@@ -103,8 +103,7 @@ async def stream_generate(request: GenerateRequest):
                     "span_id": trace_ctx.span_id,
                     "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": trace_ctx.agent_id,
-                    "chart_intent": None,
-                    "chart_spec": None,
+                    "chart_specs": [],
                 }
 
                 thread_id = trace_ctx.conversation_id
@@ -174,10 +173,9 @@ async def stream_generate(request: GenerateRequest):
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
 
-                # 6) 发送图表事件（如果 chart_node 生成了 ChartSpec）
+                # 6) 发送图表事件（如果 chart_node 生成了 ChartSpec，支持多图表）
                 if final_state:
-                    chart_envelope = emit_chart_envelope(final_state, event_ctx)
-                    if chart_envelope:
+                    for chart_envelope in emit_chart_envelopes(final_state, event_ctx):
                         yield to_sse_data(chart_envelope)
 
         except Exception as e:
@@ -212,12 +210,17 @@ async def get_chat_history(conversation_id: str):
 
         formatted_messages.append({"role": role, "content": content})
 
-    # Extract chart_spec and tool_steps from checkpoint state for frontend rendering
+    # Extract chart_specs and tool_steps from checkpoint state for frontend rendering
     result = {"messages": formatted_messages}
 
-    chart_spec = channel_values.get("chart_spec")
-    if isinstance(chart_spec, dict) and chart_spec:
-        result["chartData"] = chart_spec
+    chart_specs = channel_values.get("chart_specs")
+    if isinstance(chart_specs, list) and chart_specs:
+        result["chartDatas"] = chart_specs
+    # Legacy fallback
+    elif channel_values.get("chart_spec"):
+        cs = channel_values.get("chart_spec")
+        if isinstance(cs, dict) and cs:
+            result["chartDatas"] = [cs]
 
     tool_steps = channel_values.get("tool_steps")
     if isinstance(tool_steps, list) and tool_steps:

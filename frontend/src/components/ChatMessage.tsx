@@ -24,6 +24,7 @@ interface ChatMessageProps {
     extra?: Record<string, unknown>;
   };
   chartData?: import('../types/chat').ChartSpecData;
+  chartDatas?: import('../types/chat').ChartSpecData[];
 }
 
 type ToolStepKind = 'start' | 'result';
@@ -173,7 +174,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   toolSteps = [],
   guardReason,
   chartData,
+  chartDatas,
 }) => {
+  // Normalize: support both single chartData (legacy) and chartDatas (multi-chart)
+  const allCharts = chartDatas || (chartData ? [chartData] : []);
   // Chart message (backward compatibility)
   if (role === 'chart' && chartData) {
     return (
@@ -403,13 +407,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </div>
             ) : null}
 
-            {/* Chart: rendered INSIDE the assistant bubble, below the text */}
-            {chartData && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <ChartRenderer chartData={chartData} />
-                {chartData.description && (
-                  <p className="text-xs text-gray-500 mt-2">{chartData.description}</p>
-                )}
+            {/* Charts: rendered INSIDE the assistant bubble, below the text */}
+            {allCharts.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-200 space-y-4">
+                {allCharts.map((cd, idx) => (
+                  <div key={cd.id || idx}>
+                    {allCharts.length > 1 && (
+                      <p className="text-xs font-medium text-gray-500 mb-1">
+                        图表 {idx + 1}: {cd.title}
+                      </p>
+                    )}
+                    <ChartRenderer chartData={cd} />
+                    {cd.description && !allCharts[1] && (
+                      <p className="text-xs text-gray-500 mt-2">{cd.description}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </>

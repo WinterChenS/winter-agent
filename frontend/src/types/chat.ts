@@ -35,7 +35,7 @@ export interface Message {
     error?: string;
   }>;
   guardReason?: GuardReason;
-  chartData?: ChartSpecData;
+  chartDatas?: ChartSpecData[];
 }
 
 export interface ChatRequest {

@@ -52,6 +52,5 @@ class State(TypedDict):
     active_agent: str
 
     # ── Chart rendering ──────────────────────────────────────────────────
-    chart_intent: dict | None   # LLM analysis: {need_chart, chart_type, reason}
-    chart_spec: dict | None     # Structured ChartSpec for frontend rendering
+    chart_specs: list[dict]     # List of ChartSpec dicts for frontend rendering (multi-chart support)
 

@@ -32,10 +32,9 @@ async def generate_chart_spec(
     chart_intent: dict,
 ) -> dict | None:
     """Generate a ChartSpec dict from conversation context and chart intent."""
-    if not chart_intent.get("need_chart"):
+    chart_type = chart_intent.get("chart_type", "")
+    if not chart_type:
         return None
-
-    chart_type = chart_intent.get("chart_type", "bar")
 
     messages = [
         SystemMessage(content=CHART_GENERATOR_PROMPT),

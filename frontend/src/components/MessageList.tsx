@@ -33,7 +33,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, isSending = 
               content={message.content}
               toolSteps={message.toolSteps}
               guardReason={message.guardReason}
-              chartData={message.chartData}
+              chartDatas={message.chartDatas}
               isLoading={
                 isSending &&
                 index === lastIndex &&

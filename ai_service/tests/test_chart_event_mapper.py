@@ -1,42 +1,34 @@
-"""Tests for chart event mapper integration."""
 from __future__ import annotations
-
-from api.events.event_mapper import EventMapContext, emit_chart_envelope
+from api.events.event_mapper import EventMapContext, emit_chart_envelopes
 from observability.trace import ensure_trace_context
-
 
 def _ctx(cid="cm"):
     return EventMapContext(trace_ctx=ensure_trace_context(cid), known_tools={"search", "browser"})
 
-
-class TestEmitChartEnvelope:
+class TestEmitChartEnvelopes:
     def test_none_state(self):
-        assert emit_chart_envelope(None, _ctx()) is None
+        assert emit_chart_envelopes(None, _ctx()) == []
 
     def test_non_dict_state(self):
-        assert emit_chart_envelope("str", _ctx()) is None
+        assert emit_chart_envelopes("str", _ctx()) == []
 
     def test_no_chart_spec(self):
-        assert emit_chart_envelope({"messages": []}, _ctx()) is None
+        assert emit_chart_envelopes({"messages": []}, _ctx()) == []
 
-    def test_none_chart_spec(self):
-        assert emit_chart_envelope({"chart_spec": None}, _ctx()) is None
+    def test_empty_chart_specs(self):
+        assert emit_chart_envelopes({"chart_specs": []}, _ctx()) == []
 
-    def test_empty_chart_spec(self):
-        assert emit_chart_envelope({"chart_spec": {}}, _ctx()) is None
+    def test_valid_chart_specs(self):
+        cs = {"id": "1", "title": "Scores", "chartType": "bar", "data": [{"name": "A", "value": 10}]}
+        r = emit_chart_envelopes({"chart_specs": [cs]}, _ctx("conv-ec"))
+        assert len(r) == 1
+        assert r[0]["type"] == "chart"
+        assert r[0]["chartSpec"] == cs
 
-    def test_valid_chart_spec(self):
-        cs = {"id": "1", "title": "Scores", "chartType": "bar",
-              "data": [{"name": "A", "value": 10}]}
-        r = emit_chart_envelope({"chart_spec": cs}, _ctx("conv-ec"))
-        assert r is not None
-        assert r["type"] == "chart"
-        assert r["chartSpec"] == cs
-        assert r["conversationId"] == "conv-ec"
+    def test_multiple_charts(self):
+        r = emit_chart_envelopes({"chart_specs": [{"id":"1","chartType":"line","data":[]},{"id":"2","chartType":"pie","data":[]}]}, _ctx())
+        assert len(r) == 2
 
-    def test_chart_spec_with_description(self):
-        cs = {"id": "2", "title": "D", "chartType": "pie",
-              "description": "A pie", "data": [{"name": "X", "value": 40, "group": "G"}]}
-        r = emit_chart_envelope({"chart_spec": cs}, _ctx())
-        assert r is not None
-        assert len(r["chartSpec"]["data"]) == 1
+    def test_legacy_fallback(self):
+        r = emit_chart_envelopes({"chart_spec": {"id":"1","chartType":"bar","data":[]}}, _ctx())
+        assert len(r) == 1

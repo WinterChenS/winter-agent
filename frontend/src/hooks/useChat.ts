@@ -53,7 +53,8 @@ export function useChat() {
   const loadHistory = useCallback(async (existingId: string) => {
     try {
       const history = await getChatHistory(existingId);
-      const chartData = (history as any).chartData;
+      const chartDatas: ChartSpecData[] = (history as any).chartDatas ||
+        ((history as any).chartData ? [(history as any).chartData] : []);
       const toolSteps = (history as any).toolSteps;
 
       const formatted: Message[] = history.messages.map((msg: any) => ({
@@ -64,10 +65,10 @@ export function useChat() {
       }));
 
       // Attach chart data to the last assistant message
-      if (chartData && formatted.length > 0) {
+      if (chartDatas.length > 0 && formatted.length > 0) {
         for (let i = formatted.length - 1; i >= 0; i--) {
           if (formatted[i].role === 'assistant') {
-            formatted[i] = { ...formatted[i], chartData };
+            formatted[i] = { ...formatted[i], chartDatas };
             break;
           }
         }
@@ -158,7 +159,7 @@ export function useChat() {
       let buffer = '';
       let thinkingSteps: ThinkingStep[] = [];
       let thinkingMessageId: string | null = null;
-      let chartDataForAssistant: ChartSpecData | undefined;
+      let chartDatasForAssistant: ChartSpecData[] = [];
 
       const appendText = (text: string) => {
         if (!text) return;
@@ -169,9 +170,9 @@ export function useChat() {
       const handleParsedEvent = (parsed: StreamPayload) => {
         const textChunk = parsed.content ?? parsed.token ?? '';
 
-        // Chart event: store to attach to assistant message later
+        // Chart event: accumulate to attach to assistant message later
         if (parsed.type === 'chart' && (parsed as any).chartSpec) {
-          chartDataForAssistant = (parsed as any).chartSpec as ChartSpecData;
+          chartDatasForAssistant.push((parsed as any).chartSpec as ChartSpecData);
           return;
         }
 
@@ -318,8 +319,8 @@ export function useChat() {
       }
 
       // Attach chart data to the assistant message
-      if (chartDataForAssistant) {
-        updateMessage(assistantMessageId, { chartData: chartDataForAssistant as any });
+      if (chartDatasForAssistant.length > 0) {
+        updateMessage(assistantMessageId, { chartDatas: chartDatasForAssistant as any });
       }
     } catch (err) {
       updateMessageContent(assistantMessageId, '抱歉，AI 服务暂时不可用，请稍后再试。');

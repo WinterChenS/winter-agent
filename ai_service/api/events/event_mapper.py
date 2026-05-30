@@ -212,10 +212,13 @@ def map_langgraph_event_to_envelopes(
         if isinstance(output_state, dict):
             if "messages" in output_state:
                 final_state = output_state
+            elif "chart_specs" in output_state and isinstance(final_state, dict):
+                final_state["chart_specs"] = output_state["chart_specs"]
+            elif "chart_specs" in output_state:
+                final_state = output_state
+            # Legacy single chart_spec fallback
             elif "chart_spec" in output_state and isinstance(final_state, dict):
                 final_state["chart_spec"] = output_state["chart_spec"]
-            elif "chart_spec" in output_state:
-                final_state = output_state
 
     return envelopes, active_tool_span_id, final_state
 
@@ -240,15 +243,21 @@ def emit_guard_reason_envelope(final_state: dict[str, Any] | None, ctx: EventMap
     return envelope_agent_step(ctx.trace_ctx, reason)
 
 
-def emit_chart_envelope(
+def emit_chart_envelopes(
     final_state: dict[str, Any] | None,
     ctx: EventMapContext,
-) -> dict[str, Any] | None:
+) -> list[dict[str, Any]]:
+    """Emit chart envelopes for all chart specs in the final state (multi-chart support)."""
     if not isinstance(final_state, dict):
-        return None
-    chart_spec = final_state.get("chart_spec")
-    if not isinstance(chart_spec, dict) or not chart_spec:
-        return None
-    return envelope_chart(ctx.trace_ctx, chart_spec)
+        return []
+    # Support both new "chart_specs" (list) and legacy "chart_spec" (single dict)
+    specs = final_state.get("chart_specs")
+    if isinstance(specs, list) and specs:
+        return [envelope_chart(ctx.trace_ctx, s) for s in specs if isinstance(s, dict) and s]
+    # Legacy fallback
+    single = final_state.get("chart_spec")
+    if isinstance(single, dict) and single:
+        return [envelope_chart(ctx.trace_ctx, single)]
+    return []
 
 

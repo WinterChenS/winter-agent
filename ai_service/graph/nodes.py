@@ -687,25 +687,25 @@ async def chart_node(state: State) -> dict:
     if final_answer:
         analysis_parts.append(f"=== Agent's final answer ===\n{final_answer[:3000]}")
     analysis_text = "\n\n".join(analysis_parts) if analysis_parts else ""
+    logger.info("chart_node analysis_text length: %d, tool_result: %s, final_answer: %s",
+                len(analysis_text), bool(tool_result), bool(final_answer))
 
     llm = _build_llm(streaming=False)
 
-    from graph.chart_planner import plan_chart
+    from graph.chart_planner import plan_charts
     from graph.chart_generator import generate_chart_spec
 
-    chart_intent = await plan_chart(llm, user_message, analysis_text)
-    logger.info("Chart intent: %s", chart_intent)
+    chart_intents = await plan_charts(llm, user_message, analysis_text)
+    logger.info("Chart intents: %s", chart_intents)
 
-    if not chart_intent.get("need_chart"):
-        return {
-            "chart_intent": chart_intent,
-            "chart_spec": None,
-        }
+    if not chart_intents:
+        return {"chart_specs": []}
 
-    chart_spec = await generate_chart_spec(llm, user_message, tool_result, chart_intent)
-    logger.info("Chart spec generated: %s", "yes" if chart_spec else "no")
+    chart_specs = []
+    for intent in chart_intents:
+        spec = await generate_chart_spec(llm, user_message, tool_result, intent)
+        if spec:
+            chart_specs.append(spec)
 
-    return {
-        "chart_intent": chart_intent,
-        "chart_spec": chart_spec,
-    }
+    logger.info("Chart specs generated: %d", len(chart_specs))
+    return {"chart_specs": chart_specs}
