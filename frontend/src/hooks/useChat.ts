@@ -76,8 +76,10 @@ export function useChat() {
     setTimeout(scrollToBottom, 10);
   }, [scrollToBottom]);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, overrideConversationId?: string) => {
     if (!content.trim() || isSending) return;
+
+    const effectiveConversationId = overrideConversationId ?? conversationId;
 
     addMessage({
       role: 'user',
@@ -97,9 +99,9 @@ export function useChat() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: content.trim(),
-          conversationId,
+          conversationId: effectiveConversationId,
         }),
       });
 

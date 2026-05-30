@@ -64,7 +64,7 @@ export function ChatInterface() {
       updateSessionTitle(currentSessionId, content.slice(0, 15) + (content.length > 15 ? '...' : ''));
     }
 
-    await originalSendMessage(content);
+    await originalSendMessage(content, currentSessionId);
   };
 
   return (
