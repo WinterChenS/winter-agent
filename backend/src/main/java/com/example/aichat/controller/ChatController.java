@@ -61,6 +61,9 @@ public class ChatController {
         if (response.reason() != null) {
             payload.put("reason", response.reason());
         }
+        if (response.chartSpec() != null) {
+            payload.put("chartSpec", response.chartSpec());
+        }
 
         if (payload.isEmpty()) {
             return "{}";

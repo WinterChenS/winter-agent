@@ -11,6 +11,7 @@ public record GenerateResponse(
         String error,
         @JsonAlias({"conversationId", "conversation_id"}) String conversationId,
         @JsonProperty("steps") java.util.List<java.util.Map<String, Object>> steps,
-        @JsonProperty("reason") java.util.Map<String, Object> reason
+        @JsonProperty("reason") java.util.Map<String, Object> reason,
+        @JsonProperty("chartSpec") java.util.Map<String, Object> chartSpec
 ) {
 }
