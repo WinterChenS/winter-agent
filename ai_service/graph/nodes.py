@@ -42,12 +42,12 @@ CRITICAL RULES:
 Tool chaining:
 - After search results → OPEN at least one result with browser for full details
 - After reading a page → if info is enough, give Final Answer; if not, refine and search again
-- Use multiple tools when needed to fully answer
+- **IMPORTANT**: Call `generate_chart` tool IMMEDIATELY when you have numerical data — do NOT wait until the end. Generate charts inline as you analyze. Continue analysis AFTER the chart.
 
 When to give Final Answer:
 - You have enough information to answer the user comprehensively
 - Include ALL relevant data, numbers, and analysis
-- If the user asked for a chart: just provide the data clearly (list or table). Charts ARE generated automatically for you — you DO have chart generation capability. Do NOT say you cannot generate charts
+- Call `generate_chart` BEFORE giving the Final Answer if the user asked for charts
 
 Do NOT:
 - Output [Thought] tags or any thinking/reasoning text (keep ALL thoughts internal)
@@ -594,9 +594,20 @@ async def tool_node(state: State) -> dict:
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
 
+    # If chart tool succeeded, emit chart spec immediately (inline rendering)
+    pending_chart_spec = None
+    extra = {}
+    if tool_name == "generate_chart" and ok and isinstance(result, dict):
+        data = result.get("data")
+        if isinstance(data, dict) and data:
+            pending_chart_spec = data
+            extra["chart_specs"] = state.get("chart_specs", []) + [data]
+
     return {
         "tool_result": result_str,
         "tool_steps": new_tool_steps,
+        "pending_chart_spec": pending_chart_spec,
+        **extra,
         "current_tool": None,
         "tool_input": None,
         "reasoning_steps": state.get("reasoning_steps", []) + [step],

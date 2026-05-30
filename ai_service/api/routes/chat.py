@@ -156,6 +156,15 @@ async def stream_generate(request: GenerateRequest):
                                 assistant_text_emitted_after_tool = True
                         yield to_sse_data(envelope)
 
+                    # Emit chart events inline when chart tool produces a spec during the loop
+                    if final_state:
+                        pending = final_state.get("pending_chart_spec")
+                        if isinstance(pending, dict) and pending:
+                            chart_id = pending.get("id", "chart-pending")
+                            yield to_sse_data(envelope_chart_placeholder(trace_ctx, chart_id))
+                            yield to_sse_data(envelope_chart_ready(trace_ctx, chart_id, pending))
+                            final_state["pending_chart_spec"] = None
+
                 if collecting_control_json and control_json_buffer and not is_tool_action_json(
                     control_json_buffer,
                     event_ctx.known_tools,
