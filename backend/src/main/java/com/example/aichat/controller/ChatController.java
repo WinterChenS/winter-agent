@@ -64,6 +64,12 @@ public class ChatController {
         if (response.chartSpec() != null) {
             payload.put("chartSpec", response.chartSpec());
         }
+        if (response.chartId() != null) {
+            payload.put("chartId", response.chartId());
+        }
+        if (response.block() != null) {
+            payload.put("block", response.block());
+        }
 
         if (payload.isEmpty()) {
             return "{}";

@@ -12,6 +12,8 @@ public record GenerateResponse(
         @JsonAlias({"conversationId", "conversation_id"}) String conversationId,
         @JsonProperty("steps") java.util.List<java.util.Map<String, Object>> steps,
         @JsonProperty("reason") java.util.Map<String, Object> reason,
-        @JsonProperty("chartSpec") java.util.Map<String, Object> chartSpec
+        @JsonProperty("chartSpec") java.util.Map<String, Object> chartSpec,
+        @JsonProperty("chartId") String chartId,
+        @JsonProperty("block") java.util.Map<String, Object> block
 ) {
 }
