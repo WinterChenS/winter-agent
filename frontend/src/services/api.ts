@@ -77,11 +77,10 @@ export async function streamChat(
   return finalConversationId;
 }
 
-export async function getChatHistory(conversationId: string): Promise<any[]> {
+export async function getChatHistory(conversationId: string): Promise<any> {
   const response = await fetch(`/api/chat/history/${conversationId}`);
   if (!response.ok) {
     throw new Error('获取历史记录失败');
   }
-  const data = await response.json();
-  return data.messages || [];
+  return response.json();
 }

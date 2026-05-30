@@ -53,12 +53,45 @@ export function useChat() {
   const loadHistory = useCallback(async (existingId: string) => {
     try {
       const history = await getChatHistory(existingId);
-      const formatted = history.map((msg: any) => ({
+      const chartData = (history as any).chartData;
+      const toolSteps = (history as any).toolSteps;
+
+      const formatted: Message[] = history.messages.map((msg: any) => ({
         id: crypto.randomUUID(),
-        role: msg.role,
+        role: msg.role as Message['role'],
         content: msg.content,
         timestamp: Date.now(),
       }));
+
+      // Attach chart data to the last assistant message
+      if (chartData && formatted.length > 0) {
+        for (let i = formatted.length - 1; i >= 0; i--) {
+          if (formatted[i].role === 'assistant') {
+            formatted[i] = { ...formatted[i], chartData };
+            break;
+          }
+        }
+      }
+
+      // Insert thinking pane before the last assistant message
+      if (toolSteps && toolSteps.length > 0 && formatted.length > 0) {
+        // Find the last assistant message index
+        let insertIdx = formatted.length;
+        for (let i = formatted.length - 1; i >= 0; i--) {
+          if (formatted[i].role === 'assistant') {
+            insertIdx = i;
+          }
+        }
+        const thinkingMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'thinking',
+          content: 'done',
+          toolSteps: toolSteps.map((s: any) => ({ ...s, status: 'completed' as const })),
+          timestamp: Date.now() - 1,
+        };
+        formatted.splice(insertIdx, 0, thinkingMsg);
+      }
+
       setMessages(formatted);
       setConversationId(existingId);
       setTimeout(scrollToBottom, 100);

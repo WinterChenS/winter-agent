@@ -199,7 +199,8 @@ async def get_chat_history(conversation_id: str):
     if not state_history or "messages" not in state_history.checkpoint["channel_values"]:
         return {"messages": []}
 
-    raw_messages = state_history.checkpoint["channel_values"]["messages"]
+    channel_values = state_history.checkpoint["channel_values"]
+    raw_messages = channel_values["messages"]
     formatted_messages = []
     for msg in raw_messages:
         role = "user" if msg.type == "human" else "assistant"
@@ -211,4 +212,15 @@ async def get_chat_history(conversation_id: str):
 
         formatted_messages.append({"role": role, "content": content})
 
-    return {"messages": formatted_messages}
+    # Extract chart_spec and tool_steps from checkpoint state for frontend rendering
+    result = {"messages": formatted_messages}
+
+    chart_spec = channel_values.get("chart_spec")
+    if isinstance(chart_spec, dict) and chart_spec:
+        result["chartData"] = chart_spec
+
+    tool_steps = channel_values.get("tool_steps")
+    if isinstance(tool_steps, list) and tool_steps:
+        result["toolSteps"] = tool_steps
+
+    return result
