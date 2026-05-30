@@ -72,7 +72,7 @@ def test_emit_tool_summary_from_final_state():
 
 def test_process_stream_token_event_buffers_partial_control_json():
     event = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"action": "tool"')}}
-    rewritten, collecting, buffer, preamble = process_stream_token_event(event, False, "", {"search", "time"})
+    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(event, False, "", {"search", "time"})
 
     assert rewritten is None
     assert collecting is True
@@ -81,10 +81,10 @@ def test_process_stream_token_event_buffers_partial_control_json():
 
 def test_process_stream_token_event_filters_tool_control_json():
     part1 = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"action": "tool",')}}
-    _ , collecting, buffer, preamble = process_stream_token_event(part1, False, "", {"search", "time"})
+    _ , collecting, buffer, preamble, thought = process_stream_token_event(part1, False, "", {"search", "time"})
 
     part2 = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('"tool": "search", "query": "x"}')}}
-    rewritten, collecting, buffer, preamble = process_stream_token_event(part2, collecting, buffer, {"search", "time"})
+    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(part2, collecting, buffer, {"search", "time"})
 
     assert rewritten is None
     assert collecting is False
@@ -93,7 +93,7 @@ def test_process_stream_token_event_filters_tool_control_json():
 
 def test_process_stream_token_event_keeps_normal_json_text():
     event = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"note": "hello"}')}}
-    rewritten, collecting, buffer, preamble = process_stream_token_event(event, False, "", {"search", "time"})
+    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(event, False, "", {"search", "time"})
 
     assert rewritten is not None
     assert collecting is False

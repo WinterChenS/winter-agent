@@ -121,13 +121,15 @@ async def stream_generate(request: GenerateRequest):
                 active_tool_span_id: str | None = None
 
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
-                    event, collecting_control_json, control_json_buffer, preamble_buffer = process_stream_token_event(
+                    event, collecting_control_json, control_json_buffer, preamble_buffer, thought_text = process_stream_token_event(
                         event,
                         collecting_control_json,
                         control_json_buffer,
                         event_ctx.known_tools,
                         preamble_buffer,
                     )
+                    if thought_text:
+                        yield to_sse_data(envelope_token(trace_ctx, thought_text, event_type="thought"))
                     if event is None:
                         continue
 

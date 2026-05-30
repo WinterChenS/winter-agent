@@ -45,9 +45,9 @@ def build_envelope(
     return envelope
 
 
-def envelope_token(trace_ctx: TraceContext, content: str) -> dict[str, Any]:
+def envelope_token(trace_ctx: TraceContext, content: str, *, event_type: str = "token") -> dict[str, Any]:
     return build_envelope(
-        "token",
+        event_type,
         trace_ctx,
         payload={"content": content},
         compat_fields={"token": content, "content": content},

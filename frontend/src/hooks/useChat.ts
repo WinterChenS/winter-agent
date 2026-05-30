@@ -4,7 +4,7 @@ import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought';
   schemaVersion?: string;
   payload?: {
     reason?: GuardReason;
@@ -173,6 +173,33 @@ export function useChat() {
         // Chart event: accumulate to attach to assistant message later
         if (parsed.type === 'chart' && (parsed as any).chartSpec) {
           chartDatasForAssistant.push((parsed as any).chartSpec as ChartSpecData);
+          return;
+        }
+
+        // Thought event: show agent's reasoning step in thinking pane
+        if (parsed.type === 'thought' && textChunk) {
+          const shortThought = textChunk.length > 80 ? textChunk.slice(0, 80) + '…' : textChunk;
+          const thoughtStep: ThinkingStep = {
+            tool: '__thought__',
+            input: shortThought,
+            status: 'running',
+            startTime: Date.now(),
+          };
+          if (!thinkingMessageId) {
+            thinkingMessageId = addMessage({ role: 'thinking', content: '', toolSteps: [thoughtStep as any] });
+          }
+          thinkingSteps.push(thoughtStep);
+          updateThinkingMessage();
+          scrollToBottom();
+          // Auto-complete the thought step after a brief moment
+          setTimeout(() => {
+            thinkingSteps = thinkingSteps.map(s =>
+              s.tool === '__thought__' && s.status === 'running'
+                ? { ...s, status: 'completed' as const, elapsed_ms: Date.now() - s.startTime }
+                : s
+            );
+            updateThinkingMessage();
+          }, 300);
           return;
         }
 

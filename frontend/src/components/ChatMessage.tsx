@@ -80,6 +80,7 @@ function parseToolName(line: string): string {
 
 function getToolIcon(toolName: string): string {
   const normalized = toolName.toLowerCase();
+  if (normalized.includes('__thought__')) return '💭';
   if (normalized.includes('search')) return '🔎';
   if (normalized.includes('browser')) return '🌐';
   if (normalized.includes('python')) return '🐍';
