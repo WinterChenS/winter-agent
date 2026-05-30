@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
-import { GuardReason, Message } from '../types/chat';
+import { ChartSpecData, GuardReason, Message } from '../types/chat';
 import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'error';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error';
   schemaVersion?: string;
   payload?: {
     reason?: GuardReason;
@@ -128,6 +128,16 @@ export function useChat() {
         const incomingSteps = parsed.payload?.steps ?? parsed.steps;
         const incomingReason = parsed.payload?.reason ?? parsed.reason;
         const textChunk = parsed.content ?? parsed.token ?? '';
+
+        if (parsed.type === 'chart' && (parsed as any).chartSpec) {
+          const chartSpec = (parsed as any).chartSpec as ChartSpecData;
+          addMessage({
+            role: 'chart',
+            content: chartSpec.title || '图表',
+            chartData: chartSpec,
+          });
+          return;
+        }
 
         if (parsed.type === 'tool_summary' && Array.isArray(incomingSteps)) {
           toolSummarySteps = incomingSteps;

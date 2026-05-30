@@ -6,9 +6,25 @@ export interface GuardReason {
   extra?: Record<string, unknown>;
 }
 
+export interface ChartDataPoint {
+  name: string;
+  value: number;
+  group?: string;
+}
+
+export interface ChartSpecData {
+  id: string;
+  title: string;
+  chartType: 'line' | 'bar' | 'pie' | 'scatter' | 'area' | 'radar';
+  description: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  data: ChartDataPoint[];
+}
+
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart';
   content: string;
   timestamp: number;
   toolSteps?: Array<{
@@ -19,6 +35,7 @@ export interface Message {
     error?: string;
   }>;
   guardReason?: GuardReason;
+  chartData?: ChartSpecData;
 }
 
 export interface ChatRequest {

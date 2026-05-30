@@ -3,9 +3,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css';
+import { ChartRenderer } from './ChartRenderer';
 
 interface ChatMessageProps {
-  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step';
+  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart';
   content: string;
   isLoading?: boolean;
   toolSteps?: Array<{
@@ -22,6 +23,7 @@ interface ChatMessageProps {
     timestamp?: number;
     extra?: Record<string, unknown>;
   };
+  chartData?: import('../types/chat').ChartSpecData;
 }
 
 type ToolStepKind = 'start' | 'result';
@@ -170,7 +172,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   isLoading = false,
   toolSteps = [],
   guardReason,
+  chartData,
 }) => {
+  if (role === 'chart' && chartData) {
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-white border border-gray-200 shadow-sm">
+          <ChartRenderer chartData={chartData} />
+          {chartData.description && (
+            <p className="text-sm text-gray-600 mt-3">{chartData.description}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const isUser = role === 'user';
   const isToolSummary = role === 'tool_summary';
   const isAgentStep = role === 'agent_step';
