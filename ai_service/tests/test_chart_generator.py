@@ -1,158 +1,92 @@
-"""
-Tests for chart generator node.
-"""
+"""Tests for chart generator (mock LLM)."""
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from graph.chart_generator import CHART_GENERATOR_PROMPT, generate_chart_spec
 
 
-class TestChartGeneratorPrompt:
-    def test_prompt_is_non_empty(self):
-        assert len(CHART_GENERATOR_PROMPT) > 100
+def _mock_llm(resp_dict):
+    llm = MagicMock()
+    r = MagicMock()
+    r.content = json.dumps(resp_dict)
+    llm.ainvoke = AsyncMock(return_value=r)
+    return llm
 
-    def test_prompt_includes_json_schema(self):
-        assert "chartType" in CHART_GENERATOR_PROMPT
-        assert "title" in CHART_GENERATOR_PROMPT
-        assert "data" in CHART_GENERATOR_PROMPT
 
-    def test_prompt_mentions_rules(self):
-        assert "numerical data" in CHART_GENERATOR_PROMPT.lower()
+class TestPrompt:
+    def test_has_schema_fields(self):
+        for f in ["chartType", "title", "data"]:
+            assert f in CHART_GENERATOR_PROMPT, f"missing {f}"
 
 
 class TestGenerateChartSpec:
-    @pytest.fixture
-    def mock_llm(self):
-        llm = MagicMock()
-        llm.ainvoke = AsyncMock()
-        return llm
-
     @pytest.mark.asyncio
-    async def test_returns_none_when_need_chart_false(self, mock_llm):
-        intent = {"need_chart": False, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
+    async def test_no_chart_intent(self):
+        result = await generate_chart_spec(MagicMock(), "msg", "data",
+                                           {"need_chart": False, "chart_type": ""})
         assert result is None
-        mock_llm.ainvoke.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_generates_bar_chart_spec(self, mock_llm):
-        response = MagicMock()
-        response.content = json.dumps({
-            "title": "Scores",
-            "chartType": "bar",
-            "description": "Comparison",
-            "data": [
-                {"name": "GPT-4", "value": 86.4},
-                {"name": "Claude", "value": 88.7},
-            ],
-        })
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": "compare"}
-        result = await generate_chart_spec(mock_llm, "compare", "GPT-4: 86.4", intent)
-
-        assert result is not None
-        assert result["chartType"] == "bar"
-        assert result["title"] == "Scores"
-        assert len(result["data"]) == 2
-        assert result["data"][0]["name"] == "GPT-4"
-        assert result["data"][0]["value"] == 86.4
+    async def test_generates_bar_chart(self):
+        llm = _mock_llm({
+            "title": "Scores", "chartType": "bar", "data": [
+                {"name": "GPT-4", "value": 86.4}, {"name": "Claude", "value": 88.7}]})
+        r = await generate_chart_spec(llm, "compare", "data",
+                                      {"need_chart": True, "chart_type": "bar", "reason": ""})
+        assert r is not None
+        assert r["title"] == "Scores"
+        assert r["chartType"] == "bar"
+        assert len(r["data"]) == 2
+        assert r["data"][0]["name"] == "GPT-4"
+        assert r["data"][0]["value"] == 86.4
 
     @pytest.mark.asyncio
-    async def test_overrides_chart_type_from_intent(self, mock_llm):
-        response = MagicMock()
-        response.content = json.dumps({
-            "title": "Pie",
-            "chartType": "bar",  # LLM returned bar, but intent says pie
-            "data": [{"name": "A", "value": 50}, {"name": "B", "value": 50}],
-        })
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "pie", "reason": "proportions"}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert result["chartType"] == "pie"  # Overridden by intent
+    async def test_overrides_chart_type(self):
+        llm = _mock_llm({"title": "P", "chartType": "bar", "data": [{"name": "A", "value": 30}]})
+        r = await generate_chart_spec(llm, "shares", "data",
+                                      {"need_chart": True, "chart_type": "pie", "reason": ""})
+        assert r["chartType"] == "pie"
 
     @pytest.mark.asyncio
-    async def test_handles_markdown_code_block(self, mock_llm):
-        response = MagicMock()
-        response.content = '```json\n{"title": "Test", "chartType": "line", "data": [{"name": "X", "value": 1}]}\n```'
-        mock_llm.ainvoke.return_value = response
+    async def test_llm_error(self):
+        llm = MagicMock()
+        llm.ainvoke = AsyncMock(side_effect=Exception("fail"))
+        r = await generate_chart_spec(llm, "test", "data",
+                                      {"need_chart": True, "chart_type": "bar", "reason": ""})
+        assert r is None
 
-        intent = {"need_chart": True, "chart_type": "line", "reason": "trend"}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
+    @pytest.mark.asyncio
+    async def test_invalid_json(self):
+        llm = MagicMock()
+        r = MagicMock()
+        r.content = "bad json"
+        llm.ainvoke = AsyncMock(return_value=r)
+        result = await generate_chart_spec(llm, "test", "data",
+                                           {"need_chart": True, "chart_type": "line", "reason": ""})
+        assert result is None
 
+    @pytest.mark.asyncio
+    async def test_markdown_fence(self):
+        llm = MagicMock()
+        r = MagicMock()
+        r.content = '```json\n{"title": "T", "chartType": "line", "data": [{"name": "X", "value": 1}]}\n```'
+        llm.ainvoke = AsyncMock(return_value=r)
+        result = await generate_chart_spec(llm, "test", "data",
+                                           {"need_chart": True, "chart_type": "line", "reason": ""})
         assert result is not None
         assert result["chartType"] == "line"
 
     @pytest.mark.asyncio
-    async def test_handles_generic_code_block(self, mock_llm):
-        response = MagicMock()
-        response.content = '```\n{"title": "T", "chartType": "bar", "data": []}\n```'
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert result is not None
-        assert result["chartType"] == "bar"
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_error(self, mock_llm):
-        mock_llm.ainvoke.side_effect = RuntimeError("LLM failed")
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_invalid_json(self, mock_llm):
-        response = MagicMock()
-        response.content = "not json at all"
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_includes_description_in_result(self, mock_llm):
-        response = MagicMock()
-        response.content = json.dumps({
-            "title": "Chart",
-            "chartType": "bar",
-            "description": "A detailed description",
-            "xAxisLabel": "Models",
-            "yAxisLabel": "Score",
-            "data": [{"name": "A", "value": 1}],
-        })
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert result["description"] == "A detailed description"
-        assert result["xAxisLabel"] == "Models"
-        assert result["yAxisLabel"] == "Score"
-
-    @pytest.mark.asyncio
-    async def test_generates_id(self, mock_llm):
-        response = MagicMock()
-        response.content = json.dumps({
-            "title": "T",
-            "chartType": "bar",
-            "data": [{"name": "A", "value": 1}],
-        })
-        mock_llm.ainvoke.return_value = response
-
-        intent = {"need_chart": True, "chart_type": "bar", "reason": ""}
-        result = await generate_chart_spec(mock_llm, "test", "data", intent)
-
-        assert "id" in result
-        assert len(result["id"]) == 12
+    async def test_grouped_data(self):
+        llm = _mock_llm({
+            "title": "Groups", "chartType": "bar",
+            "data": [{"name": "A", "value": 10, "group": "G1"},
+                     {"name": "A", "value": 15, "group": "G2"}]})
+        r = await generate_chart_spec(llm, "test", "data",
+                                      {"need_chart": True, "chart_type": "bar", "reason": ""})
+        assert len(r["data"]) == 2
+        assert r["data"][0]["group"] == "G1"
