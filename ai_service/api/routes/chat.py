@@ -19,6 +19,28 @@ from api.events.event_mapper import (
 )
 from config import settings
 from core.runtime import get_checkpointer, get_tool_registry
+
+
+def _is_internal_react_message(content: str) -> bool:
+    """Filter out internal ReAct system messages from history."""
+    if not content:
+        return False
+    stripped = content.strip()
+    # System action messages: [SYSTEM: You called ...]
+    if stripped.startswith("[SYSTEM:") or stripped.startswith("[Tool result:"):
+        return True
+    # Legacy ReAct format (for old conversations)
+    if stripped.startswith("Action:") and "\nAction Input:" in stripped:
+        return True
+    if stripped.startswith("Observation (") and "):" in stripped[:30]:
+        return True
+    # Tool-call JSON that leaked into messages
+    if stripped.startswith('{"action"'):
+        return True
+    # Chart planner JSON leak
+    if stripped.startswith('{"need_chart"'):
+        return True
+    return False
 from decorator.timeit import timeit
 from domain.event_envelope import (
     envelope_error,
@@ -81,6 +103,8 @@ async def stream_generate(request: GenerateRequest):
                     "span_id": trace_ctx.span_id,
                     "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": trace_ctx.agent_id,
+                    "chart_intent": None,
+                    "chart_spec": None,
                 }
 
                 thread_id = trace_ctx.conversation_id
@@ -179,6 +203,12 @@ async def get_chat_history(conversation_id: str):
     formatted_messages = []
     for msg in raw_messages:
         role = "user" if msg.type == "human" else "assistant"
-        formatted_messages.append({"role": role, "content": msg.content})
+        content = msg.content if isinstance(msg.content, str) else str(msg.content)
+
+        # Filter out internal ReAct messages that should not appear in user-facing history
+        if _is_internal_react_message(content):
+            continue
+
+        formatted_messages.append({"role": role, "content": content})
 
     return {"messages": formatted_messages}

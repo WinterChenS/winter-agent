@@ -19,7 +19,7 @@ def _new_id(prefix: str) -> str:
 
 
 def ensure_trace_context(conversation_id: str | None, agent_id: str = "agent.main") -> TraceContext:
-    conv_id = conversation_id or "default-thread"
+    conv_id = conversation_id or _new_id("conv")
     return TraceContext(
         conversation_id=conv_id,
         trace_id=_new_id("trc"),

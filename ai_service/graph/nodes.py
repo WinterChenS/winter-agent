@@ -28,29 +28,33 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct (Reasoning + Acting) agent. Follow this cycle to solve every request:
+You are a ReAct agent. Follow this internal cycle:
 
-**Cycle:**
-  Thought → Action → Observation → (repeat until done) → Final Answer
+  [Thought] → [Action] → [Observation] → (repeat) → [Final Answer]
 
-**Rules:**
-1. THINK before acting: analyze what you need
-2. ACT: call ONE tool at a time using ONLY this JSON (no markdown, no extra text):
-   {"action": "tool", "tool": "<tool_name>", "query": "<your query>"}
-3. OBSERVE: review the tool result
-4. If you need MORE information, call another tool (go back to step 1)
-5. Only give the Final Answer when you have ENOUGH information
+CRITICAL RULES:
+1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output it as text
+2. Your response must be EXACTLY ONE of:
+   a) A tool-call JSON: {"action": "tool", "tool": "<name>", "query": "<query>"}
+   b) A Final Answer in natural language (the user's language)
+3. NEVER output both — each response is either JSON OR Final Answer, never both
 
-**Tool chaining guide:**
-- After getting search results, OPEN at least one result with browser to get full details
-- After reading a page, if the info is insufficient, search again with a refined query
-- You CAN and SHOULD chain multiple tools in one turn to fully answer the user
+Tool chaining:
+- After search results → OPEN at least one result with browser for full details
+- After reading a page → if info is enough, give Final Answer; if not, refine and search again
+- Use multiple tools when needed to fully answer
 
-**Do NOT:**
-- Answer after only one search without reading the actual content
+When to give Final Answer:
+- You have enough information to answer the user comprehensively
+- Include ALL relevant data, numbers, and analysis
+- If the user asked for a chart, include the data in your answer
+
+Do NOT:
+- Output your thinking/reasoning/analysis as text (keep it internal)
+- Output JSON and text in the same response
 - Call the same tool with the same query twice
-- Output JSON in your final answer
-- Give up early — keep going until you have enough info\
+- Give up early — keep going until you have enough info
+- Mimic the [SYSTEM:] or [Tool result:] format in your response (those are internal)\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
@@ -101,12 +105,12 @@ def _append_reason(state: State, record: dict) -> list:
     return list(state.get("reasoning_steps", [])) + [record]
 
 
-def _build_llm() -> ChatOpenAI:
+def _build_llm(streaming: bool = True) -> ChatOpenAI:
     """创建并返回 ChatOpenAI 实例（集中在一处，方便统一修改参数）。"""
     return ChatOpenAI(
         model=settings.model,
         temperature=settings.temperature,
-        streaming=True,
+        streaming=streaming,
         api_key=settings.api_key,
         base_url=settings.base_url,
         extra_body={
@@ -453,10 +457,7 @@ async def agent_node(state: State) -> dict:
                 message=f"Decided to call tool '{tool_name}' with query: '{query}'",
                 extra={"tool": tool_name},
             )
-            # ReAct: record the Action as a message so the LLM sees its own tool call in history
-            action_msg = AIMessage(content=f"Action: {tool_name}\nAction Input: {query}")
             return {
-                "messages": [action_msg],
                 "current_tool": tool_name,
                 "tool_input": {"query": query},
                 "tool_result": None,
@@ -578,11 +579,7 @@ async def tool_node(state: State) -> dict:
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
 
-    # ReAct: inject Observation into the conversation so the LLM sees the tool result in context
-    observation_text = _build_observation_message(tool_name, result_str)
-
     return {
-        "messages": [AIMessage(content=observation_text)],
         "tool_result": result_str,
         "tool_steps": new_tool_steps,
         "current_tool": None,
@@ -625,13 +622,13 @@ def _build_observation_message(tool_name: str, result_str: str) -> str:
         parsed = json.loads(result_str)
     except Exception:
         sanitized = normalize_tool_result_for_prompt(result_str)
-        return f"Observation ({tool_name}):\n{sanitized}" if sanitized else f"Observation ({tool_name}): completed."
+        return f"[Tool result: {tool_name}]\n{sanitized}" if sanitized else f"[Tool result: {tool_name}] completed."
 
     if isinstance(parsed, dict) and not parsed.get("ok", False):
         err = parsed.get("error", {})
         if isinstance(err, dict):
-            return f"Observation ({tool_name}): ERROR - {err.get('message', str(err))}"
-        return f"Observation ({tool_name}): ERROR - {err}"
+            return f"[Tool result: {tool_name}] ERROR - {err.get('message', str(err))}"
+        return f"[Tool result: {tool_name}] ERROR - {err}"
 
     data = parsed.get("data")
     if isinstance(data, dict) and "url" in data and "text" in data:
@@ -642,14 +639,14 @@ def _build_observation_message(tool_name: str, result_str: str) -> str:
         text_display = text[:4000]
         trunc_note = "\n[...truncated]" if len(text) > 4000 else ""
         return (
-            f"Observation ({tool_name}):\n"
+            f"[Tool result: {tool_name}]\n"
             f"URL: {url}\n"
             f"Title: {title}\n"
             f"Content ({length} chars):\n{text_display}{trunc_note}"
         )
 
     sanitized = normalize_tool_result_for_prompt(result_str)
-    return f"Observation ({tool_name}):\n{sanitized}" if sanitized else f"Observation ({tool_name}): completed."
+    return f"[Tool result: {tool_name}]\n{sanitized}" if sanitized else f"[Tool result: {tool_name}] completed."
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -660,12 +657,32 @@ async def chart_node(state: State) -> dict:
     user_message = _latest_user_text(state)
     tool_result = state.get("tool_result") or ""
 
-    llm = _build_llm()
+    # Extract the final assistant answer from messages for better chart intent analysis
+    final_answer = ""
+    raw_messages = list(state.get("messages") or [])
+    for msg in reversed(raw_messages):
+        msg_type = getattr(msg, "type", None)
+        msg_content = getattr(msg, "content", None)
+        if msg_type == "ai" and isinstance(msg_content, str) and msg_content.strip():
+            # Skip tool-call JSON and observation messages
+            if not msg_content.startswith("Action:") and not msg_content.startswith("Observation"):
+                final_answer = msg_content
+                break
+
+    # Combine tool result and final answer for comprehensive chart analysis
+    analysis_parts = []
+    if tool_result:
+        analysis_parts.append(f"=== Raw tool data ===\n{tool_result[:3000]}")
+    if final_answer:
+        analysis_parts.append(f"=== Agent's final answer ===\n{final_answer[:3000]}")
+    analysis_text = "\n\n".join(analysis_parts) if analysis_parts else ""
+
+    llm = _build_llm(streaming=False)
 
     from graph.chart_planner import plan_chart
     from graph.chart_generator import generate_chart_spec
 
-    chart_intent = await plan_chart(llm, user_message, tool_result)
+    chart_intent = await plan_chart(llm, user_message, analysis_text)
     logger.info("Chart intent: %s", chart_intent)
 
     if not chart_intent.get("need_chart"):
