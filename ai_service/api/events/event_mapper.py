@@ -42,6 +42,11 @@ def safe_json_loads(raw: str) -> dict[str, Any] | None:
 
 def is_tool_action_json(raw: str, known_tools: set[str]) -> bool:
     parsed = safe_json_loads(raw.strip())
+    return is_tool_action_json_str(parsed, known_tools)
+
+
+def is_tool_action_json_str(parsed: dict[str, Any] | None, known_tools: set[str]) -> bool:
+    """Check if a parsed dict is a tool-call action JSON."""
     if not parsed:
         return False
 
@@ -85,17 +90,19 @@ def process_stream_token_event(
 
     if collecting_control_json:
         merged = control_json_buffer + raw_token_content
-        if "}" not in merged:
+        parsed = safe_json_loads(merged)
+        if parsed is None:
+            # JSON not complete yet — keep buffering
             return None, True, merged, preamble_buffer, ""
-        if is_tool_action_json(merged, known_tools):
-            thought = preamble_buffer.strip()
-            return None, False, "", "", thought
+        if is_tool_action_json_str(parsed, known_tools):
+            return None, False, "", "", ""
         return _stream_event_with_content(merged), False, "", "", ""
 
     if raw_token_content.lstrip().startswith("{"):
-        if "}" not in raw_token_content:
+        parsed = safe_json_loads(raw_token_content)
+        if parsed is None:
             return None, True, raw_token_content, preamble_buffer, ""
-        if is_tool_action_json(raw_token_content, known_tools):
+        if is_tool_action_json_str(parsed, known_tools):
             return None, False, "", "", ""
         return _stream_event_with_content(raw_token_content), False, "", "", ""
 
