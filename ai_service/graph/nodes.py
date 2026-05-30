@@ -61,8 +61,11 @@ Do NOT:
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
 _TOOL_FORMAT_HINT = _REACT_SYSTEM_PROMPT
 
-# Maximum number of tool calls in one turn to avoid infinite loops.
-MAX_ITERATIONS = 5
+# Maximum number of tool calls in one turn — configurable via MAX_TOOL_ITERATIONS env var
+def _max_iterations() -> int:
+    return max(1, int(getattr(settings, "max_tool_iterations", 5) or 5))
+
+MAX_ITERATIONS = _max_iterations()
 
 
 def _max_consecutive_search_calls() -> int:
