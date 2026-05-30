@@ -50,11 +50,12 @@ When to give Final Answer:
 - If the user asked for a chart, include the data in your answer
 
 Do NOT:
-- Output your thinking/reasoning/analysis as text (keep it internal)
-- Output JSON and text in the same response
+- Output [Thought] tags or any thinking/reasoning text (keep ALL thoughts internal)
+- Output JSON and text in the same response — each response is JSON-only OR text-only
 - Call the same tool with the same query twice
 - Give up early — keep going until you have enough info
-- Mimic the [SYSTEM:] or [Tool result:] format in your response (those are internal)\
+- If you cannot find enough data after searching, provide a brief Final Answer stating so
+- Your response must NEVER contain [Thought], [Action], or [Observation] tags\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
@@ -114,7 +115,7 @@ def _build_llm(streaming: bool = True) -> ChatOpenAI:
         api_key=settings.api_key,
         base_url=settings.base_url,
         extra_body={
-            "enable_thinking": False
+            "thinking": {"type": "disabled"},
         }
     )
 
@@ -181,6 +182,17 @@ def _extract_tool_from_parsed(parsed: dict) -> tuple[str, str] | None:
 def _extract_iso_date(text: str) -> str | None:
     m = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
     return m.group(0) if m else None
+
+
+def _strip_thought_tags(text: str) -> str:
+    """Remove [Thought]...[/Thought] and standalone [Thought] tags from LLM output."""
+    # Remove [Thought]...[/Thought] blocks
+    text = re.sub(r"\[Thought\][\s\S]*?\[/Thought\]", "", text)
+    # Remove lines that start with [Thought] (some models use single-line format)
+    text = re.sub(r"^\[Thought\].*$", "", text, flags=re.MULTILINE)
+    # Remove isolated [Thought] and [/Thought] tags
+    text = text.replace("[Thought]", "").replace("[/Thought]", "")
+    return text.strip()
 
 
 def _latest_user_text(state: State) -> str:
@@ -311,6 +323,8 @@ async def agent_node(state: State) -> dict:
 
     # 5. 尝试解析是否要调工具
     content = (response.content or "").strip()
+    # Strip [Thought] tags that some models output despite prompt instructions
+    content = _strip_thought_tags(content)
     try:
         parsed = _parse_tool_call(content)
         if parsed:

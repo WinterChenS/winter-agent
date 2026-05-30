@@ -94,6 +94,10 @@ def process_stream_token_event(
             return None, False, ""
         return _stream_event_with_content(raw_token_content), False, ""
 
+    # Filter model thinking/reasoning tokens (DeepSeek may output [Thought] tags)
+    if "[Thought]" in raw_token_content or "[/Thought]" in raw_token_content:
+        return None, collecting_control_json, control_json_buffer
+
     return event, False, ""
 
 
@@ -205,8 +209,13 @@ def map_langgraph_event_to_envelopes(
 
     elif event_type == "on_chain_end":
         output_state = event.get("data", {}).get("output", {})
-        if isinstance(output_state, dict) and "messages" in output_state:
-            final_state = output_state
+        if isinstance(output_state, dict):
+            if "messages" in output_state:
+                final_state = output_state
+            elif "chart_spec" in output_state and isinstance(final_state, dict):
+                final_state["chart_spec"] = output_state["chart_spec"]
+            elif "chart_spec" in output_state:
+                final_state = output_state
 
     return envelopes, active_tool_span_id, final_state
 
