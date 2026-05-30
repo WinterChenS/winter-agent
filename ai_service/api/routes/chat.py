@@ -187,6 +187,15 @@ async def stream_generate(request: GenerateRequest):
                     yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
 
+                # Flush residual preamble buffer (short answers that never hit 200-char threshold)
+                if preamble_buffer and not assistant_text_emitted:
+                    if not current_block_id:
+                        current_block_id = f"block-{trace_ctx.turn_id}"
+                        yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
+                    yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, preamble_buffer))
+                    assistant_text_emitted = True
+                    preamble_buffer = ""
+
                 # End any open markdown block at stream completion
                 if current_block_id:
                     yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))
@@ -210,24 +219,8 @@ async def stream_generate(request: GenerateRequest):
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
 
-                # 6) 发送内容块（markdown → chart_placeholder → chart_ready 顺序）
-                if final_state:
-                    blocks = final_state.get("blocks", [])
-                    for i, block in enumerate(blocks):
-                        btype = block.get("type", "markdown")
-                        if btype == "chart":
-                            chart_spec = block.get("chart_spec", {})
-                            chart_id = chart_spec.get("id", f"chart-{i}")
-                            # 1. Placeholder
-                            yield to_sse_data(envelope_chart_placeholder(trace_ctx, chart_id))
-                            # 2. Ready
-                            yield to_sse_data(envelope_chart_ready(trace_ctx, chart_id, chart_spec))
-                        else:
-                            yield to_sse_data(envelope_block(trace_ctx, block))
-                    # Legacy fallback: if no blocks, emit chart events directly
-                    if not blocks:
-                        for chart_envelope in emit_chart_envelopes(final_state, event_ctx):
-                            yield to_sse_data(chart_envelope)
+                # 6) Charts are emitted inline during loop via pending_chart_spec.
+                # No need to re-emit from chart_node blocks.
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))
