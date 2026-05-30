@@ -51,3 +51,7 @@ class State(TypedDict):
     parent_span_id: str | None
     active_agent: str
 
+    # ── Chart rendering ──────────────────────────────────────────────────
+    chart_intent: dict | None   # LLM analysis: {need_chart, chart_type, reason}
+    chart_spec: dict | None     # Structured ChartSpec for frontend rendering
+
