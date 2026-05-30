@@ -170,7 +170,35 @@ export function useChat() {
       const handleParsedEvent = (parsed: StreamPayload) => {
         const textChunk = parsed.content ?? parsed.token ?? '';
 
-        // Chart event: accumulate to attach to assistant message later
+        // Block event: markdown blocks append to answer, charts etc.
+        if (parsed.type === 'block') {
+          const block = (parsed as any).block;
+          if (block?.type === 'markdown' && block?.content) {
+            appendText(block.content + '\n\n');
+          }
+          return;
+        }
+
+        // Chart placeholder: show skeleton loading state
+        if (parsed.type === 'chart_placeholder') {
+          const chartId = (parsed as any).chartId || 'pending';
+          chartDatasForAssistant.push({ id: chartId, title: '', chartType: 'bar', description: '', data: [], _placeholder: true } as any);
+          return;
+        }
+
+        // Chart ready: replace placeholder with real chart data
+        if (parsed.type === 'chart_ready') {
+          const spec = (parsed as any).chartSpec as ChartSpecData;
+          // Replace placeholder entry with real data
+          chartDatasForAssistant = chartDatasForAssistant.map(c =>
+            (c as any)._placeholder && c.id === spec.id ? spec : c
+          );
+          // Filter out any remaining placeholders
+          chartDatasForAssistant = chartDatasForAssistant.filter(c => !(c as any)._placeholder);
+          return;
+        }
+
+        // Legacy chart event: accumulate to attach to assistant message later
         if (parsed.type === 'chart' && (parsed as any).chartSpec) {
           chartDatasForAssistant.push((parsed as any).chartSpec as ChartSpecData);
           return;

@@ -43,6 +43,9 @@ def _is_internal_react_message(content: str) -> bool:
     return False
 from decorator.timeit import timeit
 from domain.event_envelope import (
+    envelope_block,
+    envelope_chart_placeholder,
+    envelope_chart_ready,
     envelope_error,
     envelope_token,
     to_sse_data,
@@ -104,6 +107,7 @@ async def stream_generate(request: GenerateRequest):
                     "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": trace_ctx.agent_id,
                     "chart_specs": [],
+                    "blocks": [],
                 }
 
                 thread_id = trace_ctx.conversation_id
@@ -184,10 +188,24 @@ async def stream_generate(request: GenerateRequest):
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
 
-                # 6) 发送图表事件（如果 chart_node 生成了 ChartSpec，支持多图表）
+                # 6) 发送内容块（markdown → chart_placeholder → chart_ready 顺序）
                 if final_state:
-                    for chart_envelope in emit_chart_envelopes(final_state, event_ctx):
-                        yield to_sse_data(chart_envelope)
+                    blocks = final_state.get("blocks", [])
+                    for i, block in enumerate(blocks):
+                        btype = block.get("type", "markdown")
+                        if btype == "chart":
+                            chart_spec = block.get("chart_spec", {})
+                            chart_id = chart_spec.get("id", f"chart-{i}")
+                            # 1. Placeholder
+                            yield to_sse_data(envelope_chart_placeholder(trace_ctx, chart_id))
+                            # 2. Ready
+                            yield to_sse_data(envelope_chart_ready(trace_ctx, chart_id, chart_spec))
+                        else:
+                            yield to_sse_data(envelope_block(trace_ctx, block))
+                    # Legacy fallback: if no blocks, emit chart events directly
+                    if not blocks:
+                        for chart_envelope in emit_chart_envelopes(final_state, event_ctx):
+                            yield to_sse_data(chart_envelope)
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))

@@ -90,6 +90,36 @@ def envelope_agent_step(trace_ctx: TraceContext, reason: dict[str, Any]) -> dict
     )
 
 
+def envelope_block(trace_ctx: TraceContext, block: dict[str, Any]) -> EventEnvelope:
+    """Build a 'block' event envelope carrying a content block to the frontend."""
+    return build_envelope(
+        event_type="block",
+        trace_ctx=trace_ctx,
+        payload={"block": block},
+        compat=block,
+    )
+
+
+def envelope_chart_placeholder(trace_ctx: TraceContext, chart_id: str) -> EventEnvelope:
+    """Build a 'chart_placeholder' event — frontend shows a loading skeleton."""
+    return build_envelope(
+        event_type="chart_placeholder",
+        trace_ctx=trace_ctx,
+        payload={"chartId": chart_id},
+        compat={"chartId": chart_id},
+    )
+
+
+def envelope_chart_ready(trace_ctx: TraceContext, chart_id: str, chart_spec: dict[str, Any]) -> EventEnvelope:
+    """Build a 'chart_ready' event — frontend replaces placeholder with real chart."""
+    return build_envelope(
+        event_type="chart_ready",
+        trace_ctx=trace_ctx,
+        payload={"chartId": chart_id, "chartSpec": chart_spec},
+        compat={"chartId": chart_id, "chartSpec": chart_spec},
+    )
+
+
 def envelope_chart(trace_ctx: TraceContext, chart_spec: dict[str, Any]) -> EventEnvelope:
     """Build a 'chart' event envelope carrying ChartSpec to the frontend."""
     return build_envelope(

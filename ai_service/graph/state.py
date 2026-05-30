@@ -52,5 +52,6 @@ class State(TypedDict):
     active_agent: str
 
     # ── Chart rendering ──────────────────────────────────────────────────
-    chart_specs: list[dict]     # List of ChartSpec dicts for frontend rendering (multi-chart support)
+    chart_specs: list[dict]     # List of ChartSpec dicts (multi-chart support)
+    blocks: list[dict]          # Ordered content blocks (markdown/chart/table/code)
 

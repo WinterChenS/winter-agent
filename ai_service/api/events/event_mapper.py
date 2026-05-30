@@ -221,13 +221,15 @@ def map_langgraph_event_to_envelopes(
         if isinstance(output_state, dict):
             if "messages" in output_state:
                 final_state = output_state
+            elif "blocks" in output_state and isinstance(final_state, dict):
+                final_state["blocks"] = output_state["blocks"]
+                final_state["chart_specs"] = output_state.get("chart_specs", [])
+            elif "blocks" in output_state:
+                final_state = output_state
             elif "chart_specs" in output_state and isinstance(final_state, dict):
                 final_state["chart_specs"] = output_state["chart_specs"]
             elif "chart_specs" in output_state:
                 final_state = output_state
-            # Legacy single chart_spec fallback
-            elif "chart_spec" in output_state and isinstance(final_state, dict):
-                final_state["chart_spec"] = output_state["chart_spec"]
 
     return envelopes, active_tool_span_id, final_state
 

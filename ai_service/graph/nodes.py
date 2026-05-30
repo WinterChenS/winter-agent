@@ -661,34 +661,30 @@ def _build_observation_message(tool_name: str, result_str: str) -> str:
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# chart_node：图表规划 + 生成节点
+# chart_node：图表规划 + 生成 + 内容编排节点
 # ────────────────────────────────────────────────────────────────────────────
 async def chart_node(state: State) -> dict:
-    """Analyze tool results, decide if a chart is needed, and generate ChartSpec."""
+    """Analyze tool results, generate charts, and compose ordered content blocks."""
     user_message = _latest_user_text(state)
     tool_result = state.get("tool_result") or ""
 
-    # Extract the final assistant answer from messages for better chart intent analysis
+    # Extract the final assistant answer from messages
     final_answer = ""
     raw_messages = list(state.get("messages") or [])
     for msg in reversed(raw_messages):
         msg_type = getattr(msg, "type", None)
         msg_content = getattr(msg, "content", None)
         if msg_type == "ai" and isinstance(msg_content, str) and msg_content.strip():
-            # Skip tool-call JSON and observation messages
             if not msg_content.startswith("Action:") and not msg_content.startswith("Observation"):
                 final_answer = msg_content
                 break
 
-    # Combine tool result and final answer for comprehensive chart analysis
     analysis_parts = []
     if tool_result:
         analysis_parts.append(f"=== Raw tool data ===\n{tool_result[:3000]}")
     if final_answer:
         analysis_parts.append(f"=== Agent's final answer ===\n{final_answer[:3000]}")
     analysis_text = "\n\n".join(analysis_parts) if analysis_parts else ""
-    logger.info("chart_node analysis_text length: %d, tool_result: %s, final_answer: %s",
-                len(analysis_text), bool(tool_result), bool(final_answer))
 
     llm = _build_llm(streaming=False)
 
@@ -698,14 +694,20 @@ async def chart_node(state: State) -> dict:
     chart_intents = await plan_charts(llm, user_message, analysis_text)
     logger.info("Chart intents: %s", chart_intents)
 
-    if not chart_intents:
-        return {"chart_specs": []}
-
     chart_specs = []
     for intent in chart_intents:
         spec = await generate_chart_spec(llm, user_message, tool_result, intent)
         if spec:
             chart_specs.append(spec)
-
     logger.info("Chart specs generated: %d", len(chart_specs))
-    return {"chart_specs": chart_specs}
+
+    # Compose answer + charts into ordered content blocks
+    from graph.content_composer import compose_blocks
+
+    blocks = await compose_blocks(llm, user_message, final_answer, chart_specs)
+    logger.info("Content blocks composed: %d blocks", len(blocks))
+
+    return {
+        "chart_specs": chart_specs,
+        "blocks": blocks,
+    }
