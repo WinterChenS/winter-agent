@@ -88,7 +88,8 @@ def process_stream_token_event(
         if "}" not in merged:
             return None, True, merged, preamble_buffer, ""
         if is_tool_action_json(merged, known_tools):
-            return None, False, "", "", ""
+            thought = preamble_buffer.strip()
+            return None, False, "", "", thought
         return _stream_event_with_content(merged), False, "", "", ""
 
     if raw_token_content.lstrip().startswith("{"):
@@ -102,8 +103,16 @@ def process_stream_token_event(
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Stream text freely — don't buffer as preamble (enables typewriter effect)
-    return event, False, "", "", ""
+    # Short preamble buffer: buffer first ~200 chars to detect tool-call vs direct answer.
+    # If a '{' appears within the buffer window, the preamble is reasoning → emit as thought.
+    # If no '{' appears → release as normal tokens (direct answer).
+    new_preamble = preamble_buffer + raw_token_content
+    if len(new_preamble) < 200:
+        # Still within buffer window — keep buffering to detect tool calls
+        return None, False, "", new_preamble, ""
+    # Buffer full — release the buffered text and continue streaming
+    release_event = _stream_event_with_content(new_preamble)
+    return release_event, False, "", "", ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:

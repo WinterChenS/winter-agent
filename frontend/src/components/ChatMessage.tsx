@@ -439,16 +439,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 const ThinkingPane: React.FC<{
   toolSteps: Array<{ tool: string; input: string; status: string; elapsed_ms?: number; error?: string }>;
   isDone: boolean;
-}> = ({ toolSteps, isDone }) => {
-  const [expanded, setExpanded] = useState(!isDone);
-  const allDone = toolSteps.every(s => s.status !== 'running');
-
-  React.useEffect(() => {
-    if (allDone) {
-      const timer = setTimeout(() => setExpanded(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [allDone]);
+}> = ({ toolSteps }) => {
+  const [expanded, setExpanded] = useState(true);
 
   const runningCount = toolSteps.filter(s => s.status === 'running').length;
   const title = runningCount > 0
@@ -462,7 +454,7 @@ const ThinkingPane: React.FC<{
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-500 hover:bg-blue-100/50 transition-colors"
         >
-          <span className={`inline-block w-1.5 h-1.5 rounded-full ${allDone ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${toolSteps.every(s => s.status !== 'running') ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
           <span className="font-medium text-gray-700">{title}</span>
           <span className="ml-auto text-gray-400">{expanded ? '收起 ▲' : '展开 ▼'}</span>
         </button>
@@ -475,8 +467,8 @@ const ThinkingPane: React.FC<{
                   <span className="text-sm flex-shrink-0">{getToolIcon(step.tool)}</span>
                   <span className="font-medium text-gray-700 flex-shrink-0">{step.tool}</span>
                   {step.input && (
-                    <span className="text-gray-400 truncate" title={step.input}>
-                      {step.input.length > 50 ? step.input.slice(0, 50) + '...' : step.input}
+                    <span className="text-gray-500 break-all" title={step.input}>
+                      {step.input}
                     </span>
                   )}
                   <span className="ml-auto flex items-center gap-1 flex-shrink-0">
