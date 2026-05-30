@@ -126,18 +126,16 @@ export function useChat() {
         updateMessageContent(assistantMessageId, assistantContent);
       };
 
+      let chartDataForAssistant: ChartSpecData | undefined;
+
       const handleParsedEvent = (parsed: StreamPayload) => {
         const incomingSteps = parsed.payload?.steps ?? parsed.steps;
         const incomingReason = parsed.payload?.reason ?? parsed.reason;
         const textChunk = parsed.content ?? parsed.token ?? '';
 
+        // Store chart data to attach to assistant message later
         if (parsed.type === 'chart' && (parsed as any).chartSpec) {
-          const chartSpec = (parsed as any).chartSpec as ChartSpecData;
-          addMessage({
-            role: 'chart',
-            content: chartSpec.title || '图表',
-            chartData: chartSpec,
-          });
+          chartDataForAssistant = (parsed as any).chartSpec as ChartSpecData;
           return;
         }
 
@@ -236,6 +234,13 @@ export function useChat() {
           content: guardReason.message || `Agent 执行策略已触发${codeText}`,
           guardReason,
         });
+      }
+
+      // Attach chart data to the assistant message (rendered inside the answer bubble)
+      if (chartDataForAssistant) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId ? { ...msg, chartData: chartDataForAssistant } : msg
+        ));
       }
     } catch (err) {
       updateMessageContent(assistantMessageId, '抱歉，AI 服务暂时不可用，请稍后再试。');
