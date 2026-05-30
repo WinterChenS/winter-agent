@@ -96,7 +96,7 @@ def envelope_block(trace_ctx: TraceContext, block: dict[str, Any]) -> EventEnvel
         event_type="block",
         trace_ctx=trace_ctx,
         payload={"block": block},
-        compat=block,
+        compat_fields={"content": block.get("content", ""), "chartSpec": block.get("chartSpec")},
     )
 
 
@@ -106,7 +106,7 @@ def envelope_chart_placeholder(trace_ctx: TraceContext, chart_id: str) -> EventE
         event_type="chart_placeholder",
         trace_ctx=trace_ctx,
         payload={"chartId": chart_id},
-        compat={"chartId": chart_id},
+        compat_fields={"chartId": chart_id},
     )
 
 
@@ -116,7 +116,7 @@ def envelope_chart_ready(trace_ctx: TraceContext, chart_id: str, chart_spec: dic
         event_type="chart_ready",
         trace_ctx=trace_ctx,
         payload={"chartId": chart_id, "chartSpec": chart_spec},
-        compat={"chartId": chart_id, "chartSpec": chart_spec},
+        compat_fields={"chartId": chart_id, "chartSpec": chart_spec},
     )
 
 
