@@ -110,6 +110,7 @@ async def stream_generate(request: GenerateRequest):
                     "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": trace_ctx.agent_id,
                     "chart_specs": [],
+                    "consecutive_text_count": 0,
                     "blocks": [],
                 }
 

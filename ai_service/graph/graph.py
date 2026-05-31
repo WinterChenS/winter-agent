@@ -5,21 +5,15 @@ from graph.state import State
 
 
 def _route_after_agent(state: State) -> str:
-    """
-    条件边函数：在 agent_node 执行完后，决定下一步走哪里。
-
-    规则：
-    - 如果 agent_node 设置了 current_tool 且 iteration_count <= MAX_ITERATIONS → 走 tool_node
-    - 否则（直接回答 / 超出迭代次数）→ END
-
-    ⚠️ 注意：这里必须用 <=，不能用 <。
-    agent_node 在 current_iteration == MAX_ITERATIONS 时会强制 fallback（将 current_tool 置 None）。
-    所以 routing 这里用 <= 是为了让第 MAX_ITERATIONS 轮工具能真正执行；
-    如果用 < 会导致：agent 设置了 current_tool 但 routing 直接走 END，最终答案静默丢失。
-    """
+    """Route after agent: tool calls go to tool_node, text response loops back to agent,
+    chart route goes to chart_node at end."""
     if state.get("current_tool") and state.get("iteration_count", 0) <= MAX_ITERATIONS:
         return "tool"
-    return "chart"
+    # Text response (not final answer yet): loop back to agent to continue ReAct
+    consecutive_text = int(state.get("consecutive_text_count", 0) or 0)
+    if consecutive_text >= 2:
+        return "chart"
+    return "agent"  # Self-loop: keep ReAct going
 
 
 def create_agent_graph(checkpointer=None):
@@ -54,6 +48,7 @@ def create_agent_graph(checkpointer=None):
         {
             "tool": "tool",      # 返回 "tool"  → 走 tool_node
             "chart": "chart",    # 返回 "chart" → 走 chart_node
+            "agent": "agent",    # 返回 "agent" → self-loop (continue ReAct)
             END: END,            # 返回 END     → 结束
         },
     )

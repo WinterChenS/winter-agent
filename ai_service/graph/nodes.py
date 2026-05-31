@@ -512,20 +512,34 @@ async def agent_node(state: State) -> dict:
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         pass
 
-    # 6. 普通文本回答
+    # 6. 非JSON文本回答：继续循环，不直接结束
+    consecutive_text = int(state.get("consecutive_text_count", 0) or 0) + 1
     reason = _reason_record(
         node="agent_node",
-        code="DIRECT_ANSWER",
-        message="Generated direct answer (no tool needed).",
+        code="TEXT_RESPONSE",
+        message=f"Non-tool text response (#{consecutive_text}). Continuing loop.",
     )
+    # After 2 consecutive text responses, treat as final answer
+    if consecutive_text >= 2:
+        reason["code"] = "DIRECT_ANSWER"
+        reason["message"] = "Final answer after consecutive text responses."
+        return {
+            "messages": [response],
+            "current_tool": None,
+            "tool_input": None,
+            "last_tool_name": None,
+            "last_tool_query": None,
+            "last_guard_reason": reason,
+            "consecutive_search_count": 0,
+            "consecutive_text_count": 0,
+            "reasoning_steps": _append_reason(state, reason),
+        }
+    # First text: add to messages, keep looping
     return {
         "messages": [response],
-        "current_tool": None,
+        "current_tool": None,  # No tool, but routing will continue loop
         "tool_input": None,
-        "last_tool_name": None,
-        "last_tool_query": None,
-        "last_guard_reason": reason,
-        "consecutive_search_count": 0,
+        "consecutive_text_count": consecutive_text,
         "reasoning_steps": _append_reason(state, reason),
     }
 
