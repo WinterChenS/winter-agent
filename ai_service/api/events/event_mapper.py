@@ -21,130 +21,15 @@ class EventMapContext:
     known_tools: set[str]
 
 
-def _filter_chart_denial(text: str) -> str:
-    """Remove LLM text claiming it cannot generate charts."""
-    import re
-    # Remove denial sentences
-    patterns = [
-        r'很抱歉，我无法直接生成[^。]*[。]',
-        r'抱歉，我无法生成[^。]*[。]',
-        r'I cannot generate[^.]*\.',
-        r"I can't generate[^.]*\.",
-        r'无法直接生成图表[^。]*[。]',
-        r'无法生成图片[^。]*[。]',
-    ]
-    for p in patterns:
-        text = re.sub(p, '', text)
-    # Remove Python code blocks (LLM provides matplotlib code as fallback)
-    text = re.sub(r'```python[\s\S]*?```', '', text)
-    text = re.sub(r'复制\n[^\n]*', '', text)
-    # Clean up extra whitespace
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
-
-
-def _stream_event_with_content(content: str) -> dict[str, Any]:
-    class _Chunk:
-        def __init__(self, text: str):
-            self.content = text
-
-    return {
-        "event": "on_chat_model_stream",
-        "data": {"chunk": _Chunk(content)},
-    }
-
-
-def safe_json_loads(raw: str) -> dict[str, Any] | None:
-    try:
-        parsed = json.loads(raw)
-        return parsed if isinstance(parsed, dict) else None
-    except Exception:
-        return None
-
-
-def is_tool_action_json(raw: str, known_tools: set[str]) -> bool:
-    parsed = safe_json_loads(raw.strip())
-    return is_tool_action_json_str(parsed, known_tools)
-
-
-def is_tool_action_json_str(parsed: dict[str, Any] | None, known_tools: set[str]) -> bool:
-    """Check if a parsed dict is a tool-call action JSON."""
-    if not parsed:
-        return False
-
-    action = str(parsed.get("action", "")).strip().lower()
-    if not action:
-        return False
-
-    if action == "tool":
-        tool_name = str(parsed.get("tool", "")).strip().lower()
-        if not tool_name:
-            return False
-        return tool_name in known_tools if known_tools else True
-
-    return action in known_tools
-
-
-def process_stream_token_event(
-    event: dict[str, Any],
-    collecting_control_json: bool,
-    control_json_buffer: str,
-    known_tools: set[str],
-    preamble_buffer: str = "",
-) -> tuple[dict[str, Any] | None, bool, str, str, str]:
-    """Filter tool-control JSON from model stream.
-
-    Text tokens stream freely. JSON tool calls are filtered.
-    Returns:
-      - rewritten event (or None when chunk should be swallowed)
-      - updated collecting_control_json
-      - updated control_json_buffer
-      - updated preamble_buffer (unused, kept for compat)
-      - thought_text (non-empty when reasoning text precedes a tool call)
-    """
-    if event.get("event") != "on_chat_model_stream":
-        return event, collecting_control_json, control_json_buffer, preamble_buffer, ""
-
-    chunk = event.get("data", {}).get("chunk")
-    raw_token_content = getattr(chunk, "content", "")
-    if not raw_token_content:
-        return event, collecting_control_json, control_json_buffer, preamble_buffer, ""
-
-    if collecting_control_json:
-        merged = control_json_buffer + raw_token_content
-        parsed = safe_json_loads(merged)
-        if parsed is None:
-            # JSON not complete yet — keep buffering
-            return None, True, merged, preamble_buffer, ""
-        if is_tool_action_json_str(parsed, known_tools):
-            return None, False, "", "", ""
-        return _stream_event_with_content(merged), False, "", "", ""
-
-    if raw_token_content.lstrip().startswith("{"):
-        parsed = safe_json_loads(raw_token_content)
-        if parsed is None:
-            return None, True, raw_token_content, preamble_buffer, ""
-        if is_tool_action_json_str(parsed, known_tools):
-            return None, False, "", "", ""
-        return _stream_event_with_content(raw_token_content), False, "", "", ""
-
-    # Filter thinking tags and XML leaks
-    if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>", "<tool_calls>", "</tool_calls>", "<invoke")):
-        return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
-
-    # Short preamble buffer (~300 chars): detect if text is reasoning before JSON.
-    # If JSON follows → emit as thought. If no JSON → stream freely (typewriter).
-    new_preamble = preamble_buffer + raw_token_content
-    if len(new_preamble) < 300:
-        return None, False, "", new_preamble, ""
-    # Buffer exceeded 300 chars → it's a direct answer, stream freely
-    return _stream_event_with_content(new_preamble), False, "", "", ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
     tool_result_raw = output.get("tool_result")
     if isinstance(tool_result_raw, str):
-        parsed = safe_json_loads(tool_result_raw)
+        try:
+            parsed = json.loads(tool_result_raw)
+        except Exception:
+            parsed = None
     elif isinstance(tool_result_raw, dict):
         parsed = tool_result_raw
     else:
@@ -220,13 +105,11 @@ def map_langgraph_event_to_envelopes(
             tool_name = input_state.get("current_tool") or tool_name
 
         active_tool_span_id = new_span(ctx.trace_ctx.span_id, name=f"tool:{tool_name}")
-        tool_ctx = replace(ctx.trace_ctx, span_id=active_tool_span_id, parent_span_id=ctx.trace_ctx.span_id)
+        tool_ctx = replace(ctx.trace_ctx, span_id=active_tool_span_id,
+                          parent_span_id=ctx.trace_ctx.span_id)
         envelopes.append(
-            envelope_tool_start(
-                tool_ctx,
-                tool_name,
-                f"\n\n🛠️ 正在调用工具：{tool_name}...\n",
-            )
+            envelope_tool_start(tool_ctx, tool_name,
+                              f"\n\n🛠️ 正在调用工具：{tool_name}...\n")
         )
 
     elif event_type == "on_chain_end" and event_name == "tool":
@@ -249,26 +132,8 @@ def map_langgraph_event_to_envelopes(
 
     elif event_type == "on_chain_end":
         output_state = event.get("data", {}).get("output", {})
-        if isinstance(output_state, dict):
-            if "messages" in output_state:
-                final_state = output_state
-            elif "blocks" in output_state and isinstance(final_state, dict):
-                final_state["blocks"] = output_state["blocks"]
-                final_state["chart_specs"] = output_state.get("chart_specs", [])
-            elif "blocks" in output_state:
-                final_state = output_state
-            elif "chart_specs" in output_state and isinstance(final_state, dict):
-                final_state["chart_specs"] = output_state["chart_specs"]
-            elif "chart_specs" in output_state:
-                final_state = output_state
-            # Copy inline block fields from any node output into final_state
-            if final_state is None and (output_state.get("pending_chart_spec") or output_state.get("pending_text_block")):
-                final_state = {}
-            if isinstance(final_state, dict):
-                for key in ("pending_chart_spec", "pending_text_block"):
-                    val = output_state.get(key)
-                    if val is not None:
-                        final_state[key] = val
+        if isinstance(output_state, dict) and "messages" in output_state:
+            final_state = output_state
 
     return envelopes, active_tool_span_id, final_state
 
