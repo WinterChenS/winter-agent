@@ -117,7 +117,7 @@ def _build_llm(streaming: bool = True) -> ChatOpenAI:
         streaming=streaming,
         api_key=settings.api_key,
         base_url=settings.base_url,
-        model_kwargs={
+        extra_body={
             "thinking": {"type": "disabled"},
             "tool_choice": "none",
         },
