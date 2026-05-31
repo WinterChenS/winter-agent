@@ -4,18 +4,13 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css';
 import { ChartRenderer } from './ChartRenderer';
+import type { AgentProcessStep } from '../types/chat';
 
 interface ChatMessageProps {
   role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
   content: string;
   isLoading?: boolean;
-  toolSteps?: Array<{
-    tool: string;
-    input: string;
-    status: 'completed' | 'error' | 'running';
-    elapsed_ms: number;
-    error?: string;
-  }>;
+  toolSteps?: AgentProcessStep[];
   guardReason?: {
     node?: string;
     code?: string;
@@ -80,7 +75,8 @@ function parseToolName(line: string): string {
 
 function getToolIcon(toolName: string): string {
   const normalized = toolName.toLowerCase();
-  if (normalized.includes('__thought__')) return '💭';
+  if (normalized.includes('__thought__') || normalized.includes('__reasoning__')) return '💭';
+  if (normalized.includes('__guard__')) return '⚙️';
   if (normalized.includes('search')) return '🔎';
   if (normalized.includes('browser')) return '🌐';
   if (normalized.includes('python')) return '🐍';
@@ -274,12 +270,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">{getToolIcon(step.tool)}</span>
-                        <span className="font-semibold">{step.tool}</span>
+                        <span className="text-lg">{getToolIcon(step.tool || step.kind || 'tool')}</span>
+                        <span className="font-semibold">{step.tool || step.title || 'tool'}</span>
                         <span className="text-xs opacity-70">
                           {step.status === 'completed' ? '✓ 成功' : '✗ 失败'}
                         </span>
-                        {step.elapsed_ms > 0 && (
+                        {(step.elapsed_ms || 0) > 0 && (
                           <span className="text-xs opacity-60 ml-auto">{step.elapsed_ms}ms</span>
                         )}
                       </div>
@@ -333,8 +329,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     <div className="p-2 space-y-1.5">
                       {summarySteps.map((step, idx) => (
                         <div key={`think-${idx}`} className="flex items-center gap-2 text-xs text-gray-600">
-                          <span>{getToolIcon(step.tool)}</span>
-                          <span className="font-medium text-gray-700">{step.tool}</span>
+                          <span>{getToolIcon(step.tool || step.kind || 'tool')}</span>
+                          <span className="font-medium text-gray-700">{step.tool || step.title || 'tool'}</span>
                           {step.input && (
                             <span className="text-gray-400 truncate max-w-[200px]">{step.input}</span>
                           )}
@@ -342,7 +338,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                           <span className={step.status === 'completed' ? 'text-green-600' : 'text-red-600'}>
                             {step.status === 'completed' ? '完成' : '失败'}
                           </span>
-                          {step.elapsed_ms > 0 && (
+                          {(step.elapsed_ms || 0) > 0 && (
                             <span className="text-gray-400 ml-auto">{step.elapsed_ms}ms</span>
                           )}
                         </div>
@@ -437,56 +433,78 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 // ThinkingPane: real-time agent process display (Claude Code-style)
 // ────────────────────────────────────────────────────────────────────────────
 const ThinkingPane: React.FC<{
-  toolSteps: Array<{ tool: string; input: string; status: string; elapsed_ms?: number; error?: string }>;
+  toolSteps: AgentProcessStep[];
   isDone: boolean;
 }> = ({ toolSteps }) => {
   const [expanded, setExpanded] = useState(true);
+  const [openStep, setOpenStep] = useState<number | null>(null);
 
   const runningCount = toolSteps.filter(s => s.status === 'running').length;
+  const failedCount = toolSteps.filter(s => s.status === 'error').length;
   const title = runningCount > 0
     ? `正在思考... (${runningCount} 个工具运行中)`
-    : `已完成 ${toolSteps.length} 个步骤`;
+    : `已完成 ${toolSteps.length} 个步骤${failedCount ? `，${failedCount} 个失败` : ''}`;
 
   return (
     <div className="flex justify-start mb-1">
-      <div className="max-w-[85%] rounded-xl overflow-hidden border border-blue-100 bg-blue-50/50 min-w-[280px]">
+      <div className="max-w-[85%] rounded-xl overflow-hidden border border-slate-200 bg-white/80 shadow-sm min-w-[300px]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-500 hover:bg-blue-100/50 transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
         >
-          <span className={`inline-block w-1.5 h-1.5 rounded-full ${toolSteps.every(s => s.status !== 'running') ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
-          <span className="font-medium text-gray-700">{title}</span>
-          <span className="ml-auto text-gray-400">{expanded ? '收起 ▲' : '展开 ▼'}</span>
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${runningCount ? 'bg-blue-500 animate-pulse' : failedCount ? 'bg-red-500' : 'bg-green-500'}`} />
+          <span className="font-medium text-slate-700">{title}</span>
+          <span className="ml-auto text-slate-400">{expanded ? '收起 ▲' : '展开 ▼'}</span>
         </button>
 
         {expanded && (
-          <div className="px-3 pb-2 max-h-60 overflow-y-auto">
-            <div className="space-y-0.5 border-l-2 border-blue-200 pl-2">
+          <div className="px-3 pb-3 max-h-72 overflow-y-auto">
+            <div className="space-y-1 border-l-2 border-slate-200 pl-3">
               {toolSteps.map((step, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-xs py-0.5">
-                  <span className="text-sm flex-shrink-0">{getToolIcon(step.tool)}</span>
-                  <span className="font-medium text-gray-700 flex-shrink-0">{step.tool}</span>
-                  {step.input && (
-                    <span className="text-gray-500 break-all" title={step.input}>
-                      {step.input}
+                <div key={step.id || idx} className="text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep(openStep === idx ? null : idx)}
+                    className="flex items-center gap-2 w-full py-1 text-left hover:bg-slate-50 rounded px-1"
+                  >
+                    <span className="text-sm flex-shrink-0">{getToolIcon(step.tool || step.kind || 'tool')}</span>
+                    <span className="font-medium text-slate-700 flex-shrink-0">
+                      {step.title || step.tool || '步骤'}
                     </span>
+                    <span className="text-slate-500 truncate">
+                      {step.summary || step.input || step.detail || ''}
+                    </span>
+                    <span className="ml-auto flex items-center gap-1 flex-shrink-0">
+                      {step.status === 'running' ? (
+                        <span className="inline-block w-2.5 h-2.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      ) : step.status === 'error' ? (
+                        <span className="text-red-500" title={step.error}>失败</span>
+                      ) : (
+                        <span className="text-green-600">
+                          {step.elapsed_ms ? `${(step.elapsed_ms / 1000).toFixed(1)}s` : '完成'}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {openStep === idx && (
+                    <div className="ml-7 mt-1 rounded border border-slate-200 bg-slate-50 p-2 text-slate-600 space-y-1">
+                      {step.input && (
+                        <div className="break-words">
+                          <span className="font-medium text-slate-700">输入：</span>{step.input}
+                        </div>
+                      )}
+                      {step.detail && (
+                        <div className="break-words whitespace-pre-wrap">
+                          <span className="font-medium text-slate-700">结果：</span>{step.detail}
+                        </div>
+                      )}
+                      {step.error && (
+                        <div className="break-words text-red-600">
+                          <span className="font-medium">错误：</span>{step.error}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  <span className="ml-auto flex items-center gap-1 flex-shrink-0">
-                    {step.status === 'running' ? (
-                      <span className="flex items-center gap-1 text-blue-500">
-                        <span className="inline-block w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                      </span>
-                    ) : step.status === 'error' ? (
-                      <span className="text-red-500 text-xs" title={step.error}>✗</span>
-                    ) : (
-                      <span className="text-green-600 text-xs flex items-center gap-0.5">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {step.elapsed_ms ? `${(step.elapsed_ms / 1000).toFixed(1)}s` : ''}
-                      </span>
-                    )}
-                  </span>
                 </div>
               ))}
             </div>

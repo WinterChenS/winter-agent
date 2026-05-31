@@ -22,18 +22,26 @@ export interface ChartSpecData {
   data: ChartDataPoint[];
 }
 
+export interface AgentProcessStep {
+  id?: string;
+  kind?: 'reasoning' | 'tool' | 'guard';
+  tool?: string;
+  title?: string;
+  summary?: string;
+  input?: string;
+  detail?: string;
+  status: 'completed' | 'error' | 'running';
+  elapsed_ms?: number;
+  error?: string;
+  startTime?: number;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
   content: string;
   timestamp: number;
-  toolSteps?: Array<{
-    tool: string;
-    input: string;
-    status: 'completed' | 'error' | 'running';
-    elapsed_ms: number;
-    error?: string;
-  }>;
+  toolSteps?: AgentProcessStep[];
   guardReason?: GuardReason;
   chartDatas?: ChartSpecData[];
 }

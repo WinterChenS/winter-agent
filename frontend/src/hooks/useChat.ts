@@ -1,20 +1,24 @@
 import { useState, useRef, useCallback } from 'react';
-import { ChartSpecData, GuardReason, Message } from '../types/chat';
+import { AgentProcessStep, ChartSpecData, GuardReason, Message } from '../types/chat';
 import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'block' | 'block_start' | 'block_chunk' | 'block_end' | 'chart_placeholder' | 'chart_ready';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta' | 'block' | 'block_start' | 'block_chunk' | 'block_end' | 'chart_placeholder' | 'chart_ready';
   schemaVersion?: string;
   payload?: {
+    content?: string;
+    toolName?: string;
+    input?: unknown;
+    status?: 'running' | 'completed' | 'error';
+    summary?: string;
+    elapsed_ms?: number;
+    error?: string;
+    chartId?: string;
+    chartSpec?: ChartSpecData;
+    block?: unknown;
     reason?: GuardReason;
-    steps?: Array<{
-      tool: string;
-      input: string;
-      status: 'completed' | 'error';
-      elapsed_ms: number;
-      error?: string;
-    }>;
+    steps?: AgentProcessStep[];
   };
   token?: string;
   content?: string;
@@ -22,22 +26,24 @@ interface StreamPayload {
   error?: string;
   toolName?: string;
   reason?: GuardReason;
-  steps?: Array<{
-    tool: string;
-    input: string;
-    status: 'completed' | 'error';
-    elapsed_ms: number;
-    error?: string;
-  }>;
+  steps?: AgentProcessStep[];
 }
 
-interface ThinkingStep {
-  tool: string;
-  input: string;
-  status: 'running' | 'completed' | 'error';
-  elapsed_ms?: number;
-  error?: string;
-  startTime: number;
+type ThinkingStep = AgentProcessStep & { startTime: number };
+
+function stringifyInput(input: unknown): string {
+  if (input == null) return '';
+  if (typeof input === 'string') return input;
+  if (typeof input === 'object') {
+    const maybeQuery = (input as any).query ?? (input as any).url;
+    if (maybeQuery) return String(maybeQuery);
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return String(input);
+    }
+  }
+  return String(input);
 }
 
 export function useChat() {
@@ -87,7 +93,16 @@ export function useChat() {
           id: crypto.randomUUID(),
           role: 'thinking',
           content: 'done',
-          toolSteps: toolSteps.map((s: any) => ({ ...s, status: 'completed' as const })),
+          toolSteps: toolSteps.map((s: any) => ({
+            kind: s.kind || 'tool',
+            tool: s.tool || 'unknown',
+            title: s.title || `调用 ${s.tool || 'tool'}`,
+            summary: s.summary || '',
+            input: s.input || '',
+            status: s.status === 'error' ? 'error' as const : 'completed' as const,
+            elapsed_ms: s.elapsed_ms || 0,
+            error: s.error,
+          })),
           timestamp: Date.now() - 1,
         };
         formatted.splice(insertIdx, 0, thinkingMsg);
@@ -172,7 +187,8 @@ export function useChat() {
       };
 
       const handleParsedEvent = (parsed: StreamPayload) => {
-        const textChunk = parsed.content ?? parsed.token ?? '';
+        const payload = parsed.payload ?? {};
+        const textChunk = payload.content ?? parsed.content ?? parsed.token ?? '';
 
         // Block streaming: block_start → block_chunk → block_end
         if (parsed.type === 'block_start') {
@@ -180,7 +196,7 @@ export function useChat() {
           return;
         }
         if (parsed.type === 'block_chunk') {
-          const chunkContent = (parsed as any).content || '';
+          const chunkContent = payload.content || (parsed as any).content || '';
           if (chunkContent) appendText(chunkContent);
           return;
         }
@@ -201,14 +217,14 @@ export function useChat() {
 
         // Chart placeholder: show skeleton loading state
         if (parsed.type === 'chart_placeholder') {
-          const chartId = (parsed as any).chartId || 'pending';
+          const chartId = payload.chartId || (parsed as any).chartId || 'pending';
           chartDatasForAssistant.push({ id: chartId, title: '', chartType: 'bar', description: '', data: [], _placeholder: true } as any);
           return;
         }
 
         // Chart ready: replace placeholder with real chart data
         if (parsed.type === 'chart_ready') {
-          const spec = (parsed as any).chartSpec as ChartSpecData;
+          const spec = (payload.chartSpec || (parsed as any).chartSpec) as ChartSpecData;
           // Replace placeholder entry with real data
           chartDatasForAssistant = chartDatasForAssistant.map(c =>
             (c as any)._placeholder && c.id === spec.id ? spec : c
@@ -225,12 +241,16 @@ export function useChat() {
         }
 
         // Thought event: show agent's reasoning step in thinking pane
-        if (parsed.type === 'thought' && textChunk) {
-          const shortThought = textChunk.length > 80 ? textChunk.slice(0, 80) + '…' : textChunk;
+        if ((parsed.type === 'thought' || parsed.type === 'reasoning_delta') && textChunk) {
+          const shortThought = textChunk.length > 120 ? textChunk.slice(0, 120) + '...' : textChunk;
           const thoughtStep: ThinkingStep = {
-            tool: '__thought__',
+            kind: 'reasoning',
+            tool: '__reasoning__',
+            title: '思考',
+            summary: shortThought,
             input: shortThought,
-            status: 'running',
+            status: 'completed',
+            elapsed_ms: 0,
             startTime: Date.now(),
           };
           if (!thinkingMessageId) {
@@ -239,24 +259,19 @@ export function useChat() {
           thinkingSteps.push(thoughtStep);
           updateThinkingMessage();
           scrollToBottom();
-          // Auto-complete the thought step after a brief moment
-          setTimeout(() => {
-            thinkingSteps = thinkingSteps.map(s =>
-              s.tool === '__thought__' && s.status === 'running'
-                ? { ...s, status: 'completed' as const, elapsed_ms: Date.now() - s.startTime }
-                : s
-            );
-            updateThinkingMessage();
-          }, 300);
           return;
         }
 
         // Tool started: create or update thinking pane in real-time
         if (parsed.type === 'tool_start') {
-          const toolName = parsed.toolName ?? 'unknown';
+          const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
+          const input = stringifyInput(payload.input);
           const newStep: ThinkingStep = {
+            kind: 'tool',
             tool: toolName,
-            input: '',
+            title: `调用 ${toolName}`,
+            summary: input ? `输入：${input}` : '准备执行工具',
+            input,
             status: 'running',
             startTime: Date.now(),
           };
@@ -276,7 +291,7 @@ export function useChat() {
 
         // Tool completed: update the running step
         if (parsed.type === 'tool_result') {
-          const toolName = parsed.toolName ?? 'unknown';
+          const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
           const contentText = textChunk || '';
           // Extract elapsed from content if available
           const now = Date.now();
@@ -288,10 +303,12 @@ export function useChat() {
                                  contentText.match(/读取\s*(\d+)\s*字符/);
               return {
                 ...s,
-                status: contentText.includes('失败') || contentText.includes('ERROR') ? 'error' as const : 'completed' as const,
-                elapsed_ms: now - s.startTime,
-                input: inputMatch ? inputMatch[1].trim() : s.input || contentText.slice(0, 80),
-                error: contentText.includes('失败') ? contentText.slice(0, 100) : undefined,
+                status: (payload.status === 'error' || contentText.includes('失败') || contentText.includes('ERROR')) ? 'error' as const : 'completed' as const,
+                elapsed_ms: payload.elapsed_ms ?? (now - s.startTime),
+                input: stringifyInput(payload.input) || (inputMatch ? inputMatch[1].trim() : s.input || ''),
+                summary: payload.summary || contentText.trim() || s.summary,
+                detail: contentText.trim(),
+                error: payload.error || (contentText.includes('失败') ? contentText.slice(0, 100) : undefined),
               };
             }
             return s;
@@ -305,6 +322,21 @@ export function useChat() {
           const incomingReason = parsed.payload?.reason ?? parsed.reason;
           if (incomingReason) {
             updateMessage(assistantMessageId, { guardReason: incomingReason as any });
+            const guardStep: ThinkingStep = {
+              kind: 'guard',
+              tool: '__guard__',
+              title: '策略收敛',
+              summary: incomingReason.message || incomingReason.code || 'Agent 策略触发',
+              detail: incomingReason.code,
+              status: 'completed',
+              elapsed_ms: 0,
+              startTime: Date.now(),
+            };
+            if (!thinkingMessageId) {
+              thinkingMessageId = addMessage({ role: 'thinking', content: '', toolSteps: [guardStep as any] });
+            }
+            thinkingSteps.push(guardStep);
+            updateThinkingMessage();
           }
           // Auto-collapse thinking after agent step (answer is done)
           if (thinkingMessageId && thinkingSteps.length > 0) {
@@ -319,7 +351,10 @@ export function useChat() {
           if (Array.isArray(incomingSteps) && incomingSteps.length > 0) {
             // Replace steps with final, accurate data
             thinkingSteps = incomingSteps.map((s: any) => ({
+              kind: s.kind || 'tool',
               tool: s.tool || 'unknown',
+              title: s.title || `调用 ${s.tool || 'tool'}`,
+              summary: s.summary || '',
               input: s.input || '',
               status: (s.status === 'error' ? 'error' : 'completed') as ThinkingStep['status'],
               elapsed_ms: s.elapsed_ms || 0,

@@ -54,20 +54,56 @@ def envelope_token(trace_ctx: TraceContext, content: str, *, event_type: str = "
     )
 
 
-def envelope_tool_start(trace_ctx: TraceContext, tool_name: str, content: str) -> dict[str, Any]:
+def envelope_reasoning_delta(trace_ctx: TraceContext, content: str) -> dict[str, Any]:
+    return build_envelope(
+        "reasoning_delta",
+        trace_ctx,
+        payload={"content": content},
+        compat_fields={"content": content},
+    )
+
+
+def envelope_tool_start(
+    trace_ctx: TraceContext,
+    tool_name: str,
+    content: str,
+    input_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return build_envelope(
         "tool_start",
         trace_ctx,
-        payload={"toolName": tool_name, "content": content},
+        payload={
+            "toolName": tool_name,
+            "content": content,
+            "input": input_payload or {},
+            "status": "running",
+        },
         compat_fields={"toolName": tool_name, "content": content},
     )
 
 
-def envelope_tool_result(trace_ctx: TraceContext, tool_name: str, content: str) -> dict[str, Any]:
+def envelope_tool_result(
+    trace_ctx: TraceContext,
+    tool_name: str,
+    content: str,
+    *,
+    status: str | None = None,
+    input_text: str | None = None,
+    elapsed_ms: int | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
     return build_envelope(
         "tool_result",
         trace_ctx,
-        payload={"toolName": tool_name, "content": content},
+        payload={
+            "toolName": tool_name,
+            "content": content,
+            "summary": content,
+            "status": status or "completed",
+            "input": input_text or "",
+            "elapsed_ms": elapsed_ms or 0,
+            "error": error,
+        },
         compat_fields={"toolName": tool_name, "content": content},
     )
 
@@ -171,4 +207,3 @@ def envelope_error(trace_ctx: TraceContext, message: str) -> dict[str, Any]:
 
 def to_sse_data(envelope: dict[str, Any]) -> dict[str, str]:
     return {"data": json.dumps(envelope, ensure_ascii=False)}
-

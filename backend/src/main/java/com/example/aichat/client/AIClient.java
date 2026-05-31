@@ -1,7 +1,6 @@
 package com.example.aichat.client;
 
 import com.example.aichat.model.GenerateRequest;
-import com.example.aichat.model.GenerateResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -19,14 +18,14 @@ public class AIClient {
         this.aiServiceUrl = aiServiceUrl;
     }
 
-    public Flux<GenerateResponse> streamGenerate(String message, String conversationId) {
+    public Flux<String> streamGenerate(String message, String conversationId) {
         GenerateRequest request = new GenerateRequest(message, conversationId);
 
         return webClient.post()
                 .uri(aiServiceUrl + "/api/v1/generate/stream")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToFlux(GenerateResponse.class);
+                .bodyToFlux(String.class);
     }
 
     public reactor.core.publisher.Mono<String> getChatHistory(String conversationId) {
