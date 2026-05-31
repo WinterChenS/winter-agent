@@ -28,31 +28,31 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-YOU ARE A BLOCK-BASED AGENT. Every response is JSON tool call OR Final Answer.
+You are a ReAct agent. Follow this internal cycle:
 
-MANDATORY WORKFLOW (follow exactly):
-1. Search for data
-2. For EACH distinct topic/visualization:
-   a) Call output_text with a markdown analysis paragraph
-   b) Call generate_chart with the chart data
-3. End with a brief Final Answer summary
+  [Thought] → [Action] → [Observation] → (repeat) → [Final Answer]
 
-EXAMPLE for "analyze stocks with bar chart + pie chart":
-{"action":"tool","tool":"search","query":"stock market data 2026"}
-{"action":"tool","tool":"output_text","query":"## 市场数据分析\\n\\n根据最新数据，股市..."}
-{"action":"tool","tool":"generate_chart","query":"line|Price Trend|Jan:100,Feb:110,Mar:105"}
-{"action":"tool","tool":"output_text","query":"## 投资者结构\\n\\n投资者占比..."}
-{"action":"tool","tool":"generate_chart","query":"pie|Investor Mix|Retail:40,Inst:35,Foreign:25"}
-Final Answer: 总结以上分析...
+CRITICAL RULES:
+1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output it as text
+2. Your response must be EXACTLY ONE of:
+   a) A tool-call JSON: {"action": "tool", "tool": "<name>", "query": "<your query>"}
+   b) A Final Answer in natural language (the user's language)
+3. NEVER output both — each response is either JSON OR Final Answer, never both
 
-CHART FORMAT: "type|Title|name:value,name:value"
-Supported types: line, bar, pie, scatter, area, radar
+Available tools:
+- search: web search. query = keywords
+- browser: open URL. query = EXACT URL from search result (never guess)
+- generate_chart: create chart inline. query = "type|Title|name:value,name:value" (types: line,bar,pie,scatter,area,radar). Example: "bar|Scores|GPT-4:86,Claude:88"
 
-RULES:
-- ALWAYS call output_text BEFORE generate_chart
-- Use search snippets if browser fails
-- Final Answer must be brief (2-3 sentences max)
-- NEVER output chart format strings in Final Answer\
+Tool chaining:
+- After search → open 1-2 results with browser for details
+- When you have numerical data → call generate_chart immediately
+- If browser fails twice, use search snippets and move on
+
+When to give Final Answer:
+- You have enough information to answer comprehensively
+- If user asked for charts, call generate_chart BEFORE Final Answer
+- NEVER include chart format strings in Final Answer\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
@@ -115,10 +115,7 @@ def _build_llm(streaming: bool = True) -> ChatOpenAI:
         streaming=streaming,
         api_key=settings.api_key,
         base_url=settings.base_url,
-        extra_body={
-            "thinking": {"type": "disabled"},
-            "tool_choice": "none",
-        },
+        extra_body={"thinking": {"type": "disabled"}},
     )
 
 
@@ -141,7 +138,10 @@ def _parse_tool_call(content: str) -> tuple[str, str] | None:
             if result is not None:
                 return result
 
-    # Slow path: search for JSON blocks embedded in preamble text
+    # Slow path: search for JSON blocks embedded in preamble text.
+    # Collect ALL tool calls, skip {"text":"..."} blocks.
+    # Return (tool_name, query, remaining_tool_calls)
+    all_results: list[tuple[str, str]] = []
     depth = 0
     start = -1
     for i, ch in enumerate(content):
@@ -161,24 +161,46 @@ def _parse_tool_call(content: str) -> tuple[str, str] | None:
                 if isinstance(parsed, dict):
                     result = _extract_tool_from_parsed(parsed)
                     if result is not None:
-                        return result
+                        all_results.append(result)
                 start = -1
 
-    return None
+    return all_results[0] if all_results else None
 
 
 def _extract_tool_from_parsed(parsed: dict) -> tuple[str, str] | None:
+    # Format 1: {"action": "tool", "tool": "search", "query": "..."}
     action = str(parsed.get("action", "")).strip()
-    query = str(parsed.get("query", "")).strip()
-
-    if action == "tool":
-        tool_name = str(parsed.get("tool", "")).strip()
-    else:
-        tool_name = action
-
-    if not tool_name:
+    if action:
+        query = str(parsed.get("query", "")).strip()
+        if action == "tool":
+            tool_name = str(parsed.get("tool", "")).strip()
+        else:
+            tool_name = action
+        if tool_name:
+            return tool_name, query
         return None
-    return tool_name, query
+
+    # Format 2: Native function calling: {"tool": "name", "arguments": {"query": "..."}}
+    tool_name = str(parsed.get("tool", "")).strip()
+    if tool_name:
+        args = parsed.get("arguments")
+        if isinstance(args, dict):
+            query = str(args.get("query", ""))
+        else:
+            query = str(parsed.get("query", ""))
+        return tool_name, query
+
+    # Format 3: {"query": "bar|title|data"} → chart; {"query": "http..."} → browser
+    query = str(parsed.get("query", "")).strip()
+    if query:
+        chart_types = ("line|", "bar|", "pie|", "scatter|", "area|", "radar|")
+        if any(query.startswith(ct) for ct in chart_types):
+            return "generate_chart", query
+        if query.startswith("http://") or query.startswith("https://"):
+            return "browser", query
+
+    # {"text": "..."} is model's text response — NOT a tool call
+    return None
 
 
 def _extract_iso_date(text: str) -> str | None:
