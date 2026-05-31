@@ -21,6 +21,28 @@ class EventMapContext:
     known_tools: set[str]
 
 
+def _filter_chart_denial(text: str) -> str:
+    """Remove LLM text claiming it cannot generate charts."""
+    import re
+    # Remove denial sentences
+    patterns = [
+        r'很抱歉，我无法直接生成[^。]*[。]',
+        r'抱歉，我无法生成[^。]*[。]',
+        r'I cannot generate[^.]*\.',
+        r"I can't generate[^.]*\.",
+        r'无法直接生成图表[^。]*[。]',
+        r'无法生成图片[^。]*[。]',
+    ]
+    for p in patterns:
+        text = re.sub(p, '', text)
+    # Remove Python code blocks (LLM provides matplotlib code as fallback)
+    text = re.sub(r'```python[\s\S]*?```', '', text)
+    text = re.sub(r'复制\n[^\n]*', '', text)
+    # Clean up extra whitespace
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 def _stream_event_with_content(content: str) -> dict[str, Any]:
     class _Chunk:
         def __init__(self, text: str):

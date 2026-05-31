@@ -204,7 +204,10 @@ async def stream_generate(request: GenerateRequest):
                     if not current_block_id:
                         current_block_id = f"block-{trace_ctx.turn_id}"
                         yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
-                    yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, preamble_buffer))
+                    from api.events.event_mapper import _filter_chart_denial
+                    filtered = _filter_chart_denial(preamble_buffer)
+                    if filtered:
+                        yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, filtered))
                     assistant_text_emitted = True
                     preamble_buffer = ""
 
