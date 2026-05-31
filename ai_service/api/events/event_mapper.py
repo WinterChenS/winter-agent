@@ -110,16 +110,10 @@ def process_stream_token_event(
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Short preamble buffer: buffer first ~200 chars to detect tool-call vs direct answer.
-    # If a '{' appears within the buffer window, the preamble is reasoning → emit as thought.
-    # If no '{' appears → release as normal tokens (direct answer).
-    new_preamble = preamble_buffer + raw_token_content
-    if len(new_preamble) < 200:
-        # Still within buffer window — keep buffering to detect tool calls
-        return None, False, "", new_preamble, ""
-    # Buffer full — release the buffered text and continue streaming
-    release_event = _stream_event_with_content(new_preamble)
-    return release_event, False, "", "", ""
+    # Buffer all text as potential preamble until tool call or end of response.
+    # When a tool call follows, emit preamble as thought (not in main chat).
+    # When no tool call follows (direct answer), preamble is released at end.
+    return None, False, "", preamble_buffer + raw_token_content, ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:

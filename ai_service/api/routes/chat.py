@@ -187,7 +187,7 @@ async def stream_generate(request: GenerateRequest):
                     yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
 
-                # Flush residual preamble buffer (short answers that never hit 200-char threshold)
+                # Flush residual preamble buffer (direct answer — no tool call followed)
                 if preamble_buffer and not assistant_text_emitted:
                     if not current_block_id:
                         current_block_id = f"block-{trace_ctx.turn_id}"
