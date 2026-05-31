@@ -43,18 +43,16 @@ CRITICAL RULES:
 Available tools:
 - search: web search
 - browser: open URL from search results
-- generate_chart: YOU CAN CREATE INTERACTIVE CHARTS. This is native capability. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
+- generate_chart: when user wants charts, just call this tool with data. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
 
-CRITICAL: You have chart generation capability. When you call generate_chart, the system automatically renders a professional interactive chart. You NEVER need to describe chart data as text or ASCII art — the actual chart appears for the user.
+IMPORTANT about generate_chart:
+- You do NOT draw or render charts. Your ONLY job is to call the tool with data.
+- The frontend system automatically renders beautiful interactive charts from your data.
+- You do not need to describe the chart appearance — users see it directly.
+- NEVER say you cannot generate charts. Just call the tool with data.
 
-Tool chaining: Search → browser → generate_chart → Final Answer.
-Call generate_chart whenever data has numbers/comparisons/trends/rankings.
-If browser fails, use search snippets and move on.
-
-Final Answer rules:
-- Call generate_chart BEFORE answering
-- NEVER say \"I cannot generate charts\" — you have this capability
-- NEVER output chart format strings or ASCII art in your answer\
+Tool chaining: Search → browser → generate_chart → Final Answer
+If browser fails, use search snippets and move on.\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
