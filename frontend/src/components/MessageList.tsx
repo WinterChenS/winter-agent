@@ -14,7 +14,10 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, isSending = 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, isSending]);
 
-  const lastIndex = messages.length - 1;
+  // Find the loading assistant message: the last assistant message with empty content during sending
+  const loadingAssistantId = isSending
+    ? [...messages].reverse().find(m => m.role === 'assistant')?.id
+    : undefined;
 
   return (
     <div className="h-full overflow-y-auto p-4 bg-gray-50">
@@ -26,7 +29,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, isSending = 
         </div>
       ) : (
         <>
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <ChatMessage
               key={message.id}
               role={message.role}
@@ -36,8 +39,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, isSending = 
               chartDatas={message.chartDatas}
               isLoading={
                 isSending &&
-                index === lastIndex &&
-                message.role === 'assistant' &&
+                message.id === loadingAssistantId &&
                 !message.content
               }
             />
