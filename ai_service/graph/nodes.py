@@ -44,10 +44,11 @@ CHART FORMAT for generate_chart query:
   Example: "line|Trend|Jan:100,Feb:200,Mar:150"
 
 RULES:
-1. Browser URL MUST be complete EXACT URL from search result
-2. After 3 failed searches, use available data and give Final Answer
-3. Each response is JSON-only OR text-only — never mix
-4. The JSON format is EXACTLY {"action":"tool","tool":"...","query":"..."} — no markdown, no XML\
+1. Browser: use EXACT URL from search result. If browser FAILS, try ONE more URL. If both fail, use search snippets directly
+2. NEVER search for the same thing twice. Each search must have a NEW, DIFFERENT query
+3. After 2 browser failures, STOP using browser — extract data from search result snippets instead
+4. Give Final Answer as soon as you have enough info — don't keep searching
+5. Each response is JSON-only OR text-only — never mix\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
@@ -333,7 +334,7 @@ async def agent_node(state: State) -> dict:
             max_consecutive_search_calls = _max_consecutive_search_calls()
 
             if current_iteration >= MAX_ITERATIONS:
-                fallback = "抱歉，已达到本轮工具调用上限。基于已获取的信息，我无法给出完整的最终回答，请重试或缩小问题范围。"
+                fallback = "抱歉，本轮搜索次数已达上限。请尝试缩小问题范围（如指定具体年份或数据来源），或换个更具体的问题重新提问。"
                 reason = _reason_record(
                     node="agent_node",
                     code="MAX_ITERATIONS_REACHED",
