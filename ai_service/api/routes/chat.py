@@ -199,15 +199,6 @@ async def stream_generate(request: GenerateRequest):
                     yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
                     assistant_text_emitted = True
 
-                # Flush residual preamble buffer (direct answer — no tool call followed)
-                if preamble_buffer and not assistant_text_emitted:
-                    if not current_block_id:
-                        current_block_id = f"block-{trace_ctx.turn_id}"
-                        yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
-                    yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, preamble_buffer))
-                    assistant_text_emitted = True
-                    preamble_buffer = ""
-
                 # End any open markdown block at stream completion
                 if current_block_id:
                     yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))

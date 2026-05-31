@@ -110,10 +110,8 @@ def process_stream_token_event(
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>", "<tool_calls>", "</tool_calls>", "<invoke")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Buffer all text as potential preamble until tool call or end of response.
-    # When a tool call follows, emit preamble as thought (not in main chat).
-    # When no tool call follows (direct answer), preamble is released at end.
-    return None, False, "", preamble_buffer + raw_token_content, ""
+    # Stream text immediately for typewriter effect. Only buffer JSON tool calls.
+    return event, False, "", "", ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
