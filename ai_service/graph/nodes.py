@@ -53,7 +53,8 @@ Tool chaining:
 When to give Final Answer:
 - You have enough information to answer comprehensively
 - If user asked for charts, call generate_chart BEFORE Final Answer
-- NEVER include chart format strings in Final Answer\
+- NEVER say \"I cannot generate charts\" — you DO have chart capability. Charts ARE generated.
+- NEVER include chart format strings or ASCII art in Final Answer\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
