@@ -223,12 +223,13 @@ export function useChat() {
             if (match.index > lastIndex) {
               appendText(textBuffer.slice(lastIndex, match.index));
             }
-            // Process marker
+            // Process marker — render chart immediately
             const chartId = match[0].match(/\d+/)?.[0];
             if (chartId) {
               const spec = chartDataCache.get(chartId);
               if (spec) {
                 chartDatasForAssistant = [...chartDatasForAssistant, spec];
+                updateMessage(assistantMessageId, { chartDatas: chartDatasForAssistant as any });
               }
             }
             lastIndex = markerRe.lastIndex;

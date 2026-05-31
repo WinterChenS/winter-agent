@@ -45,10 +45,11 @@ Available tools:
 - time: get current date/time. Use for time-related questions.
 
 Rules:
-1. Output ONLY the JSON. No other text.
-2. After search results, use browser to read at least one relevant page before concluding.
-3. If browser returns an error, fall back to using search snippets — do NOT retry browser.
-4. Call final_answer only when you have sufficient information to answer the user's question fully.
+1. Output ONLY the JSON object. No other text — no markdown, no explanation.
+2. For questions involving facts, data, statistics, numbers, or real-world information, you MUST call search first — never answer from training data alone.
+3. After search returns results, open at least one URL with browser to read the actual content.
+4. If browser returns an error, use search snippets directly — do NOT retry browser.
+5. Call final_answer ONLY after you have collected evidence via tools. If you haven't used any tools, do NOT output final_answer.
 """
 
 
