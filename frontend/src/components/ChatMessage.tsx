@@ -353,6 +353,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </div>
             )}
 
+            {/* Charts: rendered before answer text (charts arrive first in SSE) */}
+            {allCharts.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-gray-200 space-y-4">
+                {allCharts.map((cd, idx) => (
+                  <div key={cd.id || idx}>
+                    {allCharts.length > 1 && (
+                      <p className="text-xs font-medium text-gray-500 mb-1">
+                        图表 {idx + 1}: {cd.title}
+                      </p>
+                    )}
+                    <ChartRenderer chartData={cd} />
+                    {cd.description && !allCharts[1] && (
+                      <p className="text-xs text-gray-500 mt-2">{cd.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Main answer text */}
             {answer ? (
               <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:text-sm">
@@ -407,25 +426,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 </ReactMarkdown>
               </div>
             ) : null}
-
-            {/* Charts: rendered INSIDE the assistant bubble, below the text */}
-            {allCharts.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-200 space-y-4">
-                {allCharts.map((cd, idx) => (
-                  <div key={cd.id || idx}>
-                    {allCharts.length > 1 && (
-                      <p className="text-xs font-medium text-gray-500 mb-1">
-                        图表 {idx + 1}: {cd.title}
-                      </p>
-                    )}
-                    <ChartRenderer chartData={cd} />
-                    {cd.description && !allCharts[1] && (
-                      <p className="text-xs text-gray-500 mt-2">{cd.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </>
         )}
       </div>

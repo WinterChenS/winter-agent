@@ -44,11 +44,11 @@ CHART FORMAT for generate_chart query:
   Example: "line|Trend|Jan:100,Feb:200,Mar:150"
 
 RULES:
-1. Browser: use EXACT URL from search result. If browser FAILS, try ONE more URL. If both fail, use search snippets directly
-2. NEVER search for the same thing twice. Each search must have a NEW, DIFFERENT query
-3. After 2 browser failures, STOP using browser — extract data from search result snippets instead
-4. Give Final Answer as soon as you have enough info — don't keep searching
-5. Each response is JSON-only OR text-only — never mix\
+1. Browser: use EXACT URL from search result. If browser FAILS twice, use search snippets
+2. NEVER search for the same thing twice
+3. Give Final Answer as soon as you have enough info — don't keep searching
+4. Each response is JSON-only OR text-only — never mix
+5. NEVER include chart data/format strings (like bar|title|data) in your Final Answer — charts are already generated as interactive visuals. Just describe what the charts show\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
