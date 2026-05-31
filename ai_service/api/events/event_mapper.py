@@ -106,12 +106,13 @@ def process_stream_token_event(
             return None, False, "", "", ""
         return _stream_event_with_content(raw_token_content), False, "", "", ""
 
-    # Filter thinking tags and XML function call leaks
+    # Filter thinking tags and XML leaks
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>", "<tool_calls>", "</tool_calls>", "<invoke")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Stream text immediately for typewriter effect. Only buffer JSON tool calls.
-    return event, False, "", "", ""
+    # Buffer text. When JSON tool call follows → emit as thought (thinking pane).
+    # When response ends without JSON → release as text (main chat, typewriter).
+    return None, False, "", preamble_buffer + raw_token_content, ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
