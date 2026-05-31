@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { AgentProcessStep, ChartSpecData, GuardReason, Message } from '../types/chat';
 import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
+import { generateUUID } from '../utils/uuid';
 
 interface StreamPayload {
   type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta';
@@ -64,7 +65,7 @@ export function useChat() {
       const toolSteps = (history as any).toolSteps;
 
       const formatted: Message[] = history.messages.map((msg: any) => ({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         role: msg.role as Message['role'],
         content: msg.content,
         timestamp: Date.now(),
@@ -90,7 +91,7 @@ export function useChat() {
           }
         }
         const thinkingMsg: Message = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: 'thinking',
           content: 'done',
           toolSteps: toolSteps.map((s: any) => ({
@@ -119,7 +120,7 @@ export function useChat() {
   const addMessage = useCallback((message: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = {
       ...message,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       timestamp: Date.now(),
     };
     setMessages(prev => [...prev, newMessage]);
