@@ -182,12 +182,6 @@ export function useChat() {
       let chartDataCache: Map<string, ChartSpecData> = new Map();
       let textBuffer = "";
 
-      const appendText = (text: string) => {
-        if (!text) return;
-        assistantContent += text;
-        updateMessageContent(assistantMessageId, assistantContent);
-      };
-
       const handleParsedEvent = (parsed: StreamPayload) => {
         const payload = parsed.payload ?? {};
         const textChunk = payload.content ?? parsed.content ?? parsed.token ?? '';
@@ -216,33 +210,41 @@ export function useChat() {
           let match;
           let lastIndex = 0;
           let hasMarker = false;
+          let flushedText = '';
 
           while ((match = markerRe.exec(textBuffer)) !== null) {
             hasMarker = true;
-            // Flush text before marker
+            // Collect text before marker
             if (match.index > lastIndex) {
-              appendText(textBuffer.slice(lastIndex, match.index));
+              flushedText += textBuffer.slice(lastIndex, match.index);
             }
-            // Process marker — render chart immediately
+            // Process marker — add chart to array
             const chartId = match[0].match(/\d+/)?.[0];
             if (chartId) {
               const spec = chartDataCache.get(chartId);
               if (spec) {
                 chartDatasForAssistant = [...chartDatasForAssistant, spec];
-                updateMessage(assistantMessageId, { chartDatas: chartDatasForAssistant as any });
               }
             }
             lastIndex = markerRe.lastIndex;
           }
 
           if (hasMarker) {
-            // Keep only unprocessed text after last marker
+            // Single atomic update: content + chartDatas together
+            if (flushedText) {
+              assistantContent += flushedText;
+            }
+            updateMessage(assistantMessageId, {
+              content: assistantContent,
+              chartDatas: chartDatasForAssistant.length > 0 ? chartDatasForAssistant as any : undefined,
+            });
             textBuffer = textBuffer.slice(lastIndex);
           } else if (textBuffer.length > 20) {
-            // No marker found, buffer is large enough — flush as text
-            // But keep last 20 chars in case they're a partial [CHART:n]
+            // No marker, buffer large enough — flush most, keep tail for partial marker
             const safeLen = textBuffer.length - 20;
-            appendText(textBuffer.slice(0, safeLen));
+            const safeText = textBuffer.slice(0, safeLen);
+            assistantContent += safeText;
+            updateMessage(assistantMessageId, { content: assistantContent });
             textBuffer = textBuffer.slice(safeLen);
           }
           return;
@@ -388,7 +390,8 @@ export function useChat() {
 
       // Flush remaining text buffer at end of stream
       if (textBuffer) {
-        appendText(textBuffer);
+        assistantContent += textBuffer;
+        updateMessage(assistantMessageId, { content: assistantContent });
         textBuffer = '';
       }
 
