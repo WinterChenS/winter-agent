@@ -34,31 +34,6 @@ type SummaryToolStep = NonNullable<ChatMessageProps['toolSteps']>[number];
 
 const TOOL_LINE_PREFIXES = ['🛠️ 正在调用工具：', '工具 `'];
 
-function parseActionJsonLine(line: string): ToolStep | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed) as { action?: string; tool?: string; query?: string };
-    const action = (parsed.action || '').trim();
-    const toolName = action === 'tool' ? (parsed.tool || '').trim() : action;
-    if (!toolName) {
-      return null;
-    }
-
-    const queryPart = parsed.query ? `（query: ${parsed.query}）` : '';
-    return {
-      raw: `🛠️ 正在调用工具：${toolName}... ${queryPart}`.trim(),
-      toolName,
-      kind: 'start',
-    };
-  } catch {
-    return null;
-  }
-}
-
 function parseToolName(line: string): string {
   const startPrefix = '🛠️ 正在调用工具：';
   if (line.startsWith(startPrefix)) {
@@ -113,12 +88,6 @@ function splitToolLines(content: string): { toolSteps: ToolStep[]; answer: strin
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
-
-    const actionStep = parseActionJsonLine(trimmed);
-    if (actionStep) {
-      toolSteps.push(actionStep);
-      continue;
-    }
 
     if (TOOL_LINE_PREFIXES.some(prefix => trimmed.startsWith(prefix))) {
       const kind: ToolStepKind = trimmed.startsWith('🛠️') ? 'start' : 'result';
@@ -204,6 +173,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     }
     return splitToolLines(content);
   }, [isUser, isToolSummary, isAgentStep, content]);
+
+  // Filter [CHART:n] markers from displayed text (charts are rendered separately)
+  const displayContent = answer.replace(/\[CHART:\d+\]/g, '').trim();
 
   const [showThinking, setShowThinking] = useState(true);
   const summarySteps: SummaryToolStep[] = toolSteps;
@@ -369,7 +341,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             )}
 
             {/* Main answer text */}
-            {answer ? (
+            {displayContent ? (
               <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:text-sm">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -418,7 +390,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     },
                   }}
                 >
-                  {answer}
+                  {displayContent}
                 </ReactMarkdown>
               </div>
             ) : null}
