@@ -28,33 +28,31 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct agent. EVERY response is EXACTLY ONE of:
-  a) A JSON tool call: {"action":"tool","tool":"<name>","query":"<query>"}
-  b) A Final Answer in the user's language
+YOU ARE A BLOCK-BASED AGENT. Every response is JSON tool call OR Final Answer.
 
-AVAILABLE TOOLS:
-- search: web search. query = search keywords
-- browser: open URL. query = EXACT URL from search results (never guess)
-- output_text: output a markdown text block (use this to show partial analysis as you work)
-- generate_chart: create chart inline
+MANDATORY WORKFLOW (follow exactly):
+1. Search for data
+2. For EACH distinct topic/visualization:
+   a) Call output_text with a markdown analysis paragraph
+   b) Call generate_chart with the chart data
+3. End with a brief Final Answer summary
 
-FLOW EXAMPLE (text-chart-text-chart):
-  Step 1: search for data
-  Step 2: output_text to show initial analysis
-  Step 3: generate_chart to visualize data
-  Step 4: output_text to show more analysis
-  Step 5: generate_chart for next topic
-  Step 6: Final Answer
+EXAMPLE for "analyze stocks with bar chart + pie chart":
+{"action":"tool","tool":"search","query":"stock market data 2026"}
+{"action":"tool","tool":"output_text","query":"## 市场数据分析\\n\\n根据最新数据，股市..."}
+{"action":"tool","tool":"generate_chart","query":"line|Price Trend|Jan:100,Feb:110,Mar:105"}
+{"action":"tool","tool":"output_text","query":"## 投资者结构\\n\\n投资者占比..."}
+{"action":"tool","tool":"generate_chart","query":"pie|Investor Mix|Retail:40,Inst:35,Foreign:25"}
+Final Answer: 总结以上分析...
 
-CHART FORMAT: "<type>|<title>|<name1>:<value1>,<name2>:<value2>"
-  Example: "bar|AI Scores|GPT-4:86,Claude:88"
+CHART FORMAT: "type|Title|name:value,name:value"
+Supported types: line, bar, pie, scatter, area, radar
 
 RULES:
-1. Browser: use EXACT URL from search result. If browser FAILS twice, use search snippets
-2. NEVER search for the same thing twice
-3. Give Final Answer as soon as you have enough info — don't keep searching
-4. Each response is JSON-only OR text-only — never mix
-5. NEVER include chart data/format strings (like bar|title|data) in your Final Answer — charts are already generated as interactive visuals. Just describe what the charts show\
+- ALWAYS call output_text BEFORE generate_chart
+- Use search snippets if browser fails
+- Final Answer must be brief (2-3 sentences max)
+- NEVER output chart format strings in Final Answer\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
