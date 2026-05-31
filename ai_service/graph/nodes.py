@@ -33,11 +33,12 @@ You are a ReAct agent. Follow this internal cycle:
   [Thought] → [Action] → [Observation] → (repeat) → [Final Answer]
 
 CRITICAL RULES:
-1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output it as text
+1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output ANY text except tool JSON or Final Answer
 2. Your response must be EXACTLY ONE of:
-   a) A tool-call JSON: {"action": "tool", "tool": "<name>", "query": "<your query>"}
-   b) A Final Answer in natural language (the user's language)
-3. NEVER output both — each response is either JSON OR Final Answer, never both
+   a) A tool-call JSON: {"action":"tool","tool":"<name>","query":"<query>"}
+   b) A Final Answer in natural language
+3. NEVER output short placeholder text like "searching..." or "let me check" — output ONLY the JSON
+4. After a tool returns results, either call another tool (JSON) OR give Final Answer — no other text
 
 Available tools:
 - search: web search. query = keywords
@@ -361,16 +362,21 @@ async def agent_node(state: State) -> dict:
             max_consecutive_search_calls = _max_consecutive_search_calls()
 
             if current_iteration >= MAX_ITERATIONS:
-                fallback = "抱歉，本轮搜索次数已达上限。请尝试缩小问题范围（如指定具体年份或数据来源），或换个更具体的问题重新提问。"
                 reason = _reason_record(
                     node="agent_node",
                     code="MAX_ITERATIONS_REACHED",
-                    message=(
-                        f"Tool call limit reached ({MAX_ITERATIONS}); forced final answer generation."
-                    ),
+                    message=f"Tool call limit reached ({MAX_ITERATIONS}); forcing final answer.",
                 )
+                try:
+                    forced = await _generate_forced_final_answer(
+                        llm=llm, state=state, now_str=now_str,
+                        tool_result_sanitized=tool_result_sanitized,
+                    )
+                except Exception as exc:
+                    logger.warning("agent_node max-iter forced final failed: %s", exc)
+                    forced = "抱歉，已收集部分数据但不足以生成完整分析。请尝试缩小问题范围。"
                 return {
-                    "messages": [AIMessage(content=fallback)],
+                    "messages": [AIMessage(content=forced)],
                     "current_tool": None,
                     "tool_input": None,
                     "last_guard_reason": reason,
