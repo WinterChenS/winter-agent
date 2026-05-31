@@ -168,6 +168,15 @@ async def agent_node(state: State) -> dict:
             "Continue the ReAct cycle: if you need more info, call another tool. "
             f"Otherwise, output final_answer. ({remaining} iterations remaining)"
         )
+    else:
+        # First iteration: force tool call unless it's a trivial greeting
+        system_lines.append(
+            f"\nIMPORTANT: Your training data cutoff is before {now_str}. "
+            "For factual, statistical, or data-related questions, your knowledge is likely outdated. "
+            "You are on iteration 1. Unless the user's question is PURELY a simple greeting "
+            "(like 'hello' or 'how are you'), you MUST call a tool (search/browser/time) first. "
+            "final_answer is NOT allowed on this turn — output a tool-call JSON instead."
+        )
 
     system_prompt = "\n".join(system_lines)
 
@@ -234,8 +243,33 @@ async def agent_node(state: State) -> dict:
             "route": "tool",
         }
 
-    # 5. Handle final_answer
+    # 5. Handle final_answer — reject on first iteration
     if action == "final_answer":
+        if not tool_result_sanitized:
+            # First iteration with no tools → force search with user's question
+            user_query = ""
+            raw_messages = list(state.get("messages") or [])
+            for msg in reversed(raw_messages):
+                if hasattr(msg, "type") and msg.type == "human":
+                    user_query = (msg.content or "")[:200]
+                    break
+                if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
+                    user_query = str(msg.get("content", ""))[:200]
+                    break
+            reason = _reason_record("agent_node", "FIRST_TURN_FORCED_SEARCH",
+                "LLM attempted final_answer without tools; auto-injecting search.",
+                extra={"user_query": user_query[:100]})
+            return {
+                "current_tool": "search",
+                "tool_input": {"query": user_query or "latest information"},
+                "tool_result": None,
+                "iteration_count": current_iteration + 1,
+                "last_tool_name": "search",
+                "last_tool_query": user_query,
+                "consecutive_search_count": 1,
+                "reasoning_steps": _append_reason(state, reason),
+                "route": "tool",
+            }
         reason = _reason_record("agent_node", "FINAL_ANSWER",
             "Agent decided data collection is complete.")
         return {
