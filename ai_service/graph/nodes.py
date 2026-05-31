@@ -3,11 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
 from datetime import datetime
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 
 from config import settings
@@ -28,32 +27,29 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct agent. Follow this internal cycle:
+You are a ReAct agent. Your response MUST be a single valid JSON object.
 
-  [Thought] → [Action] → [Observation] → (repeat) → [Final Answer]
+[Internal Cycle: Thought → Action → Observation → Final Answer]
 
-CRITICAL RULES:
-1. Your Thought/Reasoning is INTERNAL ONLY — NEVER output ANY text except tool JSON or Final Answer
-2. Your response must be EXACTLY ONE of:
-   a) A tool-call JSON: {"action":"tool","tool":"<name>","query":"<query>"}
-   b) A Final Answer in natural language
-3. NEVER output short placeholder text like "searching..." or "let me check" — output ONLY the JSON
-4. After a tool returns results, either call another tool (JSON) OR give Final Answer — no other text
+CRITICAL: Output ONLY the JSON object. No markdown wrapping, no explanation.
+
+Tool call format:
+{"action":"tool","tool":"<name>","query":"<query>"}
+
+Final answer ready (data collection complete):
+{"action":"final_answer"}
 
 Available tools:
-- search: web search.
-- browser: open URL. MUST use exact URL from search result. NEVER guess or make up URLs. If browser returns error, use search snippets directly.
-- generate_chart: creates charts. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
+- search: web search. Returns titles, URLs, and content snippets.
+- browser: open a URL and read its content. MUST use exact URL from search results. Never fabricate URLs.
+- time: get current date/time. Use for time-related questions.
 
 Rules:
-1. Browser URL MUST be the exact complete URL from search results — never fabricate
-2. After 1 browser failure, stop using browser — use search snippets
-3. Call generate_chart when you have data. You CAN create charts. NEVER say you cannot.
-4. NEVER output ASCII art, code blocks, or chart descriptions as text.\
+1. Output ONLY the JSON. No other text.
+2. After search results, use browser to read at least one relevant page before concluding.
+3. If browser returns an error, fall back to using search snippets — do NOT retry browser.
+4. Call final_answer only when you have sufficient information to answer the user's question fully.
 """
-
-# Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
-_TOOL_FORMAT_HINT = _REACT_SYSTEM_PROMPT
 
 
 def _max_iterations() -> int:
@@ -104,176 +100,55 @@ def _append_reason(state: State, record: dict) -> list:
     return list(state.get("reasoning_steps", [])) + [record]
 
 
-def _build_llm(streaming: bool = True) -> ChatOpenAI:
-    """创建并返回 ChatOpenAI 实例（集中在一处，方便统一修改参数）。"""
-    return ChatOpenAI(
-        model=settings.model,
-        temperature=settings.temperature,
-        streaming=streaming,
-        api_key=settings.api_key,
-        base_url=settings.base_url,
-        extra_body={"thinking": {"type": "disabled"}},
-    )
+def _build_llm(streaming: bool = True, json_mode: bool = False) -> ChatOpenAI:
+    kwargs = {
+        "model": settings.model,
+        "temperature": 0.3 if json_mode else settings.temperature,
+        "streaming": streaming,
+        "api_key": settings.api_key,
+        "base_url": settings.base_url,
+    }
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+    return ChatOpenAI(**kwargs)
 
 
-def _parse_tool_call(content: str) -> tuple[str, str] | None:
-    """Find and parse model tool intent JSON — anywhere in the response.
-
-    LLMs sometimes emit a preamble before the JSON, so we search for the
-    first JSON object that contains the expected tool-call fields.
-    """
-    content = content.strip()
-
-    # Fast path: whole response is JSON
-    if content.startswith("{"):
-        try:
-            parsed = json.loads(content)
-        except (json.JSONDecodeError, TypeError):
-            parsed = None
-        if isinstance(parsed, dict):
-            result = _extract_tool_from_parsed(parsed)
-            if result is not None:
-                return result
-
-    # Slow path: search for JSON blocks embedded in preamble text.
-    # Collect ALL tool calls, skip {"text":"..."} blocks.
-    # Return (tool_name, query, remaining_tool_calls)
-    all_results: list[tuple[str, str]] = []
-    depth = 0
-    start = -1
-    for i, ch in enumerate(content):
-        if ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0 and start >= 0:
-                candidate = content[start:i + 1]
-                try:
-                    parsed = json.loads(candidate)
-                except (json.JSONDecodeError, TypeError):
-                    start = -1
-                    continue
-                if isinstance(parsed, dict):
-                    result = _extract_tool_from_parsed(parsed)
-                    if result is not None:
-                        all_results.append(result)
-                start = -1
-
-    return all_results[0] if all_results else None
-
-
-def _extract_tool_from_parsed(parsed: dict) -> tuple[str, str] | None:
-    # Format 1: {"action": "tool", "tool": "search", "query": "..."}
-    action = str(parsed.get("action", "")).strip()
-    if action:
-        query = str(parsed.get("query", "")).strip()
-        if action == "tool":
-            tool_name = str(parsed.get("tool", "")).strip()
-        else:
-            tool_name = action
-        if tool_name:
-            return tool_name, query
-        return None
-
-    # Format 2: Native function calling: {"tool": "name", "arguments": {"query": "..."}}
-    tool_name = str(parsed.get("tool", "")).strip()
-    if tool_name:
-        args = parsed.get("arguments")
-        if isinstance(args, dict):
-            query = str(args.get("query", ""))
-        else:
-            query = str(parsed.get("query", ""))
-        return tool_name, query
-
-    # Format 3: {"query": "bar|title|data"} → chart; {"query": "http..."} → browser
-    query = str(parsed.get("query", "")).strip()
-    if query:
-        chart_types = ("line|", "bar|", "pie|", "scatter|", "area|", "radar|")
-        if any(query.startswith(ct) for ct in chart_types):
-            return "generate_chart", query
-        if query.startswith("http://") or query.startswith("https://"):
-            return "browser", query
-
-    # {"text": "..."} is model's text response — NOT a tool call
-    return None
-
-
-def _extract_iso_date(text: str) -> str | None:
-    m = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
-    return m.group(0) if m else None
-
-
-def _strip_thought_tags(text: str) -> str:
-    """Remove [Thought]...[/Thought] and standalone [Thought] tags from LLM output."""
-    # Remove [Thought]...[/Thought] blocks
-    text = re.sub(r"\[Thought\][\s\S]*?\[/Thought\]", "", text)
-    # Remove lines that start with [Thought] (some models use single-line format)
-    text = re.sub(r"^\[Thought\].*$", "", text, flags=re.MULTILINE)
-    # Remove isolated [Thought] and [/Thought] tags
-    text = text.replace("[Thought]", "").replace("[/Thought]", "")
-    return text.strip()
-
-
-def _latest_user_text(state: State) -> str:
-    raw_messages = list(state.get("messages") or [])
-    for msg in reversed(raw_messages):
-        msg_type = getattr(msg, "type", None)
-        msg_content = getattr(msg, "content", None)
-        if msg_type == "human" and isinstance(msg_content, str):
-            return msg_content.strip()
-        if isinstance(msg, dict):
-            role = msg.get("role") or msg.get("type")
-            content = msg.get("content")
-            if role in {"user", "human"} and isinstance(content, str):
-                return content.strip()
-    return ""
-
-
-async def _generate_forced_final_answer(
-    llm: ChatOpenAI,
-    state: State,
-    now_str: str,
-    tool_result_sanitized: str,
-) -> str:
-    guidance = [
-        "You are a helpful AI assistant.",
-        f"Current date and time (server): {now_str}",
-        "You already have enough tool evidence.",
-        "Now provide a concise final answer based ONLY on the provided tool result context.",
-        "Do NOT call any tool.",
-        "Do NOT output JSON.",
-        "Reply in the same language as the user's original question.",
-    ]
-    if tool_result_sanitized:
-        guidance.append(f"Tool result context (sanitized):\n{tool_result_sanitized}")
-    forced_messages = [SystemMessage(content="\n".join(guidance))] + list(state["messages"])
-    response = await llm.ainvoke(forced_messages)
-    text = (response.content or "").strip()
-    # If the LLM still outputs JSON despite instructions, discard and use fallback
-    if text and (text.startswith("{") or text.startswith("```json")):
-        logger.warning("_generate_forced_final_answer: LLM returned JSON, using local fallback")
-        return _build_local_final_fallback(state.get("tool_result"))
-    if text:
-        return text
-    return _build_local_final_fallback(state.get("tool_result"))
+def _force_final_answer(state: State, tool_result: str | None,
+                         reason: dict | None = None) -> dict:
+    """Force transition to chart_planner when guardrails trigger."""
+    record = reason or _reason_record("agent_node", "FORCED_FINAL",
+        "Forcing transition to chart planner.")
+    return {
+        "current_tool": None,
+        "tool_input": None,
+        "tool_result": None,
+        "last_tool_name": None,
+        "last_tool_query": None,
+        "consecutive_search_count": 0,
+        "last_guard_reason": record,
+        "reasoning_steps": _append_reason(state, record),
+        "route": "chart_planner",
+    }
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# agent_node：LLM 决策节点
+# agent_node：LLM 决策节点（JSON Mode）
 # ────────────────────────────────────────────────────────────────────────────
 async def agent_node(state: State) -> dict:
     registry = get_tool_registry()
 
-    # 1. 构建工具列表描述
+    # 1. Build tool list description
     tools_desc = ""
     if registry:
         for t in registry.list_tools():
             tools_desc += f"  - {t['name']}: {t['description']}\n"
 
-    # 2. ReAct system prompt
+    # 2. Build system prompt with Observation
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    tool_result = state.get("tool_result")
+    tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
+    current_iteration = int(state.get("iteration_count", 0) or 0)
+
     system_lines = [
         _REACT_SYSTEM_PROMPT,
         f"Current server time: {now_str}",
@@ -281,268 +156,101 @@ async def agent_node(state: State) -> dict:
     if tools_desc:
         system_lines.append(f"Available tools:\n{tools_desc}")
 
-    # 3. Observation: feed tool result back with guidance to continue or finish
-    tool_result = state.get("tool_result")
-    tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
-    current_iteration = int(state.get("iteration_count", 0) or 0)
     if tool_result_sanitized:
         remaining = MAX_ITERATIONS - current_iteration
-        if remaining > 0:
-            system_lines.append(
-                f"\n--- Observation (iteration {current_iteration}/{MAX_ITERATIONS}) ---\n"
-                f"{tool_result_sanitized}\n"
-                "--- End Observation ---\n"
-            )
-            # ReAct guidance: push LLM to dig deeper before answering
-            if "browser:" in tool_result_sanitized or "browser" in tool_result_sanitized.lower():
-                system_lines.append(
-                    "You just read a web page. If the content answers the user's question, "
-                    "provide the Final Answer now. If key details are still missing, "
-                    "search for more specific info or open another relevant page."
-                )
-            if "chartType" in tool_result_sanitized or tool_result_sanitized.startswith("browser:"):
-                system_lines.append(
-                    "A chart was just generated and IS VISIBLE to the user. "
-                    "Do NOT say you cannot generate charts. Continue with analysis."
-                )
-            elif "result_count:" in tool_result_sanitized:
-                system_lines.append(
-                    "You have search results. Before answering, OPEN at least one promising "
-                    "result with the browser tool to read the actual content. "
-                    "Do NOT give the Final Answer based only on search snippets."
-                )
-            else:
-                system_lines.append(
-                    "Continue the ReAct cycle: if you need more info, call another tool. "
-                    f"Otherwise, provide the Final Answer. ({remaining} iterations remaining)"
-                )
-        else:
-            system_lines.append(
-                f"\n--- Final Observation ---\n{tool_result_sanitized}\n"
-                "No more tool calls allowed. Provide your Final Answer now."
-            )
+        system_lines.append(
+            f"\n--- Observation (iteration {current_iteration}/{MAX_ITERATIONS}) ---\n"
+            f"{tool_result_sanitized}\n"
+            "--- End Observation ---\n"
+        )
+        system_lines.append(
+            "Continue the ReAct cycle: if you need more info, call another tool. "
+            f"Otherwise, output final_answer. ({remaining} iterations remaining)"
+        )
 
     system_prompt = "\n".join(system_lines)
 
-    # 4. 调用 LLM
+    # 3. Call LLM with JSON Mode
     messages = [SystemMessage(content=system_prompt)] + list(state["messages"])
-    llm = _build_llm()
+    llm = _build_llm(streaming=False, json_mode=True)
+
     try:
         response = await llm.ainvoke(messages)
-    except Exception as exc:
-        logger.warning("agent_node ainvoke failed, fallback to local final answer: %s", exc)
-        fallback = _build_local_final_fallback(tool_result)
-        reason = _reason_record(
-            node="agent_node",
-            code="LLM_INVOKE_FAILED",
-            message="LLM invoke failed; returned local fallback final answer.",
-            extra={"error": str(exc)[:200]},
-        )
+        content = (response.content or "").strip()
+        parsed = json.loads(content)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning("agent_node: JSON parse failed, forcing final answer: %s", e)
+        return _force_final_answer(state, tool_result)
+
+    action = str(parsed.get("action", "")).strip().lower()
+
+    # 4. Handle tool call
+    if action == "tool":
+        tool_name = str(parsed.get("tool", "")).strip().lower()
+        query = str(parsed.get("query", "")).strip()
+
+        if not tool_name:
+            return _force_final_answer(state, tool_result)
+
+        normalized_query = _normalize_query(query)
+        consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+        next_consecutive = consecutive_search_count + 1 if tool_name == "search" else 0
+
+        # Guard: max iterations
+        if current_iteration >= MAX_ITERATIONS:
+            reason = _reason_record("agent_node", "MAX_ITERATIONS_REACHED",
+                f"Iteration limit ({MAX_ITERATIONS}) reached; forcing final answer.")
+            return _force_final_answer(state, tool_result, reason)
+
+        # Guard: duplicate tool call
+        last_tool_name = (state.get("last_tool_name") or "").strip().lower()
+        last_tool_query = _normalize_query(str(state.get("last_tool_query") or ""))
+        if last_tool_name == tool_name and last_tool_query == normalized_query:
+            reason = _reason_record("agent_node", "DUPLICATE_TOOL_CALL_BLOCKED",
+                f"Blocked duplicate: tool='{tool_name}', query='{query}'.",
+                extra={"tool": tool_name, "query": query})
+            return _force_final_answer(state, tool_result, reason)
+
+        # Guard: max consecutive search
+        max_search = _max_consecutive_search_calls()
+        if tool_name == "search" and next_consecutive > max_search:
+            reason = _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
+                f"Consecutive search limit ({max_search}) reached; forcing final answer.",
+                extra={"count": next_consecutive, "limit": max_search})
+            return _force_final_answer(state, tool_result, reason)
+
+        reason = _reason_record("agent_node", "TOOL_CALL_DECIDED",
+            f"Tool call: '{tool_name}' query='{query}'", extra={"tool": tool_name})
         return {
-            "messages": [AIMessage(content=fallback)],
-            "current_tool": None,
-            "tool_input": None,
-            "last_guard_reason": reason,
-            "consecutive_search_count": 0,
+            "current_tool": tool_name,
+            "tool_input": {"query": query},
+            "tool_result": None,
+            "iteration_count": current_iteration + 1,
+            "last_tool_name": tool_name,
+            "last_tool_query": query,
+            "consecutive_search_count": next_consecutive,
             "reasoning_steps": _append_reason(state, reason),
+            "route": "tool",
         }
 
-    # 5. 尝试解析是否要调工具
-    content = (response.content or "").strip()
-    # Strip [Thought] tags that some models output despite prompt instructions
-    content = _strip_thought_tags(content)
-    try:
-        parsed = _parse_tool_call(content)
-        if parsed:
-            tool_name, query = parsed
-            normalized_query = _normalize_query(query)
-            consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
-            next_consecutive_search_count = (
-                consecutive_search_count + 1 if tool_name.lower() == "search" else 0
-            )
-            max_consecutive_search_calls = _max_consecutive_search_calls()
-
-            if current_iteration >= MAX_ITERATIONS:
-                reason = _reason_record(
-                    node="agent_node",
-                    code="MAX_ITERATIONS_REACHED",
-                    message=f"Tool call limit reached ({MAX_ITERATIONS}); forcing final answer.",
-                )
-                try:
-                    forced = await _generate_forced_final_answer(
-                        llm=llm, state=state, now_str=now_str,
-                        tool_result_sanitized=tool_result_sanitized,
-                    )
-                except Exception as exc:
-                    logger.warning("agent_node max-iter forced final failed: %s", exc)
-                    forced = "抱歉，已收集部分数据但不足以生成完整分析。请尝试缩小问题范围。"
-                return {
-                    "messages": [AIMessage(content=forced)],
-                    "current_tool": None,
-                    "tool_input": None,
-                    "last_guard_reason": reason,
-                    "consecutive_search_count": 0,
-                    "reasoning_steps": _append_reason(state, reason),
-                }
-
-            # 通用去重：同一轮里如果重复同一工具同一query，直接收敛
-            last_tool_name = (state.get("last_tool_name") or "").strip().lower()
-            last_tool_query = _normalize_query(str(state.get("last_tool_query") or ""))
-            if last_tool_name == tool_name.lower() and last_tool_query == normalized_query:
-                reason = _reason_record(
-                    node="agent_node",
-                    code="DUPLICATE_TOOL_CALL_BLOCKED",
-                    message=f"Prevented duplicate tool call: tool='{tool_name}', query='{query}'.",
-                    extra={"tool": tool_name, "query": query},
-                )
-                try:
-                    forced = await _generate_forced_final_answer(
-                        llm=llm,
-                        state=state,
-                        now_str=now_str,
-                        tool_result_sanitized=tool_result_sanitized,
-                    )
-                except Exception as exc:
-                    logger.warning("agent_node forced final answer failed, fallback to local answer: %s", exc)
-                    forced = _build_local_final_fallback(tool_result)
-                return {
-                    "messages": [AIMessage(content=forced)],
-                    "current_tool": None,
-                    "tool_input": None,
-                    "last_tool_name": None,
-                    "last_tool_query": None,
-                    "last_guard_reason": reason,
-                    "consecutive_search_count": 0,
-                    "reasoning_steps": _append_reason(state, reason),
-                }
-
-            # Guard: limit consecutive searches to prevent infinite loops,
-            # but allow refined searches with different queries (duplicate check above handles exact repeats)
-            if tool_name.lower() == "search" and next_consecutive_search_count > max_consecutive_search_calls:
-                reason = _reason_record(
-                    node="agent_node",
-                    code="MAX_CONSECUTIVE_SEARCH_REACHED",
-                    message="Consecutive search call limit reached; forced final answer.",
-                    extra={
-                        "count": next_consecutive_search_count,
-                        "limit": max_consecutive_search_calls,
-                    },
-                )
-                try:
-                    forced = await _generate_forced_final_answer(
-                        llm=llm,
-                        state=state,
-                        now_str=now_str,
-                        tool_result_sanitized=tool_result_sanitized,
-                    )
-                except Exception as exc:
-                    logger.warning("agent_node max-consecutive-search finalization failed: %s", exc)
-                    forced = _build_local_final_fallback(tool_result)
-                return {
-                    "messages": [AIMessage(content=forced)],
-                    "current_tool": None,
-                    "tool_input": None,
-                    "last_tool_name": None,
-                    "last_tool_query": None,
-                    "last_guard_reason": reason,
-                    "consecutive_search_count": 0,
-                    "reasoning_steps": _append_reason(state, reason),
-                }
-
-            # 避免在单轮里重复调用 time（常见卡死点）
-            if tool_name == "time" and tool_result_sanitized.startswith("time:"):
-                latest_user = _latest_user_text(state)
-                latest_user_lower = latest_user.lower()
-                needs_fresh_search = any(k in latest_user_lower for k in [
-                    "新闻", "大新闻", "天气", "最新", "today", "latest", "recent", "now", "weather", "news"
-                ])
-                date_hint = _extract_iso_date(tool_result_sanitized) or now_str.split(" ")[0]
-
-                if needs_fresh_search:
-                    reason = _reason_record(
-                        node="agent_node",
-                        code="TIME_REPEAT_AUTOSWITCH_SEARCH",
-                        message=f"Prevented repeated time tool call; auto-switched to search with date {date_hint}.",
-                        extra={"date_hint": date_hint},
-                    )
-                    auto_query = f"{date_hint} {latest_user}".strip()
-                    return {
-                        "current_tool": "search",
-                        "tool_input": {"query": auto_query},
-                        "tool_result": None,
-                        "iteration_count": current_iteration + 1,
-                        "last_tool_name": "search",
-                        "last_tool_query": auto_query,
-                        "consecutive_search_count": consecutive_search_count + 1,
-                        "reasoning_steps": _append_reason(state, reason),
-                    }
-
-                # 非时效检索场景：直接结束，避免无意义 time 循环
-                reason = _reason_record(
-                    node="agent_node",
-                    code="TIME_REPEAT_FINALIZED",
-                    message="Prevented repeated time tool call; returned final answer.",
-                )
-                return {
-                    "messages": [AIMessage(content=f"当前时间已获取：{tool_result_sanitized.replace('time: ', '', 1)}")],
-                    "current_tool": None,
-                    "tool_input": None,
-                    "last_tool_name": None,
-                    "last_tool_query": None,
-                    "last_guard_reason": reason,
-                    "consecutive_search_count": 0,
-                    "reasoning_steps": _append_reason(state, reason),
-                }
-
-            reason = _reason_record(
-                node="agent_node",
-                code="TOOL_CALL_DECIDED",
-                message=f"Decided to call tool '{tool_name}' with query: '{query}'",
-                extra={"tool": tool_name},
-            )
-            return {
-                "current_tool": tool_name,
-                "tool_input": {"query": query},
-                "tool_result": None,
-                "iteration_count": current_iteration + 1,
-                "last_tool_name": tool_name,
-                "last_tool_query": query,
-                "consecutive_search_count": next_consecutive_search_count,
-                "reasoning_steps": _append_reason(state, reason),
-            }
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        pass
-
-    # 6. 非JSON文本回答：继续循环，不直接结束
-    consecutive_text = int(state.get("consecutive_text_count", 0) or 0) + 1
-    reason = _reason_record(
-        node="agent_node",
-        code="TEXT_RESPONSE",
-        message=f"Non-tool text response (#{consecutive_text}). Continuing loop.",
-    )
-    # After 2 consecutive text responses, treat as final answer
-    if consecutive_text >= 2:
-        reason["code"] = "DIRECT_ANSWER"
-        reason["message"] = "Final answer after consecutive text responses."
+    # 5. Handle final_answer
+    if action == "final_answer":
+        reason = _reason_record("agent_node", "FINAL_ANSWER",
+            "Agent decided data collection is complete.")
         return {
-            "messages": [response],
             "current_tool": None,
             "tool_input": None,
+            "tool_result": None,
             "last_tool_name": None,
             "last_tool_query": None,
-            "last_guard_reason": reason,
             "consecutive_search_count": 0,
-            "consecutive_text_count": 0,
             "reasoning_steps": _append_reason(state, reason),
+            "route": "chart_planner",
         }
-    # First text: add to messages, keep looping
-    return {
-        "messages": [response],
-        "current_tool": None,  # No tool, but routing will continue loop
-        "tool_input": None,
-        "consecutive_text_count": consecutive_text,
-        "reasoning_steps": _append_reason(state, reason),
-    }
+
+    # Unknown action → force final
+    logger.warning("agent_node: unknown action '%s', forcing final answer", action)
+    return _force_final_answer(state, tool_result)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -663,61 +371,8 @@ async def tool_node(state: State) -> dict:
     }
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# llm_node：V0.2 兼容节点
-# ────────────────────────────────────────────────────────────────────────────
-async def llm_node(state: State) -> dict:
-    llm = _build_llm()
-    response = await llm.ainvoke(state["messages"])
-    return {"messages": [response]}
-
-
 def _normalize_query(text: str) -> str:
     return " ".join((text or "").strip().lower().split())
-
-
-def _build_local_final_fallback(tool_result: str | None) -> str:
-    safe_ctx = normalize_tool_result_for_prompt(tool_result)
-    if not safe_ctx:
-        return "抱歉，我已完成工具调用但暂时无法生成最终回答，请重试或换一个更具体的问题。"
-    return "抱歉，我已收集到相关信息但无法生成完整总结。请重试一次，或缩小问题范围。"
-
-
-def _build_observation_message(tool_name: str, result_str: str) -> str:
-    """Build a ReAct Observation message from tool execution result.
-
-    For browser results, includes the full page content (up to 4000 chars).
-    For other tools, uses the normalized result.
-    """
-    try:
-        parsed = json.loads(result_str)
-    except Exception:
-        sanitized = normalize_tool_result_for_prompt(result_str)
-        return f"[Tool result: {tool_name}]\n{sanitized}" if sanitized else f"[Tool result: {tool_name}] completed."
-
-    if isinstance(parsed, dict) and not parsed.get("ok", False):
-        err = parsed.get("error", {})
-        if isinstance(err, dict):
-            return f"[Tool result: {tool_name}] ERROR - {err.get('message', str(err))}"
-        return f"[Tool result: {tool_name}] ERROR - {err}"
-
-    data = parsed.get("data")
-    if isinstance(data, dict) and "url" in data and "text" in data:
-        url = str(data.get("url", ""))[:120]
-        title = str(data.get("title", "Untitled"))[:200]
-        text = str(data.get("text", ""))
-        length = int(data.get("length", len(text)))
-        text_display = text[:4000]
-        trunc_note = "\n[...truncated]" if len(text) > 4000 else ""
-        return (
-            f"[Tool result: {tool_name}]\n"
-            f"URL: {url}\n"
-            f"Title: {title}\n"
-            f"Content ({length} chars):\n{text_display}{trunc_note}"
-        )
-
-    sanitized = normalize_tool_result_for_prompt(result_str)
-    return f"[Tool result: {tool_name}]\n{sanitized}" if sanitized else f"[Tool result: {tool_name}] completed."
 
 
 # ────────────────────────────────────────────────────────────────────────────
