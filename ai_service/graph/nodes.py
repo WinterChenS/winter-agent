@@ -344,30 +344,15 @@ async def tool_node(state: State) -> dict:
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
 
-    # Inline blocks: chart and text tools emit content immediately during loop
-    pending_chart_spec = None
-    pending_text_block = None
-    extra = {}
-    if ok and isinstance(result, dict):
-        data = result.get("data")
-        if isinstance(data, dict):
-            if tool_name == "generate_chart" and data:
-                pending_chart_spec = data
-                extra["chart_specs"] = state.get("chart_specs", []) + [data]
-            elif tool_name == "output_text" and data.get("text"):
-                pending_text_block = data.get("text")
-
     return {
         "tool_result": result_str,
         "tool_steps": new_tool_steps,
-        "pending_chart_spec": pending_chart_spec,
-        "pending_text_block": pending_text_block,
-        **extra,
         "current_tool": None,
         "tool_input": None,
-        "last_tool_name": None,  # reset dedup after each tool execution
+        "last_tool_name": None,
         "last_tool_query": None,
         "reasoning_steps": state.get("reasoning_steps", []) + [step],
+        "route": "agent",
     }
 
 
