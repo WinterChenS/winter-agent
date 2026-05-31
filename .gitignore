@@ -4,3 +4,35 @@
 
 # pre-commit
 .pre-commit-cache/
+
+# ── Secrets & Environment ──────────────────────────────────────────
+.env
+ai_service/.env
+*.env.local
+*.env.production
+
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ── Java / Maven ───────────────────────────────────────────────────
+backend/target/
+*.class
+*.jar
+!backend/src/**/*.jar
+
+# ── Node / Frontend ────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Docker ──────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
