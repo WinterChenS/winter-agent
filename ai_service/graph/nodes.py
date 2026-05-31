@@ -41,20 +41,20 @@ CRITICAL RULES:
 4. After a tool returns results, either call another tool (JSON) OR give Final Answer — no other text
 
 Available tools:
-- search: web search. query = keywords
-- browser: open URL. query = EXACT URL from search result (never guess)
-- generate_chart: create chart inline. query = "type|Title|name:value,name:value" (types: line,bar,pie,scatter,area,radar). Example: "bar|Scores|GPT-4:86,Claude:88"
+- search: web search
+- browser: open URL from search results
+- generate_chart: YOU CAN CREATE INTERACTIVE CHARTS. This is native capability. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
 
-Tool chaining:
-- Search → browser (1-2 results) → generate_chart (when data found) → Final Answer
-- ALWAYS call generate_chart when you have data with numbers, comparisons, trends, or rankings — even if user didn't explicitly ask
-- Charts make your answer better. Use them proactively for ANY numerical analysis.
-- If browser fails, use search snippets and move on
+CRITICAL: You have chart generation capability. When you call generate_chart, the system automatically renders a professional interactive chart. You NEVER need to describe chart data as text or ASCII art — the actual chart appears for the user.
 
-When to give Final Answer:
-- You have enough information. Call generate_chart for each chart BEFORE Final Answer.
-- NEVER say you cannot generate charts — you CAN. Charts are automatically rendered.
-- NEVER include chart format strings or ASCII art in Final Answer\
+Tool chaining: Search → browser → generate_chart → Final Answer.
+Call generate_chart whenever data has numbers/comparisons/trends/rankings.
+If browser fails, use search snippets and move on.
+
+Final Answer rules:
+- Call generate_chart BEFORE answering
+- NEVER say \"I cannot generate charts\" — you have this capability
+- NEVER output chart format strings or ASCII art in your answer\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
