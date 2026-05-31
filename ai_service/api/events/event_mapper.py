@@ -236,6 +236,14 @@ def map_langgraph_event_to_envelopes(
                 final_state["chart_specs"] = output_state["chart_specs"]
             elif "chart_specs" in output_state:
                 final_state = output_state
+            # Copy inline block fields from any node output into final_state
+            if final_state is None and (output_state.get("pending_chart_spec") or output_state.get("pending_text_block")):
+                final_state = {}
+            if isinstance(final_state, dict):
+                for key in ("pending_chart_spec", "pending_text_block"):
+                    val = output_state.get(key)
+                    if val is not None:
+                        final_state[key] = val
 
     return envelopes, active_tool_span_id, final_state
 
