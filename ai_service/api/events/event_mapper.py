@@ -132,8 +132,10 @@ def map_langgraph_event_to_envelopes(
 
     elif event_type == "on_chain_end":
         output_state = event.get("data", {}).get("output", {})
-        if isinstance(output_state, dict) and "messages" in output_state:
-            final_state = output_state
+        if isinstance(output_state, dict):
+            # Capture state from agent, chart_planner, and answer nodes
+            if "messages" in output_state or "chart_specs" in output_state:
+                final_state = output_state
 
     return envelopes, active_tool_span_id, final_state
 
