@@ -46,14 +46,14 @@ Available tools:
 - generate_chart: create chart inline. query = "type|Title|name:value,name:value" (types: line,bar,pie,scatter,area,radar). Example: "bar|Scores|GPT-4:86,Claude:88"
 
 Tool chaining:
-- After search → open 1-2 results with browser for details
-- When you have numerical data → call generate_chart immediately
-- If browser fails twice, use search snippets and move on
+- Search → browser (1-2 results) → generate_chart (when data found) → Final Answer
+- ALWAYS call generate_chart when you have data with numbers, comparisons, trends, or rankings — even if user didn't explicitly ask
+- Charts make your answer better. Use them proactively for ANY numerical analysis.
+- If browser fails, use search snippets and move on
 
 When to give Final Answer:
-- You have enough information to answer comprehensively
-- If user asked for charts, call generate_chart BEFORE Final Answer
-- NEVER say \"I cannot generate charts\" — you DO have chart capability. Charts ARE generated.
+- You have enough information. Call generate_chart for each chart BEFORE Final Answer.
+- NEVER say you cannot generate charts — you CAN. Charts are automatically rendered.
 - NEVER include chart format strings or ASCII art in Final Answer\
 """
 
