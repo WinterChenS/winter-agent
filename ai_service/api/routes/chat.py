@@ -168,8 +168,11 @@ async def stream_generate(request: GenerateRequest):
                             if not current_block_id:
                                 current_block_id = f"block-{trace_ctx.turn_id}"
                                 yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
-                            yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, envelope.get("content", "")))
-                            continue  # Skip emitting the raw token envelope
+                            from api.events.event_mapper import _filter_chart_denial
+                            filtered = _filter_chart_denial(envelope.get("content", ""))
+                            if filtered:
+                                yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, filtered))
+                            continue
                         yield to_sse_data(envelope)
 
                     # Emit block events inline during the loop

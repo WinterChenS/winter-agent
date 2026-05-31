@@ -41,18 +41,15 @@ CRITICAL RULES:
 4. After a tool returns results, either call another tool (JSON) OR give Final Answer — no other text
 
 Available tools:
-- search: web search
-- browser: open URL from search results
-- generate_chart: when user wants charts, just call this tool with data. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
+- search: web search.
+- browser: open URL. MUST use exact URL from search result. NEVER guess or make up URLs. If browser returns error, use search snippets directly.
+- generate_chart: creates charts. Format: "type|Title|name:value,name:value". Types: line,bar,pie,scatter,area,radar. Example: "bar|Scores|GPT-4:86,Claude:88"
 
-IMPORTANT about generate_chart:
-- You do NOT draw or render charts. Your ONLY job is to call the tool with data.
-- The frontend system automatically renders beautiful interactive charts from your data.
-- You do not need to describe the chart appearance — users see it directly.
-- NEVER say you cannot generate charts. Just call the tool with data.
-
-Tool chaining: Search → browser → generate_chart → Final Answer
-If browser fails, use search snippets and move on.\
+Rules:
+1. Browser URL MUST be the exact complete URL from search results — never fabricate
+2. After 1 browser failure, stop using browser — use search snippets
+3. Call generate_chart when you have data. You CAN create charts. NEVER say you cannot.
+4. NEVER output ASCII art, code blocks, or chart descriptions as text.\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
