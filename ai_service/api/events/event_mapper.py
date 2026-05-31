@@ -110,9 +110,13 @@ def process_stream_token_event(
     if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>", "<tool_calls>", "</tool_calls>", "<invoke")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
-    # Buffer text. When JSON tool call follows → emit as thought (thinking pane).
-    # When response ends without JSON → release as text (main chat, typewriter).
-    return None, False, "", preamble_buffer + raw_token_content, ""
+    # Short preamble buffer (~300 chars): detect if text is reasoning before JSON.
+    # If JSON follows → emit as thought. If no JSON → stream freely (typewriter).
+    new_preamble = preamble_buffer + raw_token_content
+    if len(new_preamble) < 300:
+        return None, False, "", new_preamble, ""
+    # Buffer exceeded 300 chars → it's a direct answer, stream freely
+    return _stream_event_with_content(new_preamble), False, "", "", ""
 
 
 def summarize_tool_result(tool_name: str, output: dict[str, Any]) -> str:
