@@ -36,6 +36,12 @@ export interface AgentProcessStep {
   startTime?: number;
 }
 
+export interface ContentBlock {
+  type: 'text' | 'chart';
+  content?: string;
+  chartId?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
@@ -44,6 +50,7 @@ export interface Message {
   toolSteps?: AgentProcessStep[];
   guardReason?: GuardReason;
   chartDatas?: ChartSpecData[];
+  contentBlocks?: ContentBlock[];
 }
 
 export interface ChatRequest {

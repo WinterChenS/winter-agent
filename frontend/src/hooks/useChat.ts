@@ -218,7 +218,9 @@ export function useChat() {
             if (match.index > lastIndex) {
               flushedText += textBuffer.slice(lastIndex, match.index);
             }
-            // Process marker — add chart to array
+            // Keep marker in text for ChatMessage to parse into chart segment
+            flushedText += match[0];
+            // Process marker — add chart to chartDatas array
             const chartId = match[0].match(/\d+/)?.[0];
             if (chartId) {
               const spec = chartDataCache.get(chartId);
@@ -231,9 +233,7 @@ export function useChat() {
 
           if (hasMarker) {
             // Single atomic update: content + chartDatas together
-            if (flushedText) {
-              assistantContent += flushedText;
-            }
+            assistantContent += flushedText;
             updateMessage(assistantMessageId, {
               content: assistantContent,
               chartDatas: chartDatasForAssistant.length > 0 ? chartDatasForAssistant as any : undefined,

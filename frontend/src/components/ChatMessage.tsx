@@ -175,7 +175,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   }, [isUser, isToolSummary, isAgentStep, content]);
 
   // Filter [CHART:n] markers from displayed text (charts are rendered separately)
-  const displayContent = answer.replace(/\[CHART:\d+\]/g, '').trim();
+  // Parse content into ordered segments: text blocks and chart markers interleaved
+type ContentSegment = { type: 'text'; content: string } | { type: 'chart'; chartId: string };
+const segments: ContentSegment[] = (() => {
+  const result: ContentSegment[] = [];
+  const parts = answer.split(/(\[CHART:\d+\])/g);
+  const chartMap = new Map(allCharts.map(c => [String(c.id), c]));
+  for (const part of parts) {
+    const match = part.match(/^\[CHART:(\d+)\]$/);
+    if (match) {
+      const chartData = chartMap.get(match[1]);
+      if (chartData) {
+        result.push({ type: 'chart', chartId: match[1] });
+      }
+    } else if (part.trim()) {
+      result.push({ type: 'text', content: part });
+    }
+  }
+  return result;
+})();
 
   const [showThinking, setShowThinking] = useState(true);
   const summarySteps: SummaryToolStep[] = toolSteps;
@@ -321,79 +339,74 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </div>
             )}
 
-            {/* Charts: rendered before answer text (charts arrive first in SSE) */}
-            {allCharts.length > 0 && (
-              <div className="mb-3 pb-3 border-b border-gray-200 space-y-4">
-                {allCharts.map((cd, idx) => (
-                  <div key={cd.id || idx}>
-                    {allCharts.length > 1 && (
-                      <p className="text-xs font-medium text-gray-500 mb-1">
-                        图表 {idx + 1}: {cd.title}
-                      </p>
-                    )}
-                    <ChartRenderer chartData={cd} />
-                    {cd.description && !allCharts[1] && (
-                      <p className="text-xs text-gray-500 mt-2">{cd.description}</p>
+            {/* Ordered segments: text and charts interleaved by [CHART:n] markers */}
+            {segments.map((seg, i) => {
+              if (seg.type === 'chart') {
+                const chartData = allCharts.find(c => String(c.id) === seg.chartId);
+                if (!chartData) return null;
+                return (
+                  <div key={`chart-${i}`} className="my-3">
+                    <ChartRenderer chartData={chartData} />
+                    {chartData.description && (
+                      <p className="text-xs text-gray-500 mt-2">{chartData.description}</p>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Main answer text */}
-            {displayContent ? (
-              <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:text-sm">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                  components={{
-                    pre: PreBlock,
-                    blockquote({ children }) {
-                      return (
-                        <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 pr-2 py-1.5 my-2 rounded-r-lg text-gray-700 not-italic">
-                          {children}
-                        </blockquote>
-                      );
-                    },
-                    code({ className, children, ...props }) {
-                      const isInline = !className;
-                      if (isInline) {
+                );
+              }
+              return (
+                <div key={`text-${i}`} className="prose prose-sm max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-table:text-sm">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      pre: PreBlock,
+                      blockquote({ children }) {
                         return (
-                          <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                          <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 pr-2 py-1.5 my-2 rounded-r-lg text-gray-700 not-italic">
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      code({ className, children, ...props }) {
+                        const isInline = !className;
+                        if (isInline) {
+                          return (
+                            <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                        return (
+                          <code className={className} {...props}>
                             {children}
                           </code>
                         );
-                      }
-                      return (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                    table({ children }) {
-                      return (
-                        <div className="overflow-x-auto my-2">
-                          <table className="min-w-full border-collapse border border-gray-300 text-sm">
-                            {children}
-                          </table>
-                        </div>
-                      );
-                    },
-                    thead({ children }) {
-                      return <thead className="bg-gray-100">{children}</thead>;
-                    },
-                    th({ children }) {
-                      return <th className="border border-gray-300 px-3 py-1.5 text-left font-semibold">{children}</th>;
-                    },
-                    td({ children }) {
-                      return <td className="border border-gray-300 px-3 py-1.5">{children}</td>;
-                    },
-                  }}
-                >
-                  {displayContent}
-                </ReactMarkdown>
-              </div>
-            ) : null}
+                      },
+                      table({ children }) {
+                        return (
+                          <div className="overflow-x-auto my-2">
+                            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+                              {children}
+                            </table>
+                          </div>
+                        );
+                      },
+                      thead({ children }) {
+                        return <thead className="bg-gray-100">{children}</thead>;
+                      },
+                      th({ children }) {
+                        return <th className="border border-gray-300 px-3 py-1.5 text-left font-semibold">{children}</th>;
+                      },
+                      td({ children }) {
+                        return <td className="border border-gray-300 px-3 py-1.5">{children}</td>;
+                      },
+                    }}
+                  >
+                    {seg.content}
+                  </ReactMarkdown>
+                </div>
+              );
+            })}
           </>
         )}
       </div>
