@@ -171,8 +171,19 @@ async def stream_generate(request: GenerateRequest):
                             continue  # Skip emitting the raw token envelope
                         yield to_sse_data(envelope)
 
-                    # Emit chart events inline when chart tool produces a spec during the loop
+                    # Emit block events inline during the loop
                     if final_state:
+                        # Text block (from output_text tool)
+                        text_block = final_state.get("pending_text_block")
+                        if isinstance(text_block, str) and text_block:
+                            import uuid
+                            block_id = f"txt-{uuid.uuid4().hex[:8]}"
+                            yield to_sse_data(envelope_block_start(trace_ctx, block_id, "markdown"))
+                            yield to_sse_data(envelope_block_chunk(trace_ctx, block_id, text_block))
+                            yield to_sse_data(envelope_block_end(trace_ctx, block_id))
+                            assistant_text_emitted = True
+                            final_state["pending_text_block"] = None
+                        # Chart block (from generate_chart tool)
                         pending = final_state.get("pending_chart_spec")
                         if isinstance(pending, dict) and pending:
                             chart_id = pending.get("id", "chart-pending")

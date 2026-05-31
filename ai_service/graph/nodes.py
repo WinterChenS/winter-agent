@@ -35,13 +35,19 @@ You are a ReAct agent. EVERY response is EXACTLY ONE of:
 AVAILABLE TOOLS:
 - search: web search. query = search keywords
 - browser: open URL. query = EXACT URL from search results (never guess)
-- generate_chart: create chart inline. query = chart type and data like "bar|GPT Scores|GPT-4:86,Claude:88"
+- output_text: output a markdown text block (use this to show partial analysis as you work)
+- generate_chart: create chart inline
 
-CHART FORMAT for generate_chart query:
-  "<type>|<title>|<name1>:<value1>,<name2>:<value2>"
-  Example: "bar|AI Scores|GPT-4:86,Claude:88,Gemini:85"
-  Example: "pie|Market Share|Apple:40,Samsung:30,Others:30"
-  Example: "line|Trend|Jan:100,Feb:200,Mar:150"
+FLOW EXAMPLE (text-chart-text-chart):
+  Step 1: search for data
+  Step 2: output_text to show initial analysis
+  Step 3: generate_chart to visualize data
+  Step 4: output_text to show more analysis
+  Step 5: generate_chart for next topic
+  Step 6: Final Answer
+
+CHART FORMAT: "<type>|<title>|<name1>:<value1>,<name2>:<value2>"
+  Example: "bar|AI Scores|GPT-4:86,Claude:88"
 
 RULES:
 1. Browser: use EXACT URL from search result. If browser FAILS twice, use search snippets
@@ -588,19 +594,24 @@ async def tool_node(state: State) -> dict:
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
 
-    # If chart tool succeeded, emit chart spec immediately (inline rendering)
+    # Inline blocks: chart and text tools emit content immediately during loop
     pending_chart_spec = None
+    pending_text_block = None
     extra = {}
-    if tool_name == "generate_chart" and ok and isinstance(result, dict):
+    if ok and isinstance(result, dict):
         data = result.get("data")
-        if isinstance(data, dict) and data:
-            pending_chart_spec = data
-            extra["chart_specs"] = state.get("chart_specs", []) + [data]
+        if isinstance(data, dict):
+            if tool_name == "generate_chart" and data:
+                pending_chart_spec = data
+                extra["chart_specs"] = state.get("chart_specs", []) + [data]
+            elif tool_name == "output_text" and data.get("text"):
+                pending_text_block = data.get("text")
 
     return {
         "tool_result": result_str,
         "tool_steps": new_tool_steps,
         "pending_chart_spec": pending_chart_spec,
+        "pending_text_block": pending_text_block,
         **extra,
         "current_tool": None,
         "tool_input": None,

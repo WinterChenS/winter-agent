@@ -12,6 +12,7 @@ from core.runtime import set_runtime, set_tool_registry
 from tools import ToolRegistry
 from tools.browser import BrowserUseTool
 from tools.chart.tool import ChartTool
+from tools.output_text.tool import OutputTextTool
 from tools.echo import EchoTool
 from tools.search import SearchTool
 from tools.time.tool import TimeTool
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     tool_registry.register(TimeTool())
     tool_registry.register(BrowserUseTool())
     tool_registry.register(ChartTool())
+    tool_registry.register(OutputTextTool())
     # tool_registry.register(EchoTool())
     print(f"ToolRegistry ready: {[t['name'] for t in tool_registry.list_tools()]}")
 

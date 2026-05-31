@@ -54,5 +54,6 @@ class State(TypedDict):
     # ── Chart rendering ──────────────────────────────────────────────────
     chart_specs: list[dict]     # List of ChartSpec dicts (multi-chart support)
     pending_chart_spec: dict | None  # Chart spec ready for immediate SSE emission
+    pending_text_block: str | None   # Text block ready for immediate SSE emission
     blocks: list[dict]          # Ordered content blocks (markdown/chart/table/code)
 
