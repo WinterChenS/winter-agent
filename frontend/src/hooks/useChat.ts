@@ -4,7 +4,7 @@ import { getChatHistory } from '../services/api';
 import { parseSseChunk } from '../services/sse';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta' | 'block' | 'block_start' | 'block_chunk' | 'block_end' | 'chart_placeholder' | 'chart_ready';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta';
   schemaVersion?: string;
   payload?: {
     content?: string;
@@ -179,6 +179,7 @@ export function useChat() {
       let thinkingSteps: ThinkingStep[] = [];
       let thinkingMessageId: string | null = null;
       let chartDatasForAssistant: ChartSpecData[] = [];
+      let chartDataCache: Map<string, ChartSpecData> = new Map();
 
       const appendText = (text: string) => {
         if (!text) return;
@@ -190,79 +191,40 @@ export function useChat() {
         const payload = parsed.payload ?? {};
         const textChunk = payload.content ?? parsed.content ?? parsed.token ?? '';
 
-        // Block streaming: block_start → block_chunk → block_end
-        if (parsed.type === 'block_start') {
-          // Start of a new markdown block — nothing to do until chunks arrive
-          return;
-        }
-        if (parsed.type === 'block_chunk') {
-          const chunkContent = payload.content || (parsed as any).content || '';
-          if (chunkContent) appendText(chunkContent);
-          return;
-        }
-        if (parsed.type === 'block_end') {
-          // Markdown block complete — append newline for spacing
-          appendText('\n\n');
-          return;
-        }
-
-        // Legacy monolithic block event
-        if (parsed.type === 'block') {
-          const block = (parsed as any).block;
-          if (block?.type === 'markdown' && block?.content) {
-            appendText(block.content + '\n\n');
-          }
-          return;
-        }
-
-        // Chart placeholder: show skeleton loading state
-        if (parsed.type === 'chart_placeholder') {
-          const chartId = payload.chartId || (parsed as any).chartId || 'pending';
-          chartDatasForAssistant.push({ id: chartId, title: '', chartType: 'bar', description: '', data: [], _placeholder: true } as any);
-          return;
-        }
-
-        // Chart ready: replace placeholder with real chart data
-        if (parsed.type === 'chart_ready') {
-          const spec = (payload.chartSpec || (parsed as any).chartSpec) as ChartSpecData;
-          // Replace placeholder entry with real data
-          chartDatasForAssistant = chartDatasForAssistant.map(c =>
-            (c as any)._placeholder && c.id === spec.id ? spec : c
-          );
-          // Filter out any remaining placeholders
-          chartDatasForAssistant = chartDatasForAssistant.filter(c => !(c as any)._placeholder);
-          return;
-        }
-
-        // Legacy chart event: accumulate to attach to assistant message later
+        // Chart data received (from Phase 2 chart_planner_node via SSE)
         if (parsed.type === 'chart' && (parsed as any).chartSpec) {
-          chartDatasForAssistant.push((parsed as any).chartSpec as ChartSpecData);
+          const spec = (parsed as any).chartSpec as ChartSpecData;
+          const key = String(spec.id ?? '0');
+          chartDataCache.set(key, spec);
           return;
         }
 
-        // Thought event: show agent's reasoning step in thinking pane
-        if ((parsed.type === 'thought' || parsed.type === 'reasoning_delta') && textChunk) {
-          const shortThought = textChunk.length > 120 ? textChunk.slice(0, 120) + '...' : textChunk;
-          const thoughtStep: ThinkingStep = {
-            kind: 'reasoning',
-            tool: '__reasoning__',
-            title: '思考',
-            summary: shortThought,
-            input: shortThought,
-            status: 'completed',
-            elapsed_ms: 0,
-            startTime: Date.now(),
-          };
-          if (!thinkingMessageId) {
-            thinkingMessageId = addMessage({ role: 'thinking', content: '', toolSteps: [thoughtStep as any] });
+        // Legacy chart event (chartSpec in payload without type)
+        if ((parsed as any).chartSpec && !parsed.type) {
+          const spec = (parsed as any).chartSpec as ChartSpecData;
+          chartDataCache.set(String(spec.id ?? '0'), spec);
+          return;
+        }
+
+        // Token event: stream text, scan for [CHART:n] markers
+        if ((parsed.type === 'token' || !parsed.type) && textChunk) {
+          const parts = textChunk.split(/(\[CHART:\d+\])/g);
+          for (const part of parts) {
+            const chartMatch = part.match(/^\[CHART:(\d+)\]$/);
+            if (chartMatch) {
+              const chartId = chartMatch[1];
+              const spec = chartDataCache.get(chartId);
+              if (spec) {
+                chartDatasForAssistant = [...chartDatasForAssistant, spec];
+              }
+            } else if (part) {
+              appendText(part);
+            }
           }
-          thinkingSteps.push(thoughtStep);
-          updateThinkingMessage();
-          scrollToBottom();
           return;
         }
 
-        // Tool started: create or update thinking pane in real-time
+        // Tool started
         if (parsed.type === 'tool_start') {
           const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
           const input = stringifyInput(payload.input);
@@ -275,13 +237,8 @@ export function useChat() {
             status: 'running',
             startTime: Date.now(),
           };
-
           if (!thinkingMessageId) {
-            thinkingMessageId = addMessage({
-              role: 'thinking',
-              content: '',
-              toolSteps: [newStep as any],
-            });
+            thinkingMessageId = addMessage({ role: 'thinking', content: '', toolSteps: [newStep as any] });
           }
           thinkingSteps.push(newStep);
           updateThinkingMessage();
@@ -289,23 +246,18 @@ export function useChat() {
           return;
         }
 
-        // Tool completed: update the running step
+        // Tool completed
         if (parsed.type === 'tool_result') {
           const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
           const contentText = textChunk || '';
-          // Extract elapsed from content if available
           const now = Date.now();
           thinkingSteps = thinkingSteps.map(s => {
             if (s.tool === toolName && s.status === 'running') {
-              // Try to extract input from the content
-              const inputMatch = contentText.match(/query:\s*(.+?)(?:\)|$)/) ||
-                                 contentText.match(/(https?:\/\/\S+)/) ||
-                                 contentText.match(/读取\s*(\d+)\s*字符/);
               return {
                 ...s,
                 status: (payload.status === 'error' || contentText.includes('失败') || contentText.includes('ERROR')) ? 'error' as const : 'completed' as const,
                 elapsed_ms: payload.elapsed_ms ?? (now - s.startTime),
-                input: stringifyInput(payload.input) || (inputMatch ? inputMatch[1].trim() : s.input || ''),
+                input: stringifyInput(payload.input) || s.input || '',
                 summary: payload.summary || contentText.trim() || s.summary,
                 detail: contentText.trim(),
                 error: payload.error || (contentText.includes('失败') ? contentText.slice(0, 100) : undefined),
@@ -317,39 +269,10 @@ export function useChat() {
           return;
         }
 
-        // Agent step: update the thinking pane and attach guard reason
-        if (parsed.type === 'agent_step') {
-          const incomingReason = parsed.payload?.reason ?? parsed.reason;
-          if (incomingReason) {
-            updateMessage(assistantMessageId, { guardReason: incomingReason as any });
-            const guardStep: ThinkingStep = {
-              kind: 'guard',
-              tool: '__guard__',
-              title: '策略收敛',
-              summary: incomingReason.message || incomingReason.code || 'Agent 策略触发',
-              detail: incomingReason.code,
-              status: 'completed',
-              elapsed_ms: 0,
-              startTime: Date.now(),
-            };
-            if (!thinkingMessageId) {
-              thinkingMessageId = addMessage({ role: 'thinking', content: '', toolSteps: [guardStep as any] });
-            }
-            thinkingSteps.push(guardStep);
-            updateThinkingMessage();
-          }
-          // Auto-collapse thinking after agent step (answer is done)
-          if (thinkingMessageId && thinkingSteps.length > 0) {
-            updateMessage(thinkingMessageId, { content: 'done' });
-          }
-          return;
-        }
-
-        // Tool summary (end of stream): finalize all steps
+        // Final tool summary
         if (parsed.type === 'tool_summary') {
           const incomingSteps = parsed.payload?.steps ?? parsed.steps;
           if (Array.isArray(incomingSteps) && incomingSteps.length > 0) {
-            // Replace steps with final, accurate data
             thinkingSteps = incomingSteps.map((s: any) => ({
               kind: s.kind || 'tool',
               tool: s.tool || 'unknown',
@@ -363,24 +286,35 @@ export function useChat() {
             }));
             updateThinkingMessage();
           }
-          // Auto-collapse
           if (thinkingMessageId) {
             updateMessage(thinkingMessageId, { content: 'done' });
           }
           return;
         }
 
+        // Agent step / guard reason
+        if (parsed.type === 'agent_step') {
+          const incomingReason = parsed.payload?.reason ?? parsed.reason;
+          if (incomingReason) {
+            updateMessage(assistantMessageId, { guardReason: incomingReason as any });
+          }
+          if (thinkingMessageId && thinkingSteps.length > 0) {
+            updateMessage(thinkingMessageId, { content: 'done' });
+          }
+          return;
+        }
+
+        // Thought / reasoning delta — ignore in new protocol
+        if (parsed.type === 'thought' || parsed.type === 'reasoning_delta') {
+          return;
+        }
+
+        // Error
         if (parsed.type === 'error' || parsed.error) {
-          throw new Error(parsed.error || '流式响应异常');
+          throw new Error(parsed.error || 'Stream response error');
         }
 
-        // Token events → assistant answer text
-        const isLegacyPlainTextEvent = !parsed.type;
-        const isAssistantAnswerToken = parsed.type === 'token' || isLegacyPlainTextEvent;
-        if (isAssistantAnswerToken && textChunk) {
-          appendText(textChunk);
-        }
-
+        // Conversation ID capture
         if (parsed.conversationId) {
           setConversationId(parsed.conversationId);
         }
