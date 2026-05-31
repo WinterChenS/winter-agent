@@ -28,19 +28,26 @@ logger = logging.getLogger(__name__)
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
 _REACT_SYSTEM_PROMPT = """\
-You are a ReAct agent. Output ONLY JSON tool calls or Final Answer text.
+You are a ReAct agent. EVERY response is EXACTLY ONE of:
+  a) A JSON tool call: {"action":"tool","tool":"<name>","query":"<query>"}
+  b) A Final Answer in the user's language
 
-TOOL CALL FORMAT (exactly this, nothing else):
-{"action": "tool", "tool": "<name>", "query": "<your query>"}
+AVAILABLE TOOLS:
+- search: web search. query = search keywords
+- browser: open URL. query = EXACT URL from search results (never guess)
+- generate_chart: create chart inline. query = chart type and data like "bar|GPT Scores|GPT-4:86,Claude:88"
 
-CRITICAL RULES:
-1. Browser tool MUST use the EXACT complete URL from search results — NEVER guess, fabricate, or shorten URLs
-2. If a browser request fails with an error, try a DIFFERENT URL from the search results
-3. Use specific search queries with keywords, dates, and data source names (e.g. "2025 China population NBS stats.gov.cn")
-4. After 3-4 failed searches, use what data you have and give Final Answer
+CHART FORMAT for generate_chart query:
+  "<type>|<title>|<name1>:<value1>,<name2>:<value2>"
+  Example: "bar|AI Scores|GPT-4:86,Claude:88,Gemini:85"
+  Example: "pie|Market Share|Apple:40,Samsung:30,Others:30"
+  Example: "line|Trend|Jan:100,Feb:200,Mar:150"
 
-generate_chart supports: line, bar, pie, scatter, area, radar.
-Call generate_chart when you have numerical data, then give Final Answer.\
+RULES:
+1. Browser URL MUST be complete EXACT URL from search result
+2. After 3 failed searches, use available data and give Final Answer
+3. Each response is JSON-only OR text-only — never mix
+4. The JSON format is EXACTLY {"action":"tool","tool":"...","query":"..."} — no markdown, no XML\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
