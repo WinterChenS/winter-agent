@@ -33,17 +33,14 @@ You are a ReAct agent. Output ONLY JSON tool calls or Final Answer text.
 TOOL CALL FORMAT (exactly this, nothing else):
 {"action": "tool", "tool": "<name>", "query": "<your query>"}
 
-EXAMPLE FLOW for "analyze stocks with charts":
-  Step 1: Search: {"action":"tool","tool":"search","query":"2026 stock market data"}
-  Step 2: Open result: {"action":"tool","tool":"browser","query":"URL"}
-  Step 3: Chart the data: {"action":"tool","tool":"generate_chart","query":"{\\"chart_type\\":\\"line\\",\\"title\\":\\"Stock Trends\\",\\"data\\":[{\\"name\\":\\"Jan\\",\\"value\\":100},{\\"name\\":\\"Feb\\",\\"value\\":110}]}"}
-  Step 4: Continue analysis: {"action":"tool","tool":"search","query":"investor ratios"}
-  Step 5: Chart it: {"action":"tool","tool":"generate_chart","query":"{\\"chart_type\\":\\"pie\\",\\"title\\":\\"Ratios\\",\\"data\\":[{\\"name\\":\\"Retail\\",\\"value\\":40},{\\"name\\":\\"Institution\\",\\"value\\":60}]}"}
-  Step 6: Final Answer in user's language with analysis summary.
+CRITICAL RULES:
+1. Browser tool MUST use the EXACT complete URL from search results — NEVER guess, fabricate, or shorten URLs
+2. If a browser request fails with an error, try a DIFFERENT URL from the search results
+3. Use specific search queries with keywords, dates, and data source names (e.g. "2025 China population NBS stats.gov.cn")
+4. After 3-4 failed searches, use what data you have and give Final Answer
 
 generate_chart supports: line, bar, pie, scatter, area, radar.
-Call generate_chart AFTER each data collection step, NOT just at the end.
-Limit total tool calls to 6-8, then give Final Answer.\
+Call generate_chart when you have numerical data, then give Final Answer.\
 """
 
 # Legacy hint — kept for backward compat, merged into _REACT_SYSTEM_PROMPT
