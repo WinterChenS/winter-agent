@@ -305,6 +305,11 @@ async def agent_node(state: State) -> dict:
                     "provide the Final Answer now. If key details are still missing, "
                     "search for more specific info or open another relevant page."
                 )
+            if "chartType" in tool_result_sanitized or tool_result_sanitized.startswith("browser:"):
+                system_lines.append(
+                    "A chart was just generated and IS VISIBLE to the user. "
+                    "Do NOT say you cannot generate charts. Continue with analysis."
+                )
             elif "result_count:" in tool_result_sanitized:
                 system_lines.append(
                     "You have search results. Before answering, OPEN at least one promising "
