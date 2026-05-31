@@ -1,3 +1,10 @@
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
 export async function streamChat(
   message: string,
   onToken: (token: string) => void,
@@ -5,9 +12,7 @@ export async function streamChat(
 ): Promise<string | undefined> {
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(),
     body: JSON.stringify({
       message,
       conversationId,
@@ -78,7 +83,9 @@ export async function streamChat(
 }
 
 export async function getChatHistory(conversationId: string): Promise<any> {
-  const response = await fetch(`/api/chat/history/${conversationId}`);
+  const response = await fetch(`/api/chat/history/${conversationId}`, {
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     throw new Error('获取历史记录失败');
   }
