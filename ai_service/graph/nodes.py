@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from config import settings
@@ -372,4 +372,150 @@ async def chart_node(state: State) -> dict:
     return {
         "chart_specs": chart_specs,
         "blocks": blocks,
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# chart_planner_node：JSON Mode 图表规划（阶段二）
+# ────────────────────────────────────────────────────────────────────────────
+_CHART_PLANNER_SYSTEM_PROMPT = """\
+You are a data analyst. Analyze the conversation below and extract chart-worthy numerical data.
+Output a single valid JSON object. No markdown wrapping.
+
+{
+  "charts": [
+    {
+      "id": 0,
+      "chart_type": "bar",
+      "title": "Chart Title",
+      "description": "What this chart shows",
+      "x_axis_label": "X Label",
+      "y_axis_label": "Y Label",
+      "data": [
+        {"name": "Item A", "value": 123},
+        {"name": "Item B", "value": 456}
+      ]
+    }
+  ]
+}
+
+Rules:
+- chart_type: line | bar | pie | scatter | area | radar
+- id: sequential integer starting from 0
+- data: maximum 20 data points
+- pie chart: do NOT set x_axis_label or y_axis_label
+- Use ONLY data found in the conversation — never fabricate numbers
+- If there is NO numerical data suitable for charts, return {"charts": []}
+"""
+
+
+async def chart_planner_node(state: State) -> dict:
+    """Phase 2: Extract chart data from conversation context using JSON Mode."""
+    from graph.validators import validate_chart_specs
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    system_content = _CHART_PLANNER_SYSTEM_PROMPT
+    if now_str:
+        system_content += f"\nCurrent time: {now_str}"
+
+    messages = [SystemMessage(content=system_content)] + list(state["messages"])
+
+    llm = _build_llm(streaming=False, json_mode=True)
+    llm.temperature = 0.1  # Override for precision — chart data extraction needs accuracy
+
+    try:
+        response = await llm.ainvoke(messages)
+        result = json.loads(response.content)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning("chart_planner_node: JSON parse failed: %s", e)
+        result = {"charts": []}
+
+    raw_charts = result.get("charts", [])
+    if not isinstance(raw_charts, list):
+        raw_charts = []
+
+    validated = validate_chart_specs(raw_charts)
+
+    return {
+        "chart_specs": validated,
+        "route": "answer",
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# answer_node：Normal Mode 流式最终答案（阶段三）
+# ────────────────────────────────────────────────────────────────────────────
+_ANSWER_SYSTEM_PROMPT_TEMPLATE = """\
+You are a helpful AI assistant. Answer the user's question based on the research results.
+Use Markdown for formatting and structure.
+
+{chart_section}
+
+[Output Instructions]
+- When your analysis reaches a point where a chart would help illustrate the data,
+  reference it using [CHART:n] on its own line (e.g., a line containing only "[CHART:0]")
+- Each available chart MUST be referenced at least once in your answer
+- When you reference a chart, do NOT repeat all its data values as text — trust the chart
+- Write naturally as if the chart is embedded in your response
+- Keep answers concise and well-structured
+- Reply in the same language as the user's question
+
+Current time: {now_str}
+"""
+
+
+def _build_chart_section(chart_specs: list) -> str:
+    """Build the chart description section for the answer prompt."""
+    if not chart_specs:
+        return "[Available Charts]\nNone. Answer without referencing any charts."
+
+    lines = ["[Available Charts]"]
+    for c in chart_specs:
+        if not isinstance(c, dict):
+            continue
+        cid = c.get("id", "?")
+        ctype = c.get("chartType", "bar")
+        title = c.get("title", "Untitled")
+        desc = c.get("description", "")
+        x_label = c.get("xAxisLabel", "")
+        y_label = c.get("yAxisLabel", "")
+        data_count = len(c.get("data", []))
+        lines.append(
+            f"  Chart {cid} ({ctype}): \"{title}\" — {desc} "
+            f"({data_count} data points, x={x_label}, y={y_label})"
+        )
+    return "\n".join(lines)
+
+
+async def answer_node(state: State) -> dict:
+    """Phase 3: Generate streaming final answer with [CHART:n] markers."""
+    chart_specs = list(state.get("chart_specs", []) or [])
+    chart_section = _build_chart_section(chart_specs)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    system_content = _ANSWER_SYSTEM_PROMPT_TEMPLATE.format(
+        chart_section=chart_section,
+        now_str=now_str,
+    )
+
+    messages = [SystemMessage(content=system_content)] + list(state["messages"])
+
+    llm = _build_llm(streaming=True, json_mode=False)
+
+    try:
+        response = await llm.ainvoke(messages)
+    except Exception as exc:
+        logger.exception("answer_node: LLM invoke failed")
+        fallback = "Sorry, an error occurred while generating the answer. Please try again."
+        return {
+            "messages": [AIMessage(content=fallback)],
+            "chart_specs": chart_specs,
+            "route": "end",
+        }
+
+    return {
+        "messages": [response],
+        "chart_specs": chart_specs,
+        "route": "end",
     }
