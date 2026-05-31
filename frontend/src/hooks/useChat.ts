@@ -180,6 +180,7 @@ export function useChat() {
       let thinkingMessageId: string | null = null;
       let chartDatasForAssistant: ChartSpecData[] = [];
       let chartDataCache: Map<string, ChartSpecData> = new Map();
+      let textBuffer = "";
 
       const appendText = (text: string) => {
         if (!text) return;
@@ -206,20 +207,42 @@ export function useChat() {
           return;
         }
 
-        // Token event: stream text, scan for [CHART:n] markers
+        // Token event: buffer across events to find [CHART:n] markers
         if ((parsed.type === 'token' || !parsed.type) && textChunk) {
-          const parts = textChunk.split(/(\[CHART:\d+\])/g);
-          for (const part of parts) {
-            const chartMatch = part.match(/^\[CHART:(\d+)\]$/);
-            if (chartMatch) {
-              const chartId = chartMatch[1];
+          textBuffer += textChunk;
+
+          // Process complete markers in buffer
+          const markerRe = /\[CHART:\d+\]/g;
+          let match;
+          let lastIndex = 0;
+          let hasMarker = false;
+
+          while ((match = markerRe.exec(textBuffer)) !== null) {
+            hasMarker = true;
+            // Flush text before marker
+            if (match.index > lastIndex) {
+              appendText(textBuffer.slice(lastIndex, match.index));
+            }
+            // Process marker
+            const chartId = match[0].match(/\d+/)?.[0];
+            if (chartId) {
               const spec = chartDataCache.get(chartId);
               if (spec) {
                 chartDatasForAssistant = [...chartDatasForAssistant, spec];
               }
-            } else if (part) {
-              appendText(part);
             }
+            lastIndex = markerRe.lastIndex;
+          }
+
+          if (hasMarker) {
+            // Keep only unprocessed text after last marker
+            textBuffer = textBuffer.slice(lastIndex);
+          } else if (textBuffer.length > 20) {
+            // No marker found, buffer is large enough — flush as text
+            // But keep last 20 chars in case they're a partial [CHART:n]
+            const safeLen = textBuffer.length - 20;
+            appendText(textBuffer.slice(0, safeLen));
+            textBuffer = textBuffer.slice(safeLen);
           }
           return;
         }
@@ -360,6 +383,12 @@ export function useChat() {
           try { parsed = JSON.parse(rawEvent) as StreamPayload; } catch { continue; }
           handleParsedEvent(parsed);
         }
+      }
+
+      // Flush remaining text buffer at end of stream
+      if (textBuffer) {
+        appendText(textBuffer);
+        textBuffer = '';
       }
 
       // Attach chart data to the assistant message

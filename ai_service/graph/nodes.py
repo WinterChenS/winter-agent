@@ -404,8 +404,10 @@ Rules:
 - id: sequential integer starting from 0
 - data: maximum 20 data points
 - pie chart: do NOT set x_axis_label or y_axis_label
-- Use ONLY data found in the conversation — never fabricate numbers
+- Extract data from tool results first. If no tool data exists, use your own knowledge
+- Do NOT fabricate numbers — only use data you are confident about
 - If there is NO numerical data suitable for charts, return {"charts": []}
+- When the user explicitly asks for a chart (柱状图/图表/bar/pie/line chart etc.), you MUST return at least one chart if ANY relevant numerical data exists
 """
 
 
@@ -453,11 +455,11 @@ Use Markdown for formatting and structure.
 {chart_section}
 
 [Output Instructions]
-- When your analysis reaches a point where a chart would help illustrate the data,
-  reference it using [CHART:n] on its own line (e.g., a line containing only "[CHART:0]")
-- Each available chart MUST be referenced at least once in your answer
-- When you reference a chart, do NOT repeat all its data values as text — trust the chart
+- When your analysis reaches a point where a chart helps, reference it with [CHART:n] on its own line
+- Each available chart MUST be referenced at least once
+- When you reference a chart, do NOT repeat all its data values as text — let the chart show them
 - Write naturally as if the chart is embedded in your response
+- NEVER say "I cannot generate charts" or "I am unable to create charts" — if no charts are listed above, simply answer without referring to charts
 - Keep answers concise and well-structured
 - Reply in the same language as the user's question
 
