@@ -13,9 +13,7 @@ from api.events.event_mapper import (
     emit_guard_reason_envelope,
     emit_final_summary_envelope,
     extract_last_assistant_text,
-    is_tool_action_json,
     map_langgraph_event_to_envelopes,
-    process_stream_token_event,
 )
 from config import settings
 from core.runtime import get_checkpointer, get_tool_registry
@@ -43,12 +41,7 @@ def _is_internal_react_message(content: str) -> bool:
     return False
 from decorator.timeit import timeit
 from domain.event_envelope import (
-    envelope_block,
-    envelope_block_start,
-    envelope_block_chunk,
-    envelope_block_end,
-    envelope_chart_placeholder,
-    envelope_chart_ready,
+    envelope_chart,
     envelope_error,
     envelope_token,
     to_sse_data,
@@ -110,43 +103,23 @@ async def stream_generate(request: GenerateRequest):
                     "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": trace_ctx.agent_id,
                     "chart_specs": [],
-                    "consecutive_text_count": 0,
                     "blocks": [],
+                    "route": "tool",
                 }
 
                 thread_id = trace_ctx.conversation_id
                 config: RunnableConfig = {"configurable": {"thread_id": thread_id}, "recursion_limit": 256}
 
-                # 用于判断工具摘要是否已发送
                 tool_summary_sent = False
                 final_state = None
-                collecting_control_json = False
-                control_json_buffer = ""
-                preamble_buffer = ""
-                assistant_text_emitted = False
                 saw_tool_event = False
-                assistant_text_emitted_after_tool = False
+                assistant_text_emitted = False
                 active_tool_span_id: str | None = None
-                # Block streaming state
-                current_block_id: str | None = None
+                charts_sent: set = set()  # Track chart IDs already sent to avoid duplicates
 
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
-                    event, collecting_control_json, control_json_buffer, preamble_buffer, thought_text = process_stream_token_event(
-                        event,
-                        collecting_control_json,
-                        control_json_buffer,
-                        event_ctx.known_tools,
-                        preamble_buffer,
-                    )
-                    if thought_text:
-                        yield to_sse_data(envelope_token(trace_ctx, thought_text, event_type="thought"))
-                    if event is None:
-                        continue
-
                     mapped, active_tool_span_id, captured_final_state = map_langgraph_event_to_envelopes(
-                        event,
-                        event_ctx,
-                        active_tool_span_id,
+                        event, event_ctx, active_tool_span_id,
                     )
                     if captured_final_state is not None:
                         final_state = captured_final_state
@@ -155,90 +128,38 @@ async def stream_generate(request: GenerateRequest):
                         envelope_type = envelope.get("type")
                         if envelope_type in {"tool_start", "tool_result"}:
                             saw_tool_event = True
-                            assistant_text_emitted_after_tool = False
-                            # End current markdown block before tool execution
-                            if current_block_id:
-                                yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))
-                                current_block_id = None
                         if envelope_type == "token":
                             assistant_text_emitted = True
-                            if saw_tool_event:
-                                assistant_text_emitted_after_tool = True
-                            # Wrap token in block_start/chunk protocol
-                            if not current_block_id:
-                                current_block_id = f"block-{trace_ctx.turn_id}"
-                                yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
-                            from api.events.event_mapper import _filter_chart_denial
-                            filtered = _filter_chart_denial(envelope.get("content", ""))
-                            if filtered:
-                                yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, filtered))
-                            continue
                         yield to_sse_data(envelope)
 
-                    # Emit block events inline during the loop
+                    # Inline: send charts from chart_planner_node output
                     if final_state:
-                        # Text block (from output_text tool)
-                        text_block = final_state.get("pending_text_block")
-                        if isinstance(text_block, str) and text_block:
-                            import uuid
-                            block_id = f"txt-{uuid.uuid4().hex[:8]}"
-                            yield to_sse_data(envelope_block_start(trace_ctx, block_id, "markdown"))
-                            yield to_sse_data(envelope_block_chunk(trace_ctx, block_id, text_block))
-                            yield to_sse_data(envelope_block_end(trace_ctx, block_id))
-                            assistant_text_emitted = True
-                            final_state["pending_text_block"] = None
-                        # Chart block (from generate_chart tool)
-                        pending = final_state.get("pending_chart_spec")
-                        if isinstance(pending, dict) and pending:
-                            chart_id = pending.get("id", "chart-pending")
-                            yield to_sse_data(envelope_chart_placeholder(trace_ctx, chart_id))
-                            yield to_sse_data(envelope_chart_ready(trace_ctx, chart_id, pending))
-                            final_state["pending_chart_spec"] = None
+                        chart_specs = final_state.get("chart_specs")
+                        if isinstance(chart_specs, list):
+                            for cs in chart_specs:
+                                if isinstance(cs, dict):
+                                    cid = str(cs.get("id", ""))
+                                    if cid and cid not in charts_sent:
+                                        charts_sent.add(cid)
+                                        yield to_sse_data(envelope_chart(trace_ctx, cs))
 
-                if collecting_control_json and control_json_buffer and not is_tool_action_json(
-                    control_json_buffer,
-                    event_ctx.known_tools,
-                ):
-                    yield to_sse_data(envelope_token(trace_ctx, control_json_buffer))
-                    assistant_text_emitted = True
-
-                # Flush preamble as text for direct answers (no tool call followed)
-                if preamble_buffer and not assistant_text_emitted:
-                    if not current_block_id:
-                        current_block_id = f"block-{trace_ctx.turn_id}"
-                        yield to_sse_data(envelope_block_start(trace_ctx, current_block_id, "markdown"))
-                    from api.events.event_mapper import _filter_chart_denial
-                    filtered = _filter_chart_denial(preamble_buffer)
-                    if filtered:
-                        yield to_sse_data(envelope_block_chunk(trace_ctx, current_block_id, filtered))
-                    assistant_text_emitted = True
-                    preamble_buffer = ""
-
-                # End any open markdown block at stream completion
-                if current_block_id:
-                    yield to_sse_data(envelope_block_end(trace_ctx, current_block_id))
-                    current_block_id = None
-
-                # 如果仅出现了工具过程 token（如”我先搜索一下”）但工具后没有最终回答 token，
-                # 兜底补发 final_state 中的最后一条 assistant 文本，避免前端只看到工具步骤。
-                if (not assistant_text_emitted) or (saw_tool_event and not assistant_text_emitted_after_tool):
+                # Fallback: extract answer text if no tokens emitted
+                if not assistant_text_emitted:
                     fallback_text = extract_last_assistant_text(final_state)
                     if fallback_text:
                         yield to_sse_data(envelope_token(trace_ctx, fallback_text))
 
-                # 5) 在所有 token 流完成后，发送统一的工具摘要事件
+                # Emit guard reason
                 guard_envelope = emit_guard_reason_envelope(final_state, event_ctx)
                 if guard_envelope:
                     yield to_sse_data(guard_envelope)
 
+                # Emit tool summary
                 if final_state and not tool_summary_sent:
                     summary_envelope = emit_final_summary_envelope(final_state, event_ctx)
                     if summary_envelope:
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
-
-                # 6) Charts are emitted inline during loop via pending_chart_spec.
-                # No need to re-emit from chart_node blocks.
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))
