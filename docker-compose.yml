@@ -1,6 +1,32 @@
 version: '3.8'
 
 services:
+  # ── Traefik Reverse Proxy (TLS + Let's Encrypt) ────────────────────
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - traefik-certs:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--configFile=/traefik.yml"
+    networks:
+      - ai-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "traefik healthcheck --ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ── PostgreSQL (shared by backend + ai-service) ──────────────────
   postgres:
     image: postgres:16-alpine
@@ -11,8 +37,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-winter-agent}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5432:5432"
     networks:
       - ai-chat-network
     healthcheck:
@@ -32,8 +56,6 @@ services:
       context: ./ai_service
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
@@ -68,8 +90,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8080:8080"
     environment:
       - AICHAT_AI_SERVICE_URL=http://ai-service:8000
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-winter-agent}
@@ -80,6 +100,19 @@ services:
         condition: service_healthy
     networks:
       - ai-chat-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-localhost}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      # SSE streaming: disable buffering for /api/chat/stream
+      - "traefik.http.middlewares.sse-buffer.buffering.maxRequestBodyBytes=0"
+      - "traefik.http.middlewares.sse-buffer.buffering.maxResponseBodyBytes=0"
+      - "traefik.http.middlewares.sse-buffer.buffering.memRequestBodyBytes=0"
+      - "traefik.http.middlewares.sse-buffer.buffering.memResponseBodyBytes=0"
+      - "traefik.http.middlewares.sse-buffer.buffering.retryExpression="
+      - "traefik.http.routers.backend.middlewares=sse-buffer"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/auth/login || exit 0"]
       interval: 30s
@@ -98,18 +131,22 @@ services:
         reservations:
           memory: 256M
 
-  # ── Frontend (Nginx static + proxy) ──────────────────────────────
+  # ── Frontend (Nginx static) ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       - backend
     networks:
       - ai-chat-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
       interval: 30s
@@ -128,4 +165,6 @@ networks:
 
 volumes:
   pgdata:
+    driver: local
+  traefik-certs:
     driver: local
