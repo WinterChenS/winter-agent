@@ -1,56 +1,72 @@
 from langgraph.graph import StateGraph, END
 
-from graph.nodes import agent_node, tool_node, chart_node, MAX_ITERATIONS
+from graph.nodes import agent_node, tool_node, chart_planner_node, answer_node, MAX_ITERATIONS
 from graph.state import State
 
 
 def _route_after_agent(state: State) -> str:
-    if state.get("current_tool") and state.get("iteration_count", 0) <= MAX_ITERATIONS:
+    route = state.get("route", "chart_planner")
+    if route == "tool" and int(state.get("iteration_count", 0) or 0) <= MAX_ITERATIONS:
         return "tool"
-    return "chart"
+    return "chart_planner"
+
+
+def _route_after_tool(state: State) -> str:
+    route = state.get("route", "agent")
+    return route  # "agent" to loop back
+
+
+def _route_after_chart_planner(state: State) -> str:
+    route = state.get("route", "answer")
+    return route  # "answer"
+
+
+def _route_after_answer(state: State) -> str:
+    route = state.get("route", "end")
+    return route if route == "end" else END
 
 
 def create_agent_graph(checkpointer=None):
     """
-    构建并编译 ReAct Agent 图。
+    V0.4 three-phase pipeline:
 
-    V0.3 图结构：
-        START
-          ↓
-        agent_node（LLM 决策：需要工具？）
-          ├── 需要工具 → tool_node → 回到 agent_node（循环）
-          ├── 不需要工具 / 已有答案 → chart_node（图表规划）
-          └── chart_node → END
+    Phase 1: JSON Mode ReAct
+        agent_node <--> tool_node (search/browser/time)
+
+    Phase 2: JSON Mode Chart Planning
+        chart_planner_node (extracts charts from conversation)
+
+    Phase 3: Normal Mode Streaming Answer
+        answer_node (streaming text with [CHART:n] markers)
     """
     workflow = StateGraph(State)
 
-    # 1. 注册节点
-    workflow.add_node("agent", agent_node)   # LLM 决策节点
-    workflow.add_node("tool", tool_node)     # 工具执行节点
-    workflow.add_node("chart", chart_node)   # 图表规划 + 生成节点
+    workflow.add_node("agent", agent_node)
+    workflow.add_node("tool", tool_node)
+    workflow.add_node("chart_planner", chart_planner_node)
+    workflow.add_node("answer", answer_node)
 
-    # 2. 设置入口：第一步交给 agent_node
     workflow.set_entry_point("agent")
 
-    # 3. 条件边：agent_node 执行完后，由 _route_after_agent 决定走哪里
-    #    返回 "tool"  → 走 tool 节点
-    #    返回 "chart" → 走 chart 节点
-    #    返回 END     → 结束图
-    workflow.add_conditional_edges(
-        "agent",                 # 从哪个节点出发
-        _route_after_agent,      # 路由函数
-        {
-            "tool": "tool",      # 返回 "tool"  → 走 tool_node
-            "chart": "chart",    # 返回 "chart" → 走 chart_node
-            END: END,            # 返回 END     → 结束
-        },
-    )
+    workflow.add_conditional_edges("agent", _route_after_agent, {
+        "tool": "tool",
+        "chart_planner": "chart_planner",
+        END: END,
+    })
 
-    # 4. 固定边：tool_node 执行完后，无条件回到 agent_node（形成循环）
-    #    agent_node 第二次调用时，会读取 tool_result 生成最终答案
-    workflow.add_edge("tool", "agent")
+    workflow.add_conditional_edges("tool", _route_after_tool, {
+        "agent": "agent",
+        END: END,
+    })
 
-    # 5. 固定边：chart_node 执行完后，输出 ChartSpec 并结束
-    workflow.add_edge("chart", END)
+    workflow.add_conditional_edges("chart_planner", _route_after_chart_planner, {
+        "answer": "answer",
+        END: END,
+    })
+
+    workflow.add_conditional_edges("answer", _route_after_answer, {
+        "end": END,
+        END: END,
+    })
 
     return workflow.compile(checkpointer=checkpointer)
