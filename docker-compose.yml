@@ -1,49 +1,131 @@
 version: '3.8'
 
 services:
+  # ── PostgreSQL (shared by backend + ai-service) ──────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-winter-agent}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - ai-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-winter-agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── AI Service (FastAPI + LangGraph) ─────────────────────────────
+  ai-service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_URI=postgresql://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-winter-agent}
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/generate/stream', data=b'{\\\"message\\\":\\\"ping\\\",\\\"conversationId\\\":\\\"health\\\"}').status\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ── Backend (Spring Boot BFF) ────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - AICHAT_AI_SERVICE_URL=http://ai-service:8000
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-winter-agent}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-app_user}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-change_me_in_production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/auth/login || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # ── Frontend (Nginx static + proxy) ──────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
       - backend
     networks:
       - ai-chat-network
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - AICHAT_AI_SERVICE_URL=http://ai-service:8000
-    depends_on:
-      - ai-service
-    networks:
-      - ai-chat-network
-
-  ai-service:
-    build:
-      context: ./ai_service
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      # 用户自定义环境变量（优先使用）
-      - API_KEY=${API_KEY:-}
-      - BASE_URL=${BASE_URL:-https://api.openai.com/v1}
-      - MODEL=${MODEL:-gpt-3.5-turbo}
-      - MAX_CONSECUTIVE_SEARCH_CALLS=${MAX_CONSECUTIVE_SEARCH_CALLS:-2}
-      # 兼容旧配置
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
-      - MODEL_NAME=${MODEL_NAME:-gpt-3.5-turbo}
-    networks:
-      - ai-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   ai-chat-network:
     driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
