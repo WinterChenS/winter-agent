@@ -616,6 +616,8 @@ async def tool_node(state: State) -> dict:
         **extra,
         "current_tool": None,
         "tool_input": None,
+        "last_tool_name": None,  # reset dedup after each tool execution
+        "last_tool_query": None,
         "reasoning_steps": state.get("reasoning_steps", []) + [step],
     }
 
