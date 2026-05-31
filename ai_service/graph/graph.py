@@ -5,15 +5,9 @@ from graph.state import State
 
 
 def _route_after_agent(state: State) -> str:
-    """Route after agent: tool calls go to tool_node, text response loops back to agent,
-    chart route goes to chart_node at end."""
     if state.get("current_tool") and state.get("iteration_count", 0) <= MAX_ITERATIONS:
         return "tool"
-    # Text response (not final answer yet): loop back to agent to continue ReAct
-    consecutive_text = int(state.get("consecutive_text_count", 0) or 0)
-    if consecutive_text >= 2:
-        return "chart"
-    return "agent"  # Self-loop: keep ReAct going
+    return "chart"
 
 
 def create_agent_graph(checkpointer=None):
@@ -48,7 +42,6 @@ def create_agent_graph(checkpointer=None):
         {
             "tool": "tool",      # 返回 "tool"  → 走 tool_node
             "chart": "chart",    # 返回 "chart" → 走 chart_node
-            "agent": "agent",    # 返回 "agent" → self-loop (continue ReAct)
             END: END,            # 返回 END     → 结束
         },
     )
