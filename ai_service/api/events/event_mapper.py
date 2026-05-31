@@ -107,7 +107,7 @@ def process_stream_token_event(
         return _stream_event_with_content(raw_token_content), False, "", "", ""
 
     # Filter thinking tags and XML function call leaks
-    if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>")):
+    if any(tag in raw_token_content for tag in ("[Thought]", "[/Thought]", "<function>", "</function>", "<query>", "</query>", "<tool_calls>", "</tool_calls>", "<invoke")):
         return None, collecting_control_json, control_json_buffer, preamble_buffer, ""
 
     # Buffer all text as potential preamble until tool call or end of response.
