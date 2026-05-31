@@ -141,9 +141,13 @@ export function useChat() {
     setIsSending(true);
 
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           message: content.trim(),
           conversationId: effectiveConversationId,
