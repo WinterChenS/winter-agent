@@ -1,3 +1,10 @@
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
 export async function streamChat(
   message: string,
   onToken: (token: string) => void,
@@ -5,9 +12,7 @@ export async function streamChat(
 ): Promise<string | undefined> {
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(),
     body: JSON.stringify({
       message,
       conversationId,
@@ -51,8 +56,12 @@ export async function streamChat(
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.content) {
-              onToken(parsed.content);
+            const textChunk = parsed.content ?? parsed.token;
+            const isLegacyPlainTextEvent = !parsed.type;
+            const isAssistantAnswerToken = parsed.type === 'token' || isLegacyPlainTextEvent;
+
+            if (isAssistantAnswerToken && textChunk) {
+              onToken(textChunk);
             }
             if (parsed.conversationId) {
               finalConversationId = parsed.conversationId;
@@ -73,11 +82,12 @@ export async function streamChat(
   return finalConversationId;
 }
 
-export async function getChatHistory(conversationId: string): Promise<any[]> {
-  const response = await fetch(`/api/chat/history/${conversationId}`);
+export async function getChatHistory(conversationId: string): Promise<any> {
+  const response = await fetch(`/api/chat/history/${conversationId}`, {
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     throw new Error('获取历史记录失败');
   }
-  const data = await response.json();
-  return data.messages || [];
+  return response.json();
 }

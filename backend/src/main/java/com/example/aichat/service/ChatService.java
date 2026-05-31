@@ -1,7 +1,6 @@
 package com.example.aichat.service;
 
 import com.example.aichat.client.AIClient;
-import com.example.aichat.model.GenerateResponse;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -14,7 +13,7 @@ public class ChatService {
         this.aiClient = aiClient;
     }
 
-    public Flux<GenerateResponse> streamChat(String message, String conversationId) {
+    public Flux<String> streamChat(String message, String conversationId) {
         return aiClient.streamGenerate(message, conversationId);
     }
 

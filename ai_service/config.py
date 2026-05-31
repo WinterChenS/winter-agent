@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # ============ 基础的大模型配置 ============
     api_key: str = ""
     base_url: str = "https://api.openai.com/v1"
-    model: str = "gpt-3.5-turbo"
+    model: str = "qwen3.7-max"
     max_tokens: int = 1000
     temperature: float = 0.7  # 模型回复的随机性度量，0.7是一个兼顾严谨与发散的适中值
 
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     langchain_endpoint: str = "https://api.smith.langchain.com"
     langchain_api_key: str = ""
     langchain_project: str = "default"
+
+    # ============ V0.3 Policy / Observability 配置 ============
+    policy_tool_whitelist: str = ""
+    policy_max_query_len: int = 500
+    policy_timeout_override_ms: int = 0
+    max_consecutive_search_calls: int = 100
+    max_tool_iterations: int = 100
+    trace_enabled: bool = True
 
     class Config:
         # 指明去当前执行根目录去寻找 '.env' 文件自动解析到上面这些变量里

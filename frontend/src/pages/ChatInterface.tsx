@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChatInput } from '../components/ChatInput';
 import { MessageList } from '../components/MessageList';
 import { Sidebar } from '../components/Sidebar';
+import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../hooks/useChat';
 import { useSessions } from '../hooks/useSessions';
 
@@ -14,6 +15,7 @@ export function ChatInterface() {
   const isNewSessionRef = useRef(false);
 
   const { sessions, createSession, removeSession, updateSessionTitle } = useSessions();
+const { username, logout } = useAuth();
 
   const {
     messages,
@@ -64,7 +66,7 @@ export function ChatInterface() {
       updateSessionTitle(currentSessionId, content.slice(0, 15) + (content.length > 15 ? '...' : ''));
     }
 
-    await originalSendMessage(content);
+    await originalSendMessage(content, currentSessionId);
   };
 
   return (
@@ -92,14 +94,28 @@ export function ChatInterface() {
           <h1 className="text-xl font-semibold text-gray-800">
             {routeSessionId ? sessions.find(s => s.id === routeSessionId)?.title || 'AI Chat' : '新对话'}
           </h1>
-          {messages.length > 0 && (
+          <div className="ml-auto flex items-center gap-4">
+            {messages.length > 0 && (
+              <button
+                onClick={handleNewSession}
+                className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                清空/新对话
+              </button>
+            )}
+            {username && (
+              <span className="text-sm text-gray-400">{username}</span>
+            )}
             <button
-              onClick={handleNewSession}
-              className="ml-auto text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              onClick={() => { logout(); navigate('/login'); }}
+              className="text-sm text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1"
             >
-              清空/新对话
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              退出
             </button>
-          )}
+          </div>
         </header>
 
         <main className="flex-1 overflow-hidden relative">

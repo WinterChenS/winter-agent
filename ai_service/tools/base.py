@@ -45,6 +45,11 @@ class BaseTool(ABC):
 	name: str
 	description: str
 	input_schema: dict[str, Any]
+	output_schema: dict[str, Any] = {}
+	version: str = "1.0.0"
+	timeout_ms: int = 30000
+	retry_policy: dict[str, Any] = {"max_retries": 0}
+	policy_tags: list[str] = []
 
 	@abstractmethod
 	async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:

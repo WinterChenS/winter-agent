@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Conversation } from '../types/chat';
+import { generateUUID } from '../utils/uuid';
 
 export function useSessions() {
   const [sessions, setSessions] = useState<Conversation[]>([]);
@@ -18,7 +19,7 @@ export function useSessions() {
 
   const createSession = useCallback((title: string = '新对话') => {
     const newSession: Conversation = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       title,
       createdAt: Date.now(),
     };
