@@ -3,7 +3,6 @@ from api.events.event_mapper import (
     emit_guard_reason_envelope,
     emit_final_summary_envelope,
     map_langgraph_event_to_envelopes,
-    process_stream_token_event,
 )
 from observability.trace import ensure_trace_context
 
@@ -68,36 +67,6 @@ def test_emit_tool_summary_from_final_state():
     assert envelope is not None
     assert envelope["type"] == "tool_summary"
     assert envelope["payload"]["steps"][0]["tool"] == "search"
-
-
-def test_process_stream_token_event_buffers_partial_control_json():
-    event = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"action": "tool"')}}
-    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(event, False, "", {"search", "time"})
-
-    assert rewritten is None
-    assert collecting is True
-    assert buffer.startswith('{"action"')
-
-
-def test_process_stream_token_event_filters_tool_control_json():
-    part1 = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"action": "tool",')}}
-    _ , collecting, buffer, preamble, thought = process_stream_token_event(part1, False, "", {"search", "time"})
-
-    part2 = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('"tool": "search", "query": "x"}')}}
-    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(part2, collecting, buffer, {"search", "time"})
-
-    assert rewritten is None
-    assert collecting is False
-    assert buffer == ""
-
-
-def test_process_stream_token_event_keeps_normal_json_text():
-    event = {"event": "on_chat_model_stream", "data": {"chunk": _Chunk('{"note": "hello"}')}}
-    rewritten, collecting, buffer, preamble, thought = process_stream_token_event(event, False, "", {"search", "time"})
-
-    assert rewritten is not None
-    assert collecting is False
-    assert buffer == ""
 
 
 def test_emit_tool_summary_returns_none_for_empty_steps():

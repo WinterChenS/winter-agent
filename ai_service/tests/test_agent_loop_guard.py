@@ -25,7 +25,7 @@ async def test_duplicate_search_is_forced_to_final_answer(monkeypatch):
             "基于已有检索结果：今天主要新闻包括...",
         ]
     )
-    monkeypatch.setattr(nodes, "_build_llm", lambda: llm)
+    monkeypatch.setattr(nodes, "_build_llm", lambda streaming=True, json_mode=False: llm)
     monkeypatch.setattr(nodes, "get_tool_registry", lambda: None)
 
     state = {
@@ -41,8 +41,9 @@ async def test_duplicate_search_is_forced_to_final_answer(monkeypatch):
 
     assert out["current_tool"] is None
     assert out["tool_input"] is None
-    assert out["messages"][0].content.startswith("基于已有检索结果")
-    assert llm.calls == 2
+    assert out["route"] == "chart_planner"
+    assert out["last_guard_reason"]["code"] == "DUPLICATE_TOOL_CALL_BLOCKED"
+    assert llm.calls == 1
 
 
 @pytest.mark.asyncio
@@ -53,7 +54,7 @@ async def test_search_with_existing_hits_skips_new_search(monkeypatch):
             "我已基于已检索到的信息整理如下...",
         ]
     )
-    monkeypatch.setattr(nodes, "_build_llm", lambda: llm)
+    monkeypatch.setattr(nodes, "_build_llm", lambda streaming=True, json_mode=False: llm)
     monkeypatch.setattr(nodes, "get_tool_registry", lambda: None)
 
     state = {
@@ -83,7 +84,7 @@ async def test_max_consecutive_search_guard_forces_final_answer(monkeypatch):
             "下面是基于已有检索证据的最终汇总...",
         ]
     )
-    monkeypatch.setattr(nodes, "_build_llm", lambda: llm)
+    monkeypatch.setattr(nodes, "_build_llm", lambda streaming=True, json_mode=False: llm)
     monkeypatch.setattr(nodes, "get_tool_registry", lambda: None)
     monkeypatch.setattr(nodes.settings, "max_consecutive_search_calls", 2, raising=False)
 
@@ -105,7 +106,7 @@ async def test_max_consecutive_search_guard_forces_final_answer(monkeypatch):
     assert out["last_guard_reason"]["code"] == "MAX_CONSECUTIVE_SEARCH_REACHED"
     assert isinstance(out["reasoning_steps"][-1], dict)
     assert out["reasoning_steps"][-1]["code"] == "MAX_CONSECUTIVE_SEARCH_REACHED"
-    assert "最终" in out["messages"][0].content or "汇总" in out["messages"][0].content
-    assert llm.calls == 2
+    assert out["route"] == "chart_planner"
+    assert llm.calls == 1
 
 
