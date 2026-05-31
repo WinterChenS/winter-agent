@@ -57,3 +57,6 @@ class State(TypedDict):
     pending_text_block: str | None   # Text block ready for immediate SSE emission
     blocks: list[dict]          # Ordered content blocks (markdown/chart/table/code)
 
+    # ── V0.4 three-phase routing ─────────────────────────────────────────
+    route: str  # "tool" | "chart_planner" | "answer" | "end"
+
