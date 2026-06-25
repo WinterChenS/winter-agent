@@ -10,9 +10,12 @@ from api.routes.system import router as system_router
 from config import settings
 from core.runtime import set_runtime, set_tool_registry
 from tools import ToolRegistry
-from tools.browser import BrowserUseTool
-from tools.search import SearchTool
-from tools.time.tool import TimeTool
+
+# Auto-discovery: import tool modules so @tool classes register via BaseTool.__subclasses__()
+import tools.browser.tool as _
+import tools.sandbox.tool as _
+import tools.search.tool as _
+import tools.time.tool as _
 
 
 # FastApi 生命周期的钩子，使用@asynccontextmanager注解
@@ -38,9 +41,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化 ToolRegistry（全局单例，整个应用生命周期共用）
     tool_registry = ToolRegistry()
-    tool_registry.register(SearchTool())
-    tool_registry.register(TimeTool())
-    tool_registry.register(BrowserUseTool())
+    tool_registry.discover()
     print(f"ToolRegistry ready: {[t['name'] for t in tool_registry.list_tools()]}")
 
     set_runtime(pg_pool, checkpointer)
