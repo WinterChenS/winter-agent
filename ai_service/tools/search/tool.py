@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from tavily import TavilyClient
 
 from tools.base import BaseTool, ToolResult
+from tools.schema import tool, ToolSchema
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ _SEARCH_CACHE_TTL_SECONDS = 3600  # 1 hour
 _search_result_cache: dict[str, tuple[float, Any]] = {}
 
 
+@tool
 class SearchTool(BaseTool):
     name = "search"
     description = "Search the web for a query and return ranked snippets."
@@ -37,6 +39,21 @@ class SearchTool(BaseTool):
         },
         "required": ["query"],
     }
+    schema: ToolSchema = ToolSchema(
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query text"},
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (default: 5)",
+                    "minimum": 1,
+                    "maximum": 20,
+                },
+            },
+            "required": ["query"],
+        },
+    )
 
     @staticmethod
     @lru_cache(maxsize=1)

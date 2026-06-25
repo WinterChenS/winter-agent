@@ -4,10 +4,12 @@ import logging
 from typing import Any, Mapping
 
 from tools.base import BaseTool, ToolResult
+from tools.schema import tool, ToolSchema
 
 logger = logging.getLogger(__name__)
 
 
+@tool
 class TimeTool(BaseTool):
     name = "time"
     description = "Get the current date and time. Useful for questions about the current time or date."
@@ -21,6 +23,18 @@ class TimeTool(BaseTool):
         },
         "required": [],
     }
+    schema: ToolSchema = ToolSchema(
+        parameters={
+            "type": "object",
+            "properties": {
+                "timezone": {
+                    "type": "string",
+                    "description": "The timezone to get the time for (e.g., 'Asia/Shanghai', 'UTC'). Defaults to local system time if not provided."
+                }
+            },
+            "required": [],
+        },
+    )
 
     async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
         try:
