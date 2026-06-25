@@ -19,6 +19,13 @@ class ValidTool(BaseTool):
 
     name: str = "valid_tool"
     description: str = "A valid tool for testing"
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Search query"},
+        },
+        "required": ["query"],
+    }
     schema: ToolSchema = ToolSchema(
         parameters={
             "type": "object",
@@ -67,6 +74,14 @@ class ToolWithParamDetails(BaseTool):
 
     name: str = "param_tool"
     description: str = "Tool with parameters"
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The user name"},
+            "age": {"type": "integer", "description": "The user age"},
+        },
+        "required": ["name"],
+    }
     schema: ToolSchema = ToolSchema(
         parameters={
             "type": "object",
