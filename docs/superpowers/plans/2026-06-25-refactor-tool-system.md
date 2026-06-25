@@ -1,6 +1,6 @@
 # Tool System Refactor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Refactor the tool system to use Pydantic-based schema, `@tool` decorator-based auto-discovery, parallel tool execution, and a Docker sandbox for Python code execution.
 
@@ -89,7 +89,7 @@ Task 1 (schema + decorator)
 - Consumes: `BaseTool` from `tools/base.py` — adds `schema: ToolSchema` class attribute
 - Consumes: `ToolResult` from `tools/base.py` — unchanged
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ai_service/tests/test_tool_schema.py`:
 
@@ -180,7 +180,7 @@ class TestToolDecorator:
         assert not hasattr(NormalClass, "_is_tool")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 ```bash
@@ -189,7 +189,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: `ModuleNotFoundError: No module named 'tools.schema'`
 
-- [ ] **Step 3: Create `ai_service/tools/schema.py`**
+- [x] **Step 3: Create `ai_service/tools/schema.py`**
 
 ```python
 from __future__ import annotations
@@ -208,7 +208,7 @@ def tool(cls):
     return cls
 ```
 
-- [ ] **Step 4: Update `ai_service/tools/base.py` -- replace `input_schema` with `schema: ToolSchema`**
+- [x] **Step 4: Update `ai_service/tools/base.py` -- replace `input_schema` with `schema: ToolSchema`**
 
 Edit `ai_service/tools/base.py`. Replace the class attribute `input_schema: dict[str, Any]` with `schema: ToolSchema`. Also remove `output_schema`, `version`, `timeout_ms`, `retry_policy`, `policy_tags` since they are either covered by ToolSchema or managed by the registry.
 
@@ -270,7 +270,7 @@ class BaseTool(ABC):
         """Execute the tool with validated input payload."""
 ```
 
-- [ ] **Step 5: Update `ai_service/tools/__init__.py`**
+- [x] **Step 5: Update `ai_service/tools/__init__.py`**
 
 ```python
 from tools.base import BaseTool, ToolError, ToolResult
@@ -289,7 +289,7 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -298,7 +298,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All 7 tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -319,7 +319,7 @@ git commit -m "feat: add ToolSchema model and @tool decorator for tool auto-disc
 - Produces: `ToolRegistry.discover()` — scans `BaseTool.__subclasses__()`, filters by `_is_tool`, validates schema, calls `register()`
 - Produces: `ToolRegistry.build_tools_prompt()` — returns a formatted string for LLM prompt
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ai_service/tests/test_tool_registry.py`:
 
@@ -515,7 +515,7 @@ class TestToolRegistryMethods:
             registry.register(EtaTool())
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 ```bash
@@ -524,7 +524,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: Various failures because `ToolRegistry` doesn't have `discover()` or `build_tools_prompt()` yet.
 
-- [ ] **Step 3: Rewrite `ai_service/tools/registry.py`**
+- [x] **Step 3: Rewrite `ai_service/tools/registry.py`**
 
 Replace the entire file content:
 
@@ -673,7 +673,7 @@ class ToolRegistry:
             ).to_dict()
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -682,7 +682,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -706,7 +706,7 @@ git commit -m "feat: rewrite ToolRegistry with auto-discovery and build_tools_pr
 - Produces: `TimeTool` with `@tool` decorator + `ToolSchema`
 - Produces: `BrowserUseTool` with `@tool` decorator + `ToolSchema`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ai_service/tests/test_tool_migration.py`:
 
@@ -784,7 +784,7 @@ class TestMigratedTools:
         assert "browser" in names
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 ```bash
@@ -793,7 +793,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: Failures because existing tools don't have `@tool` decorator or `ToolSchema`.
 
-- [ ] **Step 3: Migrate `ai_service/tools/search/tool.py`**
+- [x] **Step 3: Migrate `ai_service/tools/search/tool.py`**
 
 Make the following changes:
 1. Replace `input_schema` assignment with `schema = ToolSchema(parameters={...})`
@@ -830,7 +830,7 @@ from tools.schema import ToolSchema, tool
 
 Remove the old `input_schema` class attribute.
 
-- [ ] **Step 4: Migrate `ai_service/tools/time/tool.py`**
+- [x] **Step 4: Migrate `ai_service/tools/time/tool.py`**
 
 Changes to the TimeTool class:
 
@@ -860,7 +860,7 @@ from tools.schema import ToolSchema, tool
 
 Remove the old `input_schema` class attribute.
 
-- [ ] **Step 5: Migrate `ai_service/tools/browser/tool.py`**
+- [x] **Step 5: Migrate `ai_service/tools/browser/tool.py`**
 
 Changes to the BrowserUseTool class:
 
@@ -899,7 +899,7 @@ from tools.schema import ToolSchema, tool
 
 Remove the old `input_schema` class attribute.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -908,7 +908,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 7: Run existing tests to verify no regressions**
+- [x] **Step 7: Run existing tests to verify no regressions**
 
 Run:
 ```bash
@@ -917,7 +917,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All existing tests still PASS (the migration only changes the schema field name and adds decorators, existing tests use `tools/base.py` types which are unchanged).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -938,7 +938,7 @@ git commit -m "feat: migrate SearchTool, TimeTool, BrowserUseTool to @tool decor
 - Produces: Updated `_REACT_SYSTEM_PROMPT` mentioning `actions` parallel format
 - Produces: `agent_node` returns `{"tool_input": {"actions": [...]}}` for parallel calls
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ai_service/tests/test_parallel_protocol.py`:
 
@@ -1059,7 +1059,7 @@ class TestPromptBuilds:
         assert "mock_b" in prompt
 ```
 
-- [ ] **Step 2: Update `_REACT_SYSTEM_PROMPT` in `ai_service/graph/nodes.py`**
+- [x] **Step 2: Update `_REACT_SYSTEM_PROMPT` in `ai_service/graph/nodes.py`**
 
 Replace the existing `_REACT_SYSTEM_PROMPT` to include the parallel `actions` format:
 
@@ -1100,7 +1100,7 @@ Rules:
 """
 ```
 
-- [ ] **Step 3: Update `agent_node` in `ai_service/graph/nodes.py` to support `actions`**
+- [x] **Step 3: Update `agent_node` in `ai_service/graph/nodes.py` to support `actions`**
 
 Replace the tool builds section in `agent_node`:
 
@@ -1161,7 +1161,7 @@ Then, in the JSON parsing section (after `parsed = json.loads(content)` around l
         # ... existing code unchanged from this point ...
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -1170,7 +1170,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 5: Run existing tool tests to verify regressions**
+- [x] **Step 5: Run existing tool tests to verify regressions**
 
 Run:
 ```bash
@@ -1179,7 +1179,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: No regressions. If any graph-related tests call `agent_node` and fail due to prompt changes, fix the test expectations to match the new prompt text.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -1202,7 +1202,7 @@ git commit -m "feat: update agent_node with parallel tool protocol (actions arra
 - Produces: `tool_node` returns merged `tool_result` for parallel calls
 - Produces: Multiple `tool_step_record` entries for parallel calls
 
-- [ ] **Step 1: Write the failing tests for parallel tool_node**
+- [x] **Step 1: Write the failing tests for parallel tool_node**
 
 Append to `ai_service/tests/test_parallel_protocol.py`:
 
@@ -1403,7 +1403,7 @@ class TestToolNodeParallelExecution:
         assert len(limited) == 3
 ```
 
-- [ ] **Step 2: Update `tool_node` in `ai_service/graph/nodes.py` for parallel execution**
+- [x] **Step 2: Update `tool_node` in `ai_service/graph/nodes.py` for parallel execution**
 
 Replace the `tool_node` function. The new version detects `actions` in `tool_input` and executes in parallel:
 
@@ -1661,7 +1661,7 @@ from policy.models import PolicyContext
 
 Check existing import and add if missing.
 
-- [ ] **Step 3: Run parallel tests**
+- [x] **Step 3: Run parallel tests**
 
 Run:
 ```bash
@@ -1670,7 +1670,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 4: Run full existing test suite**
+- [x] **Step 4: Run full existing test suite**
 
 Run:
 ```bash
@@ -1679,7 +1679,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All existing tests still PASS (single tool path remains unchanged)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -1699,7 +1699,7 @@ git commit -m "feat: update tool_node with parallel execution via asyncio.gather
 - Modify: `ai_service/requirements.txt` (add `docker` package)
 - Create: `ai_service/tests/test_code_sandbox.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ai_service/tests/test_code_sandbox.py`:
 
@@ -1774,7 +1774,7 @@ class TestCodeSandboxExecution:
         assert result.ok is False
 ```
 
-- [ ] **Step 2: Create `ai_service/tools/sandbox/Dockerfile.sandbox`**
+- [x] **Step 2: Create `ai_service/tools/sandbox/Dockerfile.sandbox`**
 
 ```dockerfile
 FROM python:3.12-slim
@@ -1790,7 +1790,7 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 ```
 
-- [ ] **Step 3: Create `ai_service/tools/sandbox/docker-entrypoint.sh`**
+- [x] **Step 3: Create `ai_service/tools/sandbox/docker-entrypoint.sh`**
 
 ```bash
 #!/bin/sh
@@ -1801,7 +1801,7 @@ exec python /workspace/script.py
 
 Make it executable with `chmod +x ai_service/tools/sandbox/docker-entrypoint.sh`.
 
-- [ ] **Step 4: Create `ai_service/tools/sandbox/docker-compose.sandbox.yml`**
+- [x] **Step 4: Create `ai_service/tools/sandbox/docker-compose.sandbox.yml`**
 
 ```yaml
 version: "3.9"
@@ -1824,7 +1824,7 @@ services:
     stop_grace_period: 1s
 ```
 
-- [ ] **Step 5: Create `ai_service/tools/sandbox/__init__.py`**
+- [x] **Step 5: Create `ai_service/tools/sandbox/__init__.py`**
 
 ```python
 from tools.sandbox.tool import CodeSandboxTool
@@ -1832,7 +1832,7 @@ from tools.sandbox.tool import CodeSandboxTool
 __all__ = ["CodeSandboxTool"]
 ```
 
-- [ ] **Step 6: Create `ai_service/tools/sandbox/tool.py`**
+- [x] **Step 6: Create `ai_service/tools/sandbox/tool.py`**
 
 ```python
 from __future__ import annotations
@@ -1966,11 +1966,11 @@ def _run_in_sandbox(code: str, timeout: int) -> ToolResult:
         )
 ```
 
-- [ ] **Step 7: Add `docker` to `ai_service/requirements.txt`** (not needed — we use `subprocess` to call `docker` CLI instead of the Docker SDK)
+- [x] **Step 7: Add `docker` to `ai_service/requirements.txt`** (not needed — we use `subprocess` to call `docker` CLI instead of the Docker SDK)
 
 The design doc uses `subprocess` to call Docker. The requirements.txt does not need the `docker` Python package since we call the `docker` CLI directly. Skip this step.
 
-- [ ] **Step 8: Build the sandbox Docker image**
+- [x] **Step 8: Build the sandbox Docker image**
 
 Run:
 ```bash
@@ -1980,7 +1980,7 @@ docker compose -f docker-compose.sandbox.yml build
 ```
 Expected: Docker image `code-sandbox:latest` is built successfully.
 
-- [ ] **Step 9: Run tests (Docker-available tests skipped if no Docker)**
+- [x] **Step 9: Run tests (Docker-available tests skipped if no Docker)**
 
 Run:
 ```bash
@@ -1989,7 +1989,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: Schema tests PASS. Integration tests skip with "Docker not available" if Docker is not running on this machine.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -2004,7 +2004,7 @@ git commit -m "feat: add Docker sandbox for Python code execution"
 **Files:**
 - Modify: `ai_service/main.py`
 
-- [ ] **Step 1: Update `ai_service/main.py`**
+- [x] **Step 1: Update `ai_service/main.py`**
 
 Replace the tool registration section in `lifespan`:
 
@@ -2039,7 +2039,7 @@ from tools.search import SearchTool
 from tools.time.tool import TimeTool
 ```
 
-- [ ] **Step 2: Verify the app starts correctly**
+- [x] **Step 2: Verify the app starts correctly**
 
 Run:
 ```bash
@@ -2065,7 +2065,7 @@ asyncio.run(test())
 ```
 Expected: `Discovered tools: ['search', 'time', 'browser']`
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run:
 ```bash
@@ -2074,7 +2074,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -2089,7 +2089,7 @@ git commit -m "refactor: replace manual tool registration with auto-discovery in
 **Files:**
 - Create: `ai_service/tests/test_end_to_end.py`
 
-- [ ] **Step 1: Write the integration tests**
+- [x] **Step 1: Write the integration tests**
 
 Create `ai_service/tests/test_end_to_end.py`:
 
@@ -2305,7 +2305,7 @@ class TestEndToEnd:
         assert lines[0].startswith("  - formatter:")
 ```
 
-- [ ] **Step 2: Run the integration tests**
+- [x] **Step 2: Run the integration tests**
 
 Run:
 ```bash
@@ -2314,7 +2314,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 3: Run the full test suite for final regression check**
+- [x] **Step 3: Run the full test suite for final regression check**
 
 Run:
 ```bash
@@ -2323,7 +2323,7 @@ cd /Volumes/work/projects/winter-agent/ai_service
 ```
 Expected: All tests PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -2338,7 +2338,7 @@ git commit -m "test: add end-to-end integration test for full tool system pipeli
 **Files:**
 - Create: `ai_service/tools/README.md`
 
-- [ ] **Step 1: Create `ai_service/tools/README.md`**
+- [x] **Step 1: Create `ai_service/tools/README.md`**
 
 ```markdown
 # Tool System
@@ -2404,7 +2404,7 @@ class MyTool(BaseTool):
 Tools use `ToolSchema` (Pydantic BaseModel) with a `parameters` dict following [OpenAI function calling schema](https://platform.openai.com/docs/guides/function-calling) format.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent

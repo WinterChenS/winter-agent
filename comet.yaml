@@ -1,0 +1,2 @@
+build_command: bash scripts/build.sh
+verify_command: bash scripts/build.sh
