@@ -14,24 +14,22 @@ logger = logging.getLogger(__name__)
 
 @tool
 class CodeSandboxTool(BaseTool):
-    """Execute Python code in an isolated subprocess sandbox.
+    """Execute Python code using subprocess for data analysis and computation.
 
     Each invocation spawns a fresh subprocess running the given Python code
     with a configurable timeout (default 30 s).  stdout and stderr are
     captured separately.  On Linux the subprocess also has its memory capped
     at 256 MB via ``resource.setrlimit``.
 
-    The sandbox runs **the same Python interpreter** as the parent process
-    (``sys.executable``).  Pre-installed packages (pandas, numpy, matplotlib)
-    are available inside the sandbox automatically.
+    Note: runs with the same privileges as the AI service process.
+    Pre-installed packages (pandas, numpy, matplotlib) are available
+    automatically.
     """
 
-    name = "code_sandbox"
+    name = "execute_python"
     description = (
-        "Execute Python code in an isolated sandbox and return its output. "
-        "Useful for running user-provided Python snippets, calculations, or "
-        "data analysis with pandas/numpy. The sandbox has a 30-second timeout "
-        "and each execution is fully isolated."
+        "Execute Python code using subprocess for data analysis and computation. "
+        "Note: runs with the same privileges as the AI service process."
     )
     input_schema = {
         "type": "object",

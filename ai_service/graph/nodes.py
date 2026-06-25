@@ -209,6 +209,20 @@ async def agent_node(state: State) -> dict:
         if not first_tool_name:
             return _force_final_answer(state, tool_result)
 
+        # Count consecutive searches from all parallel actions
+        consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+        parallel_search_count = sum(1 for a in actions if str(a.get("tool", "")).strip().lower() == "search")
+        next_consecutive = consecutive_search_count + parallel_search_count if parallel_search_count > 0 else 0
+
+        # Guard: max consecutive search
+        max_search = _max_consecutive_search_calls()
+        search_extra = {"parallel_search_count": parallel_search_count, "consecutive_search_count": next_consecutive, "limit": max_search}
+        if parallel_search_count > 0 and next_consecutive > max_search:
+            reason = _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
+                f"Consecutive search limit ({max_search}) reached in parallel call; forcing final answer.",
+                extra=search_extra)
+            return _force_final_answer(state, tool_result, reason)
+
         reason = _reason_record("agent_node", "PARALLEL_TOOL_CALL",
             f"Parallel tool call: {len(actions)} tools",
             extra={"tools": [a.get("tool") for a in actions]})
@@ -219,7 +233,7 @@ async def agent_node(state: State) -> dict:
             "iteration_count": current_iteration + 1,
             "last_tool_name": first_tool_name,
             "last_tool_query": str(actions[0].get("query", "")).strip(),
-            "consecutive_search_count": 0,
+            "consecutive_search_count": next_consecutive,
             "reasoning_steps": _append_reason(state, reason),
             "route": "tool",
         }
@@ -352,7 +366,7 @@ async def _execute_single_tool(
     registry = get_tool_registry()
     if not registry:
         return {
-            "result": {"ok": False, "error": "ToolRegistry not initialized", "code": "REGISTRY_NOT_READY"},
+            "result": {"ok": False, "error": {"code": "REGISTRY_NOT_READY", "message": "ToolRegistry not initialized"}},
             "elapsed_ms": int((time.time() - step_start) * 1000),
             "status": "error",
             "error_msg": "ToolRegistry not initialized",
@@ -395,6 +409,31 @@ async def _execute_single_tool(
 # ────────────────────────────────────────────────────────────────────────────
 async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
     """Execute all tools in ``actions`` concurrently and merge results."""
+    # Guard: remaining iterations must cover parallel actions
+    current_iteration = int(state.get("iteration_count", 0) or 0)
+    remaining = MAX_ITERATIONS - current_iteration
+    if len(actions) > remaining:
+        logger.warning(
+            "_parallel_tool_execution: %d parallel tools exceed remaining %d iterations; truncating to %d",
+            len(actions), remaining, remaining,
+        )
+        actions = actions[:remaining]
+        if not actions:
+            result_str = json.dumps({
+                "ok": False,
+                "error": {"code": "ITERATION_BUDGET_EXCEEDED", "message": "No remaining iterations for parallel execution", "retryable": False},
+            }, ensure_ascii=False)
+            return {
+                "tool_result": result_str,
+                "tool_steps": state.get("tool_steps", []),
+                "current_tool": None,
+                "tool_input": None,
+                "last_tool_name": None,
+                "last_tool_query": None,
+                "reasoning_steps": state.get("reasoning_steps", []),
+                "route": "agent",
+            }
+
     gate = _build_policy_gate()
     context = PolicyContext(
         conversation_id=str(state.get("conversation_id") or ""),
@@ -403,7 +442,7 @@ async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
 
     raw_results = await asyncio.gather(
         *[_execute_single_tool(
-            a.get("tool", ""),
+            str(a.get("tool", "")).strip().lower(),
             {"query": a.get("query", "")},
             gate,
             context,
@@ -504,7 +543,7 @@ async def tool_node(state: State) -> dict:
     else:
         registry = get_tool_registry()
         if not registry:
-            result = {"ok": False, "error": "ToolRegistry not initialized", "code": "REGISTRY_NOT_READY"}
+            result = {"ok": False, "error": {"code": "REGISTRY_NOT_READY", "message": "ToolRegistry not initialized"}}
             result_str = json.dumps(result, ensure_ascii=False)
             step = f"[tool_node] ERROR: registry not available, skipped '{tool_name}'"
             status = "error"

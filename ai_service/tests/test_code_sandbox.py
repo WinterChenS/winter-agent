@@ -12,7 +12,7 @@ def sandbox() -> CodeSandboxTool:
 
 
 class TestCodeSandbox:
-    """Tests for CodeSandboxTool — subprocess-based Python code sandbox."""
+    """Tests for CodeSandboxTool — subprocess-based Python code execution."""
 
     @pytest.mark.asyncio
     async def test_execute_simple_code(self, sandbox: CodeSandboxTool) -> None:

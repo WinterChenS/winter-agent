@@ -79,6 +79,12 @@ class ToolRegistry:
 			if cls.schema is None:
 				logger.warning("Skipping %s: schema is None", cls.__name__)
 				continue
+			if not isinstance(cls.schema.parameters, dict) or not cls.schema.parameters:
+				logger.warning("Skipping %s: schema.parameters is empty or not a dict", cls.__name__)
+				continue
+			if "properties" not in cls.schema.parameters:
+				logger.warning("Skipping %s: schema.parameters missing 'properties' key", cls.__name__)
+				continue
 			try:
 				instance = cls()
 				self.register(instance)
