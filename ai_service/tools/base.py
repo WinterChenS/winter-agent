@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from tools.schema import ToolSchema
+
 
 @dataclass(slots=True)
 class ToolError:
@@ -50,6 +52,7 @@ class BaseTool(ABC):
 	timeout_ms: int = 30000
 	retry_policy: dict[str, Any] = {"max_retries": 0}
 	policy_tags: list[str] = []
+	schema: ToolSchema | None = None
 
 	@abstractmethod
 	async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
