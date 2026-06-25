@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Mapping
 
 from domain.capability import CapabilityCall, CapabilityResult, CapabilitySpec
 from tools.base import BaseTool, ToolResult
+
+logger = logging.getLogger(__name__)
 
 
 class ToolRegistryError(Exception):
@@ -58,6 +61,57 @@ class ToolRegistry:
 			).to_dict()
 			for tool in self._tools.values()
 		]
+
+	def discover(self) -> None:
+		"""Auto-discover and register all @tool-decorated BaseTool subclasses.
+
+		Scans ``BaseTool.__subclasses__()`` for classes that have ``_is_tool = True``
+		(set by the ``@tool`` decorator) and a non-``None`` ``schema``.  Each valid
+		class is instantiated and registered via ``register()``.
+
+		Incomplete tools (missing ``_is_tool`` or missing schema) are skipped
+		with a warning logged.
+		"""
+		for cls in BaseTool.__subclasses__():
+			if not getattr(cls, "_is_tool", False):
+				logger.warning("Skipping %s: missing _is_tool marker", cls.__name__)
+				continue
+			if cls.schema is None:
+				logger.warning("Skipping %s: schema is None", cls.__name__)
+				continue
+			try:
+				instance = cls()
+				self.register(instance)
+				logger.info("Registered tool: %s (%s)", instance.name, cls.__name__)
+			except Exception:
+				logger.exception("Failed to register %s", cls.__name__)
+
+	def build_tools_prompt(self) -> str:
+		"""Return a formatted prompt string listing all registered tools.
+
+		Each entry includes the tool's name, description, and parameter
+		information from its schema.  Returns an empty string when no tools
+		are registered.
+		"""
+		if not self._tools:
+			return ""
+
+		lines: list[str] = ["## Available Tools", ""]
+		for tool in self._tools.values():
+			lines.append(f"- **{tool.name}**: {tool.description}")
+			if tool.schema and tool.schema.parameters:
+				props = tool.schema.parameters.get("properties", {})
+				required_params = tool.schema.parameters.get("required", [])
+				if props:
+					lines.append("  Parameters:")
+					for param_name, param_info in props.items():
+						param_type = param_info.get("type", "any")
+						param_desc = param_info.get("description", "")
+						req = "required" if param_name in required_params else "optional"
+						lines.append(f"  - {param_name} ({param_type}, {req}): {param_desc}")
+			lines.append("")
+
+		return "\n".join(lines)
 
 	async def invoke(self, name: str, input_payload: Mapping[str, Any]) -> dict[str, Any]:
 		tool = self.get(name)
