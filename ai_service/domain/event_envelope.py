@@ -147,3 +147,63 @@ def envelope_error(trace_ctx: TraceContext, message: str) -> dict[str, Any]:
 
 def to_sse_data(envelope: dict[str, Any]) -> dict[str, str]:
     return {"data": json.dumps(envelope, ensure_ascii=False)}
+
+
+def envelope_message_delta(
+    trace_ctx: TraceContext, message_id: str, delta: str
+) -> dict[str, Any]:
+    """message.delta — token-level text increment."""
+    return build_envelope(
+        "message.delta",
+        trace_ctx,
+        payload={"messageId": message_id, "agentId": trace_ctx.agent_id, "delta": delta},
+        compat_fields={"messageId": message_id, "delta": delta},
+    )
+
+
+def envelope_message_tool_call(
+    trace_ctx: TraceContext, message_id: str, tool_call: dict[str, Any]
+) -> dict[str, Any]:
+    """message.tool_call — tool invocation status update."""
+    return build_envelope(
+        "message.tool_call",
+        trace_ctx,
+        payload={
+            "messageId": message_id,
+            "agentId": trace_ctx.agent_id,
+            "toolCall": tool_call,
+        },
+        compat_fields={"messageId": message_id, "toolCall": tool_call},
+    )
+
+
+def envelope_message_reasoning(
+    trace_ctx: TraceContext, message_id: str, delta: str
+) -> dict[str, Any]:
+    """message.reasoning — AI thinking process increment."""
+    return build_envelope(
+        "message.reasoning",
+        trace_ctx,
+        payload={"messageId": message_id, "agentId": trace_ctx.agent_id, "delta": delta},
+        compat_fields={"messageId": message_id, "delta": delta},
+    )
+
+
+def envelope_message_done(
+    trace_ctx: TraceContext, message_id: str, *,
+    status: str = "done", error: str | None = None,
+) -> dict[str, Any]:
+    """message.done — stream completion signal."""
+    payload: dict[str, Any] = {
+        "messageId": message_id,
+        "agentId": trace_ctx.agent_id,
+        "status": status,
+    }
+    if error:
+        payload["error"] = error
+    return build_envelope(
+        "message.done",
+        trace_ctx,
+        payload=payload,
+        compat_fields={"messageId": message_id, "status": status},
+    )
