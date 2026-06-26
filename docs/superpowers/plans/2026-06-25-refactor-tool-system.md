@@ -1,3 +1,7 @@
+---
+archived-with: 2026-06-25-refactor-tool-system
+status: final
+---
 # Tool System Refactor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.

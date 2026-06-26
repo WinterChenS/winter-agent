@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as _json
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -62,9 +63,23 @@ class MockAgentRepository(AgentRepository):
         return [a for a in self._agents.values() if a.enabled]
 
 
-def _row_to_agent(row: dict[str, Any]) -> AgentDefinition:
-    """Convert a database row (dict) to an AgentDefinition."""
-    return AgentDefinition(**row)
+_AGENT_SELECT = """
+    SELECT id, name, display_name, description, system_prompt,
+           tools, model_config, trigger_keywords, collaboration_strategy,
+           priority, enabled
+    FROM agent_definitions
+"""
+_AGENT_COLS = ["id", "name", "display_name", "description", "system_prompt",
+               "tools", "model_config", "trigger_keywords", "collaboration_strategy",
+               "priority", "enabled"]
+
+def _row_to_agent(row: Any) -> AgentDefinition:
+    """Convert a database row to an AgentDefinition."""
+    d = dict(zip(_AGENT_COLS, row))
+    for field in ("tools", "model_config", "trigger_keywords"):
+        if isinstance(d.get(field), str):
+            d[field] = _json.loads(d[field])
+    return AgentDefinition(**d)
 
 
 class PostgresAgentRepository(AgentRepository):
@@ -76,34 +91,35 @@ class PostgresAgentRepository(AgentRepository):
     async def list_all(self) -> list[AgentDefinition]:
         async with self._pool.connection() as conn:
             rows = await conn.execute(
-                "SELECT * FROM agent_definitions ORDER BY priority DESC"
+                _AGENT_SELECT + " ORDER BY priority DESC"
             )
             records = await rows.fetchall()
-            return [_row_to_agent(dict(r)) for r in records]
+            return [_row_to_agent(r) for r in records]
 
     async def get_by_id(self, agent_id: str) -> AgentDefinition | None:
         async with self._pool.connection() as conn:
             rows = await conn.execute(
-                "SELECT * FROM agent_definitions WHERE id = %s", (agent_id,)
+                _AGENT_SELECT + " WHERE id = %s", (agent_id,)
             )
             record = await rows.fetchone()
             if record is None:
                 return None
-            return _row_to_agent(dict(record))
+            return _row_to_agent(record)
 
     async def create(self, agent: AgentDefinition) -> AgentDefinition:
         async with self._pool.connection() as conn:
             await conn.execute(
                 """
                 INSERT INTO agent_definitions (id, name, display_name, description,
-                    system_prompt, tools, model_params, trigger_keywords,
+                    system_prompt, tools, model_config, trigger_keywords,
                     collaboration_strategy, priority, enabled)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     agent.id, agent.name, agent.display_name, agent.description,
-                    agent.system_prompt, agent.tools, agent.model_params,
-                    agent.trigger_keywords, agent.collaboration_strategy,
+                    agent.system_prompt,
+                    _json.dumps(agent.tools), _json.dumps(agent.model_params),
+                    _json.dumps(agent.trigger_keywords), agent.collaboration_strategy,
                     agent.priority, agent.enabled,
                 ),
             )
@@ -120,15 +136,16 @@ class PostgresAgentRepository(AgentRepository):
                 """
                 UPDATE agent_definitions SET
                     name = %s, display_name = %s, description = %s,
-                    system_prompt = %s, tools = %s, model_params = %s,
+                    system_prompt = %s, tools = %s, model_config = %s,
                     trigger_keywords = %s, collaboration_strategy = %s,
                     priority = %s, enabled = %s
                 WHERE id = %s
                 """,
                 (
                     agent.name, agent.display_name, agent.description,
-                    agent.system_prompt, agent.tools, agent.model_params,
-                    agent.trigger_keywords, agent.collaboration_strategy,
+                    agent.system_prompt,
+                    _json.dumps(agent.tools), _json.dumps(agent.model_params),
+                    _json.dumps(agent.trigger_keywords), agent.collaboration_strategy,
                     agent.priority, agent.enabled, agent_id,
                 ),
             )
@@ -145,7 +162,7 @@ class PostgresAgentRepository(AgentRepository):
     async def list_enabled(self) -> list[AgentDefinition]:
         async with self._pool.connection() as conn:
             rows = await conn.execute(
-                "SELECT * FROM agent_definitions WHERE enabled = true ORDER BY priority DESC"
+                _AGENT_SELECT + " WHERE enabled = true ORDER BY priority DESC"
             )
             records = await rows.fetchall()
-            return [_row_to_agent(dict(r)) for r in records]
+            return [_row_to_agent(r) for r in records]

@@ -9,7 +9,8 @@ from api.routes.agents import router as agents_router
 from api.routes.chat import router as chat_router
 from api.routes.system import router as system_router
 from config import settings
-from core.runtime import set_runtime, set_tool_registry
+from core.runtime import set_runtime, set_tool_registry, set_agent_repository
+from repositories.agent_repository import PostgresAgentRepository
 from tools import ToolRegistry
 
 # Auto-discovery: import tool modules so @tool classes register via BaseTool.__subclasses__()
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
 
     set_runtime(pg_pool, checkpointer)
     set_tool_registry(tool_registry)
+    set_agent_repository(PostgresAgentRepository(pg_pool))
 
     yield  # ← 应用正常运行中
 
