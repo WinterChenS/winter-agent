@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -75,8 +76,35 @@ class CollaborationEngine:
         runtimes: list[AgentRuntime],
         user_query: str,
     ) -> CollaborationResult:
-        msg = "Parallel strategy not yet implemented"
-        raise NotImplementedError(msg)
+        async def run_single(runtime):
+            try:
+                messages = [
+                    SystemMessage(content=runtime.system_prompt),
+                    HumanMessage(content=user_query),
+                ]
+                response = await runtime.llm.ainvoke(messages)
+                return {"agent": runtime.name, "status": "ok", "output": response.content.strip()}
+            except Exception as e:
+                return {"agent": runtime.name, "status": "error", "error": str(e)}
+
+        agent_results = await asyncio.gather(*[run_single(r) for r in runtimes], return_exceptions=True)
+
+        # Handle exceptions from gather itself
+        cleaned = []
+        for r in agent_results:
+            if isinstance(r, Exception):
+                cleaned.append({"agent": "unknown", "status": "error", "error": str(r)})
+            else:
+                cleaned.append(r)
+
+        # Merge results
+        parts = []
+        for r in cleaned:
+            if r["status"] == "ok":
+                parts.append(f"[{r['agent']}]: {r['output']}")
+        merged = "\n\n".join(parts)
+
+        return CollaborationResult(content=merged, agent_results=cleaned)
 
     async def _supervisor(
         self,

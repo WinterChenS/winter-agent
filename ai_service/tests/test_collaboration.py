@@ -72,6 +72,37 @@ async def test_sequential_single_agent():
 
 
 @pytest.mark.asyncio
+async def test_parallel_two_agents():
+    runtime_a = AgentRuntime(name="a", llm=MockLLM("Result A"), system_prompt="", tools=[], strategy="parallel")
+    runtime_b = AgentRuntime(name="b", llm=MockLLM("Result B"), system_prompt="", tools=[], strategy="parallel")
+
+    engine = CollaborationEngine()
+    result = await engine.execute([runtime_a, runtime_b], "query", "parallel")
+
+    assert len(result.agent_results) == 2
+    assert "Result A" in result.content
+    assert "Result B" in result.content
+
+
+@pytest.mark.asyncio
+async def test_parallel_error_isolation():
+    class ErrorLLM:
+        async def ainvoke(self, messages):
+            raise Exception("fail")
+
+    runtime_a = AgentRuntime(name="a", llm=ErrorLLM(), system_prompt="", tools=[], strategy="parallel")
+    runtime_b = AgentRuntime(name="b", llm=MockLLM("Result B"), system_prompt="", tools=[], strategy="parallel")
+
+    engine = CollaborationEngine()
+    result = await engine.execute([runtime_a, runtime_b], "query", "parallel")
+
+    assert len(result.agent_results) == 2
+    assert result.agent_results[0]["status"] == "error"
+    assert result.agent_results[1]["status"] == "ok"
+    assert "Result B" in result.content  # Good result still appears
+
+
+@pytest.mark.asyncio
 async def test_unknown_strategy_raises():
     engine = CollaborationEngine()
     with pytest.raises(ValueError, match="Unknown strategy"):
