@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 import random
 
 from fastapi import APIRouter
@@ -43,6 +44,7 @@ from decorator.timeit import timeit
 from domain.event_envelope import (
     envelope_chart,
     envelope_error,
+    envelope_message_done,
     envelope_token,
     to_sse_data,
 )
@@ -75,6 +77,26 @@ async def stream_generate(request: GenerateRequest):
     @timeit
     async def event_generator():
         trace_ctx = ensure_trace_context(request.conversation_id)
+
+        # Use frontend-provided messageId, or generate fallback
+        message_id = request.message_id or f"msg-{uuid.uuid4().hex[:12]}"
+
+        # Load agent if specified
+        agent_id = request.agent_id
+        if agent_id:
+            from core.runtime import get_agent_repository
+            agent_repo = get_agent_repository()
+            agent_def = await agent_repo.get_by_id(agent_id)
+            if not agent_def:
+                yield to_sse_data(envelope_message_done(
+                    trace_ctx, message_id, status="error",
+                    error=f"Agent not found: {agent_id}",
+                ))
+                return
+            active_agent = agent_id
+        else:
+            active_agent = trace_ctx.agent_id or "default"
+
         event_ctx = EventMapContext(trace_ctx=trace_ctx, known_tools=_tool_names())
         try:
             if not settings.api_key:
@@ -82,6 +104,7 @@ async def stream_generate(request: GenerateRequest):
                 for char in response:
                     yield to_sse_data(envelope_token(trace_ctx, char))
                     await asyncio.sleep(0.05)
+                yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
             else:
                 checkpointer = get_checkpointer()
                 graph = create_agent_graph(checkpointer=checkpointer)
@@ -101,7 +124,7 @@ async def stream_generate(request: GenerateRequest):
                     "turn_id": trace_ctx.turn_id,
                     "span_id": trace_ctx.span_id,
                     "parent_span_id": trace_ctx.parent_span_id,
-                    "active_agent": trace_ctx.agent_id,
+                    "active_agent": active_agent,
                     "chart_specs": [],
                     "blocks": [],
                     "route": "tool",
@@ -120,6 +143,7 @@ async def stream_generate(request: GenerateRequest):
                 async for event in graph.astream_events(inputs, config=config, version="v2"):
                     mapped, active_tool_span_id, captured_final_state = map_langgraph_event_to_envelopes(
                         event, event_ctx, active_tool_span_id,
+                        message_id=message_id,
                     )
                     if captured_final_state is not None:
                         final_state = captured_final_state
@@ -160,6 +184,18 @@ async def stream_generate(request: GenerateRequest):
                     if summary_envelope:
                         yield to_sse_data(summary_envelope)
                         tool_summary_sent = True
+
+                # Stream complete
+                yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
+
+                # Async persist (DB layer may not be available yet)
+                try:
+                    from repositories.message_repository import save_message
+                    asyncio.create_task(save_message(
+                        trace_ctx, message_id, final_state,
+                    ))
+                except (ImportError, Exception):
+                    pass
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))
