@@ -158,7 +158,7 @@ def map_langgraph_event_to_envelopes(
         envelopes.append(envelope_message_tool_call(tool_ctx, message_id, {
             "id": tool_call_id,
             "name": tool_name,
-            "status": "completed",
+            "status": "done",
             "result": f"{summary}\n\n",
         }))
         active_tool_span_id = None
