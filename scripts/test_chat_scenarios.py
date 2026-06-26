@@ -18,8 +18,9 @@ def stream_query(message: str, timeout: int = 60) -> dict:
     req = urllib.request.Request(BASE_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
 
-    events = {"token": 0, "tool_start": 0, "tool_result": 0, "chart": 0, "error": 0}
+    events = {"message.delta": 0, "message.tool_call": 0, "message.reasoning": 0, "message.done": 0, "chart": 0, "error": 0}
     tokens = []
+    message_ids = set()
 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -43,9 +44,13 @@ def stream_query(message: str, timeout: int = 60) -> dict:
                                 etype = event.get("type", "unknown")
                                 if etype in events:
                                     events[etype] += 1
-                                if etype == "token":
-                                    content = event.get("content") or event.get("token") or ""
+                                if etype == "message.delta":
+                                    content = event.get("delta") or ""
                                     tokens.append(content)
+                                # Verify messageId is present for all non-error events
+                                if etype != "error":
+                                    assert "messageId" in event, f"Missing messageId in {etype} event"
+                                    message_ids.add(event["messageId"])
                             except json.JSONDecodeError:
                                 pass
     except urllib.error.HTTPError as e:
@@ -57,6 +62,7 @@ def stream_query(message: str, timeout: int = 60) -> dict:
         "events": events,
         "response": "".join(tokens)[:500],
         "token_count": len(tokens),
+        "message_ids": message_ids,
     }
 
 
@@ -72,22 +78,23 @@ def test(description: str, query: str, checks: list[str]) -> bool:
         return False
 
     events = result["events"]
-    print(f"  Events: tokens={events['token']} search={events['tool_start']} chart={events['chart']} error={events['error']}")
+    print(f"  Events: delta={events['message.delta']} tool_call={events['message.tool_call']} chart={events['chart']} error={events['error']}")
+    print(f"  MessageIds collected: {len(result.get('message_ids', set()))}")
     print(f"  Response: {result['response'][:200]}...")
 
     passed = True
     for check in checks:
         if check == "search_used":
-            ok = events["tool_start"] > 0
-            print(f"  {'✅' if ok else '❌'} search_used: {events['tool_start']} tool calls")
+            ok = events["message.tool_call"] > 0
+            print(f"  {'✅' if ok else '❌'} search_used: {events['message.tool_call']} tool calls")
             passed = passed and ok
         elif check == "chart_generated":
             ok = events["chart"] > 0
             print(f"  {'✅' if ok else '❌'} chart_generated: {events['chart']} chart events")
             passed = passed and ok
         elif check == "no_tools":
-            ok = events["tool_start"] == 0
-            print(f"  {'✅' if ok else '❌'} no_tools: {events['tool_start']} unexpected tool calls")
+            ok = events["message.tool_call"] == 0
+            print(f"  {'✅' if ok else '❌'} no_tools: {events['message.tool_call']} unexpected tool calls")
             passed = passed and ok
         elif check == "has_response":
             ok = len(result["response"]) > 10
@@ -99,8 +106,8 @@ def test(description: str, query: str, checks: list[str]) -> bool:
             passed = passed and ok
         elif check.startswith("token_min:"):
             min_tokens = int(check.split(":")[1])
-            ok = events["token"] >= min_tokens
-            print(f"  {'✅' if ok else '❌'} token_min:{min_tokens}: {events['token']} tokens")
+            ok = events["message.delta"] >= min_tokens
+            print(f"  {'✅' if ok else '❌'} token_min:{min_tokens}: {events['message.delta']} delta events")
             passed = passed and ok
 
     return passed
