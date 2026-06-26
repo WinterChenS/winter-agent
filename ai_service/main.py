@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
+from api.routes.agents import router as agents_router
 from api.routes.chat import router as chat_router
 from api.routes.system import router as system_router
 from config import settings
@@ -69,6 +70,7 @@ app.add_middleware(
     allow_headers=["*"],           # 允许所有的 HTTP 请求头字段
 )
 
-# 包含系统与聊天相关的路由
+# 包含系统、聊天与代理管理的路由
 app.include_router(system_router)
 app.include_router(chat_router)
+app.include_router(agents_router)
