@@ -4,6 +4,7 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { ChatInterface } from './pages/ChatInterface';
 import { LoginPage } from './pages/LoginPage';
 import { AdminAgents } from './pages/AdminAgents';
+import { ChatContainer } from './features/ai-chat';
 
 function App() {
   return (
@@ -18,6 +19,12 @@ function App() {
         } />
         <Route path="/admin/agents" element={
           <PrivateRoute><AdminAgents /></PrivateRoute>
+        } />
+        <Route path="/chat-v2/:id" element={
+          <PrivateRoute><ChatContainer /></PrivateRoute>
+        } />
+        <Route path="/chat-v2" element={
+          <PrivateRoute><ChatContainer /></PrivateRoute>
         } />
       </Routes>
     </AuthProvider>
