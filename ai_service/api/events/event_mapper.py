@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass, replace
 from typing import Any
 
 from domain.event_envelope import (
     envelope_agent_step,
     envelope_chart,
-    envelope_token,
-    envelope_tool_result,
-    envelope_tool_start,
+    envelope_message_delta,
+    envelope_message_reasoning,
+    envelope_message_tool_call,
     envelope_tool_summary,
 )
 from observability.trace import TraceContext, new_span
@@ -81,10 +82,15 @@ def extract_last_assistant_text(final_state: dict[str, Any] | None) -> str:
     return ""
 
 
+# Track tool_call_id by span_id across function calls (unique per connection+tool)
+_active_tool_call_ids: dict[str, str] = {}
+
+
 def map_langgraph_event_to_envelopes(
     event: dict[str, Any],
     ctx: EventMapContext,
     active_tool_span_id: str | None,
+    message_id: str = "",
 ) -> tuple[list[dict[str, Any]], str | None, dict[str, Any] | None]:
     envelopes: list[dict[str, Any]] = []
     final_state: dict[str, Any] | None = None
@@ -96,20 +102,44 @@ def map_langgraph_event_to_envelopes(
         chunk = event.get("data", {}).get("chunk")
         content = getattr(chunk, "content", "")
         if content:
-            envelopes.append(envelope_token(ctx.trace_ctx, content))
+            envelopes.append(envelope_message_delta(ctx.trace_ctx, message_id, content))
+
+        # Reasoning content embedded in stream chunks (e.g., Anthropic thinking)
+        reasoning = (
+            getattr(chunk, "reasoning_content", None)
+            or getattr(chunk, "reasoning", None)
+            or ""
+        )
+        if reasoning:
+            envelopes.append(envelope_message_reasoning(ctx.trace_ctx, message_id, reasoning))
+
+        # additional_kwargs reasoning (e.g., OpenAI-style streaming)
+        additional_kwargs = getattr(chunk, "additional_kwargs", {}) or {}
+        reasoning_from_kwargs = additional_kwargs.get("reasoning_content", "")
+        if reasoning_from_kwargs:
+            envelopes.append(envelope_message_reasoning(ctx.trace_ctx, message_id, reasoning_from_kwargs))
 
     elif event_type == "on_chain_start" and event_name == "tool":
         input_state = event.get("data", {}).get("input", {})
         tool_name = "unknown"
+        input_payload: dict[str, Any] = {}
         if isinstance(input_state, dict):
             tool_name = input_state.get("current_tool") or tool_name
+            input_payload = {k: v for k, v in input_state.items() if k != "current_tool"}
 
         active_tool_span_id = new_span(ctx.trace_ctx.span_id, name=f"tool:{tool_name}")
+        tool_call_id = uuid.uuid4().hex[:12]
+        _active_tool_call_ids[active_tool_span_id] = tool_call_id
+
         tool_ctx = replace(ctx.trace_ctx, span_id=active_tool_span_id,
                           parent_span_id=ctx.trace_ctx.span_id)
         envelopes.append(
-            envelope_tool_start(tool_ctx, tool_name,
-                              f"\n\n🛠️ 正在调用工具：{tool_name}...\n")
+            envelope_message_tool_call(tool_ctx, message_id, {
+                "id": tool_call_id,
+                "name": tool_name,
+                "arguments": input_payload,
+                "status": "running",
+            })
         )
 
     elif event_type == "on_chain_end" and event_name == "tool":
@@ -121,13 +151,20 @@ def map_langgraph_event_to_envelopes(
         if tool_name == "tool" and isinstance(input_state, dict):
             tool_name = input_state.get("current_tool") or tool_name
 
+        tool_call_id = _active_tool_call_ids.pop(active_tool_span_id, "")
+
         summary = summarize_tool_result(tool_name, output_state if isinstance(output_state, dict) else {})
         tool_ctx = replace(
             ctx.trace_ctx,
             span_id=active_tool_span_id or new_span(ctx.trace_ctx.span_id, name=f"tool:{tool_name}"),
             parent_span_id=ctx.trace_ctx.span_id,
         )
-        envelopes.append(envelope_tool_result(tool_ctx, tool_name, f"{summary}\n\n"))
+        envelopes.append(envelope_message_tool_call(tool_ctx, message_id, {
+            "id": tool_call_id,
+            "name": tool_name,
+            "status": "completed",
+            "result": f"{summary}\n\n",
+        }))
         active_tool_span_id = None
 
     elif event_type == "on_chain_end":
