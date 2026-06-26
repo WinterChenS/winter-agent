@@ -61,12 +61,12 @@ def test_map_tool_end_event():
     assert mapped[0]["type"] == "message.tool_call"
     tc = mapped[0]["payload"]["toolCall"]
     assert tc["name"] == "search"
-    assert tc["status"] == "completed"
+    assert tc["status"] == "done"
 
 
 def test_emit_tool_summary_from_final_state():
     ctx = _ctx()
-    final_state = {"tool_steps": [{"tool": "search", "status": "completed"}]}
+    final_state = {"tool_steps": [{"tool": "search", "status": "done"}]}
     envelope = emit_final_summary_envelope(final_state, ctx)
 
     assert envelope is not None
