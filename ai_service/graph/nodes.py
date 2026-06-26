@@ -137,6 +137,13 @@ def _force_final_answer(state: State, tool_result: str | None,
 # agent_node：LLM 决策节点（JSON Mode）
 # ────────────────────────────────────────────────────────────────────────────
 async def agent_node(state: State) -> dict:
+    # ── Active-agent direct routing ──────────────────────────────────────
+    # When active_agent is explicitly set (not null, not "default"),
+    # skip the ReAct loop entirely and route directly to chart_planner.
+    active = state.get("active_agent", "default")
+    if active and active != "default":
+        return {"route": "chart_planner", "active_agent": active}
+
     registry = get_tool_registry()
 
     # 1. Build tool list description
