@@ -44,6 +44,7 @@ from decorator.timeit import timeit
 from domain.event_envelope import (
     envelope_chart,
     envelope_error,
+    envelope_message_delta,
     envelope_message_done,
     envelope_token,
     to_sse_data,
@@ -102,7 +103,7 @@ async def stream_generate(request: GenerateRequest):
             if not settings.api_key:
                 response = random.choice(MOCK_RESPONSES)
                 for char in response:
-                    yield to_sse_data(envelope_token(trace_ctx, char))
+                    yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
                     await asyncio.sleep(0.05)
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
             else:
@@ -152,7 +153,7 @@ async def stream_generate(request: GenerateRequest):
                         envelope_type = envelope.get("type")
                         if envelope_type in {"tool_start", "tool_result"}:
                             saw_tool_event = True
-                        if envelope_type == "token":
+                        if envelope_type == "message.delta":
                             assistant_text_emitted = True
                         yield to_sse_data(envelope)
 
@@ -171,7 +172,7 @@ async def stream_generate(request: GenerateRequest):
                 if not assistant_text_emitted:
                     fallback_text = extract_last_assistant_text(final_state)
                     if fallback_text:
-                        yield to_sse_data(envelope_token(trace_ctx, fallback_text))
+                        yield to_sse_data(envelope_message_delta(trace_ctx, message_id, fallback_text))
 
                 # Emit guard reason
                 guard_envelope = emit_guard_reason_envelope(final_state, event_ctx)
