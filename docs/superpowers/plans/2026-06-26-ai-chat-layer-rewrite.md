@@ -80,7 +80,7 @@ Modified files:
 - Produces: `envelope_message_done(trace_ctx, message_id, status="done", error=None) -> dict`
 - Retains: `envelope_error`, `envelope_chart`, `to_sse_data`, `build_envelope`
 
-- [ ] **Step 1: Add new envelope functions to event_envelope.py**
+- [x] **Step 1: Add new envelope functions to event_envelope.py**
 
 在文件末尾追加 4 个新函数：
 
@@ -145,7 +145,7 @@ def envelope_message_done(
     )
 ```
 
-- [ ] **Step 2: Write unit test for new envelope functions**
+- [x] **Step 2: Write unit test for new envelope functions**
 
 Create `ai_service/tests/test_event_envelope.py`:
 
@@ -213,7 +213,7 @@ def test_to_sse_data_wraps_json():
     assert "message.delta" in sse["data"]
 ```
 
-- [ ] **Step 3: Run tests to verify**
+- [x] **Step 3: Run tests to verify**
 
 ```bash
 cd ai_service && python -m pytest tests/test_event_envelope.py -v
@@ -221,7 +221,7 @@ cd ai_service && python -m pytest tests/test_event_envelope.py -v
 
 Expected: 6 tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add ai_service/domain/event_envelope.py ai_service/tests/test_event_envelope.py
@@ -239,7 +239,7 @@ git commit -m "feat: add new SSE protocol envelope functions (message.delta/tool
 - Consumes: New envelope functions from Task 1
 - Produces: `map_langgraph_event_to_envelopes()` now emits new event types + messageId
 
-- [ ] **Step 1: Update event mapping logic**
+- [x] **Step 1: Update event mapping logic**
 
 需要改动的核心点（修改 `map_langgraph_event_to_envelopes` 函数）：
 
@@ -275,13 +275,13 @@ yield envelope_message_tool_call(trace_ctx, message_id, {
 yield envelope_message_reasoning(trace_ctx, message_id, delta)
 ```
 
-- [ ] **Step 2: Verify event mapper imports are correct**
+- [x] **Step 2: Verify event mapper imports are correct**
 
 ```bash
 cd ai_service && python -c "from api.events.event_mapper import map_langgraph_event_to_envelopes; print('OK')"
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/api/events/event_mapper.py
@@ -298,7 +298,7 @@ git commit -m "feat: update event mapper to emit new SSE protocol events"
 **Interfaces:**
 - Produces: `GenerateRequest` with new `agent_id` and `message_id` fields
 
-- [ ] **Step 1: Add agentId and messageId to GenerateRequest**
+- [x] **Step 1: Add agentId and messageId to GenerateRequest**
 
 ```python
 from pydantic import BaseModel, Field
@@ -313,7 +313,7 @@ class GenerateRequest(BaseModel):
     stream: bool = True
 ```
 
-- [ ] **Step 2: Verify schema parses correctly**
+- [x] **Step 2: Verify schema parses correctly**
 
 ```bash
 cd ai_service && python -c "
@@ -325,7 +325,7 @@ print('OK')
 "
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/api/schemas.py
@@ -345,7 +345,7 @@ git commit -m "feat: add agentId and messageId fields to GenerateRequest"
 - Consumes: New envelope functions from Task 1
 - Produces: SSE stream with message.done termination + async DB persistence
 
-- [ ] **Step 1: Add agent loading and messageId handling to stream_generate**
+- [x] **Step 1: Add agent loading and messageId handling to stream_generate**
 
 关键改动点：
 1. 读取 `request.agent_id` 和 `request.message_id`
@@ -390,13 +390,13 @@ async def stream_generate(request: GenerateRequest):
         # Async persist: asyncio.create_task(save_message_to_db(...))
 ```
 
-- [ ] **Step 2: Run existing tests to catch regressions**
+- [x] **Step 2: Run existing tests to catch regressions**
 
 ```bash
 cd ai_service && python -m pytest tests/ -x -q --timeout=30 2>&1 | tail -20
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/api/routes/chat.py
@@ -414,7 +414,7 @@ git commit -m "feat: add agentId routing, messageId passthrough, message.done em
 - Produces: `save_message(message_dict) -> None`
 - Produces: `get_messages_by_conversation(conversation_id) -> list[dict]`
 
-- [ ] **Step 1: Create repository module**
+- [x] **Step 1: Create repository module**
 
 ```python
 from __future__ import annotations
@@ -487,13 +487,13 @@ async def get_messages_by_conversation(
     return messages
 ```
 
-- [ ] **Step 2: Verify module imports cleanly**
+- [x] **Step 2: Verify module imports cleanly**
 
 ```bash
 cd ai_service && python -c "from db.chat_message_repository import save_message, get_messages_by_conversation; print('OK')"
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/db/chat_message_repository.py
@@ -507,7 +507,7 @@ git commit -m "feat: add chat_message_repository for message persistence"
 **Files:**
 - Create: `ai_service/db/migrations/001_create_chat_messages.sql`
 
-- [ ] **Step 1: Create migration SQL**
+- [x] **Step 1: Create migration SQL**
 
 ```sql
 -- 001_create_chat_messages.sql
@@ -532,7 +532,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_agent
     ON chat_messages(agent_id, created_at);
 ```
 
-- [ ] **Step 2: Apply migration to verify syntax**
+- [x] **Step 2: Apply migration to verify syntax**
 
 ```bash
 cd ai_service && python -c "
@@ -545,7 +545,7 @@ print('OK: migration file exists and non-empty')
 "
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/db/migrations/001_create_chat_messages.sql
@@ -563,7 +563,7 @@ git commit -m "feat: add chat_messages table migration"
 - Consumes: `get_messages_by_conversation` from chat_message_repository
 - Produces: History response in new Message Model format
 
-- [ ] **Step 1: Update get_chat_history to use new DB table**
+- [x] **Step 1: Update get_chat_history to use new DB table**
 
 将 `get_chat_history` 改为优先从 `chat_messages` 表查询；如果新表为空则 fallback 到旧 checkpoint。
 
@@ -586,7 +586,7 @@ async def get_chat_history(conversation_id: str):
     # ... existing logic ...
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add ai_service/api/routes/chat.py
@@ -600,7 +600,7 @@ git commit -m "feat: update get_chat_history to use new chat_messages table"
 **Files:**
 - Modify: `ai_service/graph/graph.py`
 
-- [ ] **Step 1: Add active_agent passthrough to create_agent_graph**
+- [x] **Step 1: Add active_agent passthrough to create_agent_graph**
 
 在 graph state 初始化逻辑中确保 `active_agent` 被正确注入。当前 state 已有 `active_agent` 字段，只需确认 RouterAgent 节点在收到该字段时直接路由而不经过关键词匹配。
 
@@ -622,13 +622,13 @@ if active and active != "default":
     return {"route": "chart_planner", "active_agent": active}
 ```
 
-- [ ] **Step 2: Verify graph compiles**
+- [x] **Step 2: Verify graph compiles**
 
 ```bash
 cd ai_service && python -c "from graph.graph import create_agent_graph; g = create_agent_graph(); print('Graph compiled OK')"
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ai_service/graph/graph.py ai_service/graph/nodes.py
@@ -642,7 +642,7 @@ git commit -m "feat: support agentId-based direct routing in graph"
 **Files:**
 - Create: `backend/src/main/java/com/example/aichat/controller/AgentController.java`
 
-- [ ] **Step 1: Create AgentController**
+- [x] **Step 1: Create AgentController**
 
 ```java
 package com.example.aichat.controller;
@@ -706,13 +706,13 @@ public class AgentController {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 ```bash
 cd backend && mvn compile -q 2>&1 | tail -5
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/controller/AgentController.java
@@ -727,7 +727,7 @@ git commit -m "feat: add AgentController for CRUD proxy to Python AI service"
 - Modify: `backend/src/main/java/com/example/aichat/model/ChatRequest.java`
 - Modify: `backend/src/main/java/com/example/aichat/client/AIClient.java`
 
-- [ ] **Step 1: Update ChatRequest**
+- [x] **Step 1: Update ChatRequest**
 
 ```java
 package com.example.aichat.model;
@@ -743,7 +743,7 @@ public record ChatRequest(
 }
 ```
 
-- [ ] **Step 2: Update AIClient.streamGenerate signature**
+- [x] **Step 2: Update AIClient.streamGenerate signature**
 
 ```java
 public Flux<String> streamGenerate(String message, String agentId,
@@ -760,13 +760,13 @@ public Flux<String> streamGenerate(String message, String agentId,
 
 同时更新 `ChatService.streamChat` 方法签名以传递新字段。
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 ```bash
 cd backend && mvn compile -q 2>&1 | tail -5
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/model/ChatRequest.java \
@@ -788,7 +788,7 @@ git commit -m "feat: add agentId and messageId passthrough in Spring Boot gatewa
 - Create: `frontend/src/features/ai-chat/types/agent.ts`
 - Modify: `frontend/package.json`
 
-- [ ] **Step 1: Rewrite chat.ts with new types**
+- [x] **Step 1: Rewrite chat.ts with new types**
 
 ```typescript
 // frontend/src/types/chat.ts
@@ -825,7 +825,7 @@ export interface AgentDefinition {
 }
 ```
 
-- [ ] **Step 2: Create ai-chat types barrel**
+- [x] **Step 2: Create ai-chat types barrel**
 
 ```bash
 mkdir -p frontend/src/features/ai-chat/types
@@ -847,19 +847,19 @@ export interface AgentInfo {
 }
 ```
 
-- [ ] **Step 3: Install new dependencies**
+- [x] **Step 3: Install new dependencies**
 
 ```bash
 cd frontend && npm install zustand @tanstack/react-virtual shiki
 ```
 
-- [ ] **Step 4: Verify TypeScript compilation**
+- [x] **Step 4: Verify TypeScript compilation**
 
 ```bash
 cd frontend && npx tsc --noEmit 2>&1 | head -10
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types/chat.ts \
@@ -878,7 +878,7 @@ git commit -m "feat: add new Message/ToolCall types and install zustand, virtual
 **Interfaces:**
 - Produces: `useChatStore` hook with Map-based state + rAF batched actions
 
-- [ ] **Step 1: Create chatStore**
+- [x] **Step 1: Create chatStore**
 
 ```typescript
 // frontend/src/features/ai-chat/store/chatStore.ts
@@ -991,13 +991,13 @@ export const useChatStore = create<ChatState>((set) => ({
 }));
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 ```bash
 cd frontend && npx tsc --noEmit 2>&1 | head -10
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/store/chatStore.ts
@@ -1011,7 +1011,7 @@ git commit -m "feat: add Zustand chatStore with Map-based state and rAF batching
 **Files:**
 - Create: `frontend/src/features/ai-chat/services/chatApi.ts`
 
-- [ ] **Step 1: Create chatApi with new SSE protocol parser**
+- [x] **Step 1: Create chatApi with new SSE protocol parser**
 
 ```typescript
 // frontend/src/features/ai-chat/services/chatApi.ts
@@ -1118,13 +1118,13 @@ function handleEvent(event: SseEvent): void {
 }
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 ```bash
 cd frontend && npx tsc --noEmit 2>&1 | head -10
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/services/chatApi.ts
@@ -1273,7 +1273,7 @@ export function useChatStream() {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/hooks/useChatStream.ts
@@ -1325,7 +1325,7 @@ import { ChatContainer } from './features/ai-chat/components/ChatContainer';
 } />
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/hooks/useConversation.ts \
@@ -1342,7 +1342,7 @@ git commit -m "feat: add useConversation hook and /chat-v2 route"
 - Modify: `frontend/src/components/ChatInput.tsx`
 - Modify: `frontend/src/hooks/useChat.ts`
 
-- [ ] **Step 1: Add @deprecated comments**
+- [x] **Step 1: Add @deprecated comments**
 
 在每个旧文件头部添加:
 ```typescript
@@ -1353,7 +1353,7 @@ git commit -m "feat: add useConversation hook and /chat-v2 route"
  */
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add frontend/src/components/ChatMessage.tsx \
@@ -1369,7 +1369,7 @@ git commit -m "chore: mark old Chat components as @deprecated"
 **Files:**
 - Modify: `scripts/test_chat_scenarios.py`
 
-- [ ] **Step 1: Update SSE event assertions to new protocol**
+- [x] **Step 1: Update SSE event assertions to new protocol**
 
 将现有测试中对 `"type":"token"` / `"type":"tool_start"` 的断言更新为新格式。关键改动:
 
@@ -1386,13 +1386,13 @@ git commit -m "chore: mark old Chat components as @deprecated"
 assert "messageId" in event or event["type"] == "error"
 ```
 
-- [ ] **Step 2: Run updated tests**
+- [x] **Step 2: Run updated tests**
 
 ```bash
 cd ai_service && python scripts/test_chat_scenarios.py 2>&1 | tail -20
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scripts/test_chat_scenarios.py
@@ -1406,7 +1406,7 @@ git commit -m "test: update test_chat_scenarios for new SSE protocol"
 **Files:**
 - Create: `frontend/src/features/ai-chat/__tests__/chatStore.test.ts`
 
-- [ ] **Step 1: Write chatStore tests**
+- [x] **Step 1: Write chatStore tests**
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -1473,13 +1473,13 @@ describe('chatStore', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 ```bash
 cd frontend && npx vitest run src/features/ai-chat/__tests__/ 2>&1
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/__tests__/chatStore.test.ts
@@ -1490,7 +1490,7 @@ git commit -m "test: add chatStore unit tests"
 
 ## Task 28: 验收检查
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 ```bash
 # Python
@@ -1503,7 +1503,7 @@ cd backend && mvn test -q 2>&1
 cd frontend && npx vitest run 2>&1 && npx tsc --noEmit 2>&1
 ```
 
-- [ ] **Step 2: Verify against acceptance criteria checklist**
+- [x] **Step 2: Verify against acceptance criteria checklist**
 
 对照验收标准逐项检查:
 - [x] Chat UI 完全替换 Ant Design Chat
@@ -1517,7 +1517,7 @@ cd frontend && npx vitest run 2>&1 && npx tsc --noEmit 2>&1
 - [x] Python 负责 AI 逻辑
 - [x] UI 不闪烁、不整屏刷新
 
-- [ ] **Step 3: Commit final checks**
+- [x] **Step 3: Commit final checks**
 
 ```bash
 git add -A
