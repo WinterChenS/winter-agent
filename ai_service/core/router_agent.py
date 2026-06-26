@@ -53,11 +53,11 @@ class RouterAgent:
         # 1. Keyword matching
         matched = self._keyword_match(user_query, agents)
         if matched:
-            strategy = (
-                matched[0].collaboration_strategy
-                if len(matched) == 1
-                else "parallel"
-            )
+            if len(matched) == 1:
+                strategy = matched[0].collaboration_strategy
+            else:
+                strategies = set(a.collaboration_strategy for a in matched)
+                strategy = matched[0].collaboration_strategy if len(strategies) == 1 else "parallel"
             return RouterResult(matched, strategy, "keyword")
 
         # 2. LLM fallback
@@ -91,7 +91,8 @@ class RouterAgent:
                 for a in agents
             ]
         )
-        prompt = ROUTER_SYSTEM_PROMPT.format(agent_descriptions=descriptions)
+        safe_descriptions = descriptions.replace('{', '{{').replace('}', '}}')
+        prompt = ROUTER_SYSTEM_PROMPT.format(agent_descriptions=safe_descriptions)
         llm = ChatOpenAI(
             model=settings.model,
             temperature=0,

@@ -45,7 +45,7 @@ class AgentFactory:
         # Build LLM
         llm = ChatOpenAI(
             model=settings.model,
-            temperature=definition.model_settings.get("temperature", 0.7),
+            temperature=definition.model_params.get("temperature", 0.7),
             streaming=False,
             api_key=settings.api_key,
             base_url=settings.base_url,

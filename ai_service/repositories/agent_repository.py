@@ -96,13 +96,13 @@ class PostgresAgentRepository(AgentRepository):
             await conn.execute(
                 """
                 INSERT INTO agent_definitions (id, name, display_name, description,
-                    system_prompt, tools, model_settings, trigger_keywords,
+                    system_prompt, tools, model_params, trigger_keywords,
                     collaboration_strategy, priority, enabled)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     agent.id, agent.name, agent.display_name, agent.description,
-                    agent.system_prompt, agent.tools, agent.model_settings,
+                    agent.system_prompt, agent.tools, agent.model_params,
                     agent.trigger_keywords, agent.collaboration_strategy,
                     agent.priority, agent.enabled,
                 ),
@@ -120,14 +120,14 @@ class PostgresAgentRepository(AgentRepository):
                 """
                 UPDATE agent_definitions SET
                     name = %s, display_name = %s, description = %s,
-                    system_prompt = %s, tools = %s, model_settings = %s,
+                    system_prompt = %s, tools = %s, model_params = %s,
                     trigger_keywords = %s, collaboration_strategy = %s,
                     priority = %s, enabled = %s
                 WHERE id = %s
                 """,
                 (
                     agent.name, agent.display_name, agent.description,
-                    agent.system_prompt, agent.tools, agent.model_settings,
+                    agent.system_prompt, agent.tools, agent.model_params,
                     agent.trigger_keywords, agent.collaboration_strategy,
                     agent.priority, agent.enabled, agent_id,
                 ),

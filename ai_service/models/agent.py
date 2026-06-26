@@ -15,7 +15,7 @@ class AgentDefinition(BaseModel):
     description: str = ""
     system_prompt: str
     tools: list[str] = []
-    model_settings: dict[str, Any] = Field(default_factory=lambda: {"temperature": 0.7})
+    model_params: dict[str, Any] = Field(default_factory=lambda: {"temperature": 0.7})
     trigger_keywords: list[str] = []
     collaboration_strategy: str = "sequential"
     priority: int = 0

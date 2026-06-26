@@ -9,7 +9,7 @@ def test_agent_definition_valid():
         description="A test agent",
         system_prompt="You are a helpful assistant.",
         tools=["search", "time"],
-        model_settings={"temperature": 0.7},
+        model_params={"temperature": 0.7},
         trigger_keywords=["搜索", "测试"],
         collaboration_strategy="parallel",
         priority=1,
@@ -25,7 +25,7 @@ def test_agent_definition_defaults():
         system_prompt="Be helpful.",
     )
     assert agent.tools == []
-    assert agent.model_settings == {"temperature": 0.7}
+    assert agent.model_params == {"temperature": 0.7}
     assert agent.collaboration_strategy == "sequential"
     assert agent.priority == 0
     assert agent.enabled is True

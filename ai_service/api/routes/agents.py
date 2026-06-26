@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from models.agent import AgentDefinition
 from core.runtime import get_agent_repository
 
+# Authentication is handled upstream by the Spring Boot BFF (JWT gateway).
+# The AI service (FastAPI) does not manage auth itself.
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
 

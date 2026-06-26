@@ -132,7 +132,6 @@ def create_multi_agent_graph(
         {
             "factory": "factory",
             "chart_planner": "chart_planner",
-            END: END,
         },
     )
 
@@ -142,7 +141,6 @@ def create_multi_agent_graph(
         {
             "collaboration": "collaboration",
             "chart_planner": "chart_planner",
-            END: END,
         },
     )
 
@@ -152,7 +150,6 @@ def create_multi_agent_graph(
         {
             "merge": "merge",
             "chart_planner": "chart_planner",
-            END: END,
         },
     )
 
@@ -161,7 +158,6 @@ def create_multi_agent_graph(
         _route_from_merge,
         {
             "chart_planner": "chart_planner",
-            END: END,
         },
     )
 
