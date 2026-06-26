@@ -17,7 +17,7 @@ from api.events.event_mapper import (
     map_langgraph_event_to_envelopes,
 )
 from config import settings
-from core.runtime import get_checkpointer, get_tool_registry
+from core.runtime import get_checkpointer, get_pool, get_tool_registry
 
 
 def _is_internal_react_message(content: str) -> bool:
@@ -206,6 +206,15 @@ async def stream_generate(request: GenerateRequest):
 @timeit
 @router.get("/history/{conversation_id}")
 async def get_chat_history(conversation_id: str):
+    # Try new DB table first
+    pool = get_pool()
+    if pool:
+        from db.chat_message_repository import get_messages_by_conversation
+        messages = await get_messages_by_conversation(pool, conversation_id)
+        if messages:
+            return {"messages": messages}
+
+    # Fallback: old checkpoint-based history
     checkpointer = get_checkpointer()
     if not checkpointer:
         return {"messages": []}
