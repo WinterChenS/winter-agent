@@ -188,12 +188,21 @@ async def stream_generate(request: GenerateRequest):
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
 
-                # Async persist (DB layer may not be available yet)
+                # Async persist message to database
                 try:
-                    from repositories.message_repository import save_message
-                    asyncio.create_task(save_message(
-                        trace_ctx, message_id, final_state,
-                    ))
+                    pool = get_pool()
+                    if pool and final_state:
+                        from db.chat_message_repository import save_message
+                        message_dict = {
+                            "id": message_id,
+                            "conversation_id": trace_ctx.conversation_id,
+                            "role": "assistant",
+                            "content": extract_last_assistant_text(final_state),
+                            "toolCalls": final_state.get("tool_steps", []),
+                            "status": "done",
+                            "agentId": trace_ctx.agent_id,
+                        }
+                        asyncio.create_task(save_message(pool, message_dict))
                 except (ImportError, Exception):
                     pass
 
