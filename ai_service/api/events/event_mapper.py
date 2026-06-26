@@ -104,20 +104,16 @@ def map_langgraph_event_to_envelopes(
         if content:
             envelopes.append(envelope_message_delta(ctx.trace_ctx, message_id, content))
 
-        # Reasoning content embedded in stream chunks (e.g., Anthropic thinking)
+        # Reasoning content (single source with fallback to avoid double-emission)
+        additional_kwargs = getattr(chunk, "additional_kwargs", {}) or {}
         reasoning = (
             getattr(chunk, "reasoning_content", None)
             or getattr(chunk, "reasoning", None)
+            or additional_kwargs.get("reasoning_content", "")
             or ""
         )
         if reasoning:
             envelopes.append(envelope_message_reasoning(ctx.trace_ctx, message_id, reasoning))
-
-        # additional_kwargs reasoning (e.g., OpenAI-style streaming)
-        additional_kwargs = getattr(chunk, "additional_kwargs", {}) or {}
-        reasoning_from_kwargs = additional_kwargs.get("reasoning_content", "")
-        if reasoning_from_kwargs:
-            envelopes.append(envelope_message_reasoning(ctx.trace_ctx, message_id, reasoning_from_kwargs))
 
     elif event_type == "on_chain_start" and event_name == "tool":
         input_state = event.get("data", {}).get("input", {})
