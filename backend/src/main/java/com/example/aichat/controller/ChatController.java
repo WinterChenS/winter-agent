@@ -23,7 +23,8 @@ public class ChatController {
 
     @PostMapping(value = "/stream", produces = "text/event-stream")
     public Flux<String> streamChat(@RequestBody ChatRequest request) {
-        return chatService.streamChat(request.message(), request.conversationId())
+        return chatService.streamChat(request.message(), request.agentId(),
+                                       request.conversationId(), request.messageId())
                 .onErrorResume(error -> Flux.just("{\"type\":\"error\",\"error\":\"AI 服务繁忙，请稍后再试\"}"));
     }
 

@@ -18,8 +18,10 @@ public class AIClient {
         this.aiServiceUrl = aiServiceUrl;
     }
 
-    public Flux<String> streamGenerate(String message, String conversationId) {
-        GenerateRequest request = new GenerateRequest(message, conversationId);
+    public Flux<String> streamGenerate(String message, String agentId,
+                                        String conversationId, String messageId) {
+        GenerateRequest request = new GenerateRequest(message, agentId,
+                                                       conversationId, messageId);
 
         return webClient.post()
                 .uri(aiServiceUrl + "/api/v1/generate/stream")
