@@ -344,6 +344,18 @@ async def _execute_single_tool(
     context: PolicyContext,
 ) -> dict:
     """Execute a single tool, return dict with 'result', 'elapsed_ms', 'status', 'error_msg'."""
+    # Normalize tool_input: map "query" to the tool's first required param if different
+    registry = get_tool_registry()
+    if registry and "query" in tool_input:
+        try:
+            tool = registry.get(tool_name)
+            schema_params = getattr(tool, "schema", None)
+            if schema_params and isinstance(schema_params.parameters, dict):
+                required = schema_params.parameters.get("required", [])
+                if required and required[0] != "query" and required[0] not in tool_input:
+                    tool_input = {required[0]: tool_input["query"]}
+        except Exception:
+            pass
     call = CapabilityCall(capability_name=tool_name, input_payload=tool_input)
     step_start = time.time()
 
