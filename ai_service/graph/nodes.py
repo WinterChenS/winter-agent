@@ -137,14 +137,8 @@ def _force_final_answer(state: State, tool_result: str | None,
 # agent_node：LLM 决策节点（JSON Mode）
 # ────────────────────────────────────────────────────────────────────────────
 async def agent_node(state: State) -> dict:
-    # ── Active-agent direct routing ──────────────────────────────────────
-    # When active_agent is explicitly set (not null, not "default"),
-    # skip the ReAct loop entirely and route directly to chart_planner.
     active = state.get("active_agent", "default")
     logging.info("[AGENT_NODE] active_agent=%s iteration=%s", active, state.get("iteration_count", 0))
-    if active and active != "default":
-        logging.warning("[AGENT_NODE] ⚠️ agent '%s' selected — ReAct bypassed, routing to chart_planner (no tools will be called)", active)
-        return {"route": "chart_planner", "active_agent": active}
 
     registry = get_tool_registry()
 
