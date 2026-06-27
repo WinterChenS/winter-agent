@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import uuid
-from datetime import timedelta
 from pathlib import Path
 
 import urllib3
@@ -53,25 +53,28 @@ def _get_client() -> Minio | None:
 
 
 def _ensure_bucket(client: Minio, bucket: str = "agent-images") -> bool:
-    """Create bucket if it doesn't exist."""
+    """Create bucket if it doesn't exist, set public-read policy."""
     try:
         if not client.bucket_exists(bucket):
             client.make_bucket(bucket)
             logger.info("Created MinIO bucket: %s", bucket)
+
+        # Set bucket policy to allow public read access
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": [f"arn:aws:s3:::{bucket}/*"],
+            }],
+        }
+        client.set_bucket_policy(bucket, json.dumps(policy))
+        logger.info("Set public-read policy on bucket: %s", bucket)
         return True
     except S3Error as e:
-        logger.error("Failed to ensure bucket %s: %s", bucket, e)
-        return False
-
-
-def _public_url(internal_url: str) -> str:
-    """Rewrite internal MinIO URL to public endpoint if configured."""
-    pub = os.getenv("MINIO_PUBLIC_ENDPOINT", "")
-    if not pub:
-        return internal_url
-    # Replace scheme+host+port from internal URL with public endpoint
-    import re
-    return re.sub(r'https?://[^/]+', pub.rstrip('/'), internal_url)
+        logger.warning("Failed to set bucket policy (non-fatal): %s", e)
+        return True
 
 
 def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
@@ -104,15 +107,16 @@ def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
             content_type=f"image/{ext.lstrip('.')}",
         )
 
-        # Generate a presigned URL valid for 7 days
-        url = client.presigned_get_object(
-            bucket_name=bucket,
-            object_name=object_name,
-            expires=timedelta(days=7),
-        )
+        # Generate direct URL (no signature needed — bucket is public-read)
+        pub = os.getenv("MINIO_PUBLIC_ENDPOINT", os.getenv("MINIO_ENDPOINT", ""))
+        if pub:
+            pub = pub.rstrip("/")
+        else:
+            pub = f"http://{client._base_url.host}:{client._base_url.port}"
+        direct_url = f"{pub}/{bucket}/{object_name}"
 
-        logger.info("Uploaded %s → MinIO %s/%s", path.name, bucket, object_name)
-        return _public_url(url)
+        logger.info("Uploaded %s → %s", path.name, direct_url)
+        return direct_url
 
     except S3Error as e:
         logger.error("MinIO upload failed for %s: %s", path, e)
