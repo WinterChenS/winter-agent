@@ -129,23 +129,29 @@ async def stream_generate(request: GenerateRequest):
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
             else:
                 checkpointer = get_checkpointer()
-                graph = create_agent_graph(checkpointer=checkpointer)
+
+                # ── Multi-Agent Graph ──────────────────────────────────────
+                from core.router_agent import RouterAgent
+                from core.agent_factory import AgentFactory
+                from core.collaboration import CollaborationEngine
+                from graph.multi_agent_graph import create_multi_agent_graph
+
+                agent_repo = get_agent_repository()
+                router = RouterAgent(repository=agent_repo)
+                factory = AgentFactory()
+                engine = CollaborationEngine()
+                graph = create_multi_agent_graph(
+                    router=router,
+                    factory=factory,
+                    engine=engine,
+                    checkpointer=checkpointer,
+                )
+
+                logging.info("[CHAT] using multi-agent graph: router→factory→collaboration→chart→answer")
+
                 inputs = {
                     "messages": [HumanMessage(content=request.message)],
                     "conversation_id": trace_ctx.conversation_id,
-                    "tool_steps": [],
-                    "iteration_count": 0,
-                    "current_tool": None,
-                    "tool_input": None,
-                    "tool_result": None,
-                    "last_tool_name": None,
-                    "last_tool_query": None,
-                    "consecutive_search_count": 0,
-                    "last_guard_reason": None,
-                    "trace_id": trace_ctx.trace_id,
-                    "turn_id": trace_ctx.turn_id,
-                    "span_id": trace_ctx.span_id,
-                    "parent_span_id": trace_ctx.parent_span_id,
                     "active_agent": active_agent,
                     "chart_specs": [],
                     "blocks": [],
