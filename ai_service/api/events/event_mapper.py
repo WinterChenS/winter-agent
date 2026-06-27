@@ -98,6 +98,11 @@ def map_langgraph_event_to_envelopes(
     event_type = event.get("event")
     event_name = event.get("name")
 
+    # Diagnostic: log non-stream events to identify tool/reasoning source
+    if event_type not in ("on_chat_model_stream",):
+        import sys
+        print(f"[EVENT_MAPPER] type={event_type} name={event_name}", file=sys.stderr, flush=True)
+
     if event_type == "on_chat_model_stream":
         chunk = event.get("data", {}).get("chunk")
         content = getattr(chunk, "content", "")
