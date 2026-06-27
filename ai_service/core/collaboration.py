@@ -19,6 +19,30 @@ class CollaborationResult:
         self.agent_results = agent_results
 
 
+def _build_lc_tool(tool_obj):
+    """Build a LangChain StructuredTool from a BaseTool, using its input_schema."""
+    from langchain_core.tools import StructuredTool
+
+    name = tool_obj.name
+    desc = getattr(tool_obj, 'description', name) or name
+    input_schema = getattr(tool_obj, 'input_schema', None) or {}
+
+    async def _execute(**kwargs) -> str:
+        # Unwrap if LangChain double-wraps in 'kwargs' key
+        if 'kwargs' in kwargs and len(kwargs) == 1:
+            kwargs = kwargs['kwargs']
+        result = await tool_obj.execute(kwargs)
+        return str(result)
+
+    return StructuredTool(
+        name=name,
+        description=desc,
+        func=None,
+        coroutine=_execute,
+        args_schema=input_schema,
+    )
+
+
 class CollaborationEngine:
     def __init__(self, event_bus: StreamingEventBus | None = None) -> None:
         self._bus = event_bus
@@ -61,13 +85,7 @@ class CollaborationEngine:
             for t in runtime.tools:
                 if hasattr(t, 'name') and hasattr(t, 'execute'):
                     from langchain_core.tools import tool
-                    _name = t.name
-                    _desc = getattr(t, 'description', t.name) or t.name
-                    @tool(_name, description=_desc)
-                    async def _wrapped(_tool=t, **kwargs) -> str:
-                        result = await _tool.execute(kwargs)
-                        return str(result)
-                    lc_tools.append(_wrapped)
+                    lc_tools.append(_build_lc_tool(t))
             if lc_tools:
                 llm = llm.bind_tools(lc_tools)
 
