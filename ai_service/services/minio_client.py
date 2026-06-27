@@ -64,6 +64,16 @@ def _ensure_bucket(client: Minio, bucket: str = "agent-images") -> bool:
         return False
 
 
+def _public_url(internal_url: str) -> str:
+    """Rewrite internal MinIO URL to public endpoint if configured."""
+    pub = os.getenv("MINIO_PUBLIC_ENDPOINT", "")
+    if not pub:
+        return internal_url
+    # Replace scheme+host+port from internal URL with public endpoint
+    import re
+    return re.sub(r'https?://[^/]+', pub.rstrip('/'), internal_url)
+
+
 def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
     """Upload an image file to MinIO. Returns the public URL or None on failure."""
     client = _get_client()
@@ -102,7 +112,7 @@ def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
         )
 
         logger.info("Uploaded %s → MinIO %s/%s", path.name, bucket, object_name)
-        return url
+        return _public_url(url)
 
     except S3Error as e:
         logger.error("MinIO upload failed for %s: %s", path, e)
