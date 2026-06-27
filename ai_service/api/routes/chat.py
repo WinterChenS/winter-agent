@@ -74,6 +74,53 @@ def _sanitize_delta(text: str) -> str:
     text = re.sub(r'```python\s*\n.*?\n```', '', text, flags=re.DOTALL)
     return text
 
+def _accumulate_tool_call(envelope: dict, acc: dict[str, dict]) -> None:
+    """Accumulate tool calls from SSE envelopes for DB persistence.
+
+    Handles both message.tool_call (LangGraph) and tool.started/finished/failed
+    (StreamingEventBus) envelope formats, merging by tool call ID.
+    """
+    envelope_type = envelope.get("type", "")
+    payload = envelope.get("payload", {}) or {}
+
+    if envelope_type == "message.tool_call":
+        tc = payload.get("toolCall")
+        if isinstance(tc, dict) and tc.get("id"):
+            tc_id = tc["id"]
+            existing = acc.get(tc_id, {})
+            # Merge: later updates (done/failed) override earlier (running)
+            merged = {**existing}
+            for k, v in tc.items():
+                if v is not None:
+                    merged[k] = v
+            if "arguments" not in merged:
+                merged["arguments"] = existing.get("arguments", {})
+            acc[tc_id] = merged
+    elif envelope_type in ("tool.started", "tool.finished", "tool.failed"):
+        tc_id = payload.get("tool_call_id")
+        if tc_id:
+            existing = acc.get(tc_id, {})
+            merged = {**existing, "id": tc_id}
+            if envelope_type == "tool.started":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["arguments"] = payload.get("arguments") or existing.get("arguments", {})
+                merged["status"] = "running"
+            elif envelope_type == "tool.finished":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["status"] = "done"
+                if "result" in payload:
+                    merged["result"] = payload["result"]
+                # Preserve arguments from started event
+                if "arguments" not in merged:
+                    merged["arguments"] = existing.get("arguments", {})
+            elif envelope_type == "tool.failed":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["status"] = "failed"
+                if "error" in payload:
+                    merged["result"] = payload["error"]
+            acc[tc_id] = merged
+
+
 MOCK_RESPONSES = [
     "Hello! I am AI Assistant V0.2. How can I help you today?",
     "This is a mock response. The AI service is running in mock mode without a real LLM API key.",
@@ -230,6 +277,7 @@ async def stream_generate(request: GenerateRequest):
 
                 graph_done_flag = False
                 bus_done_flag = False
+                tool_calls_accumulated: dict[str, dict] = {}
 
                 while not (graph_done_flag and bus_done_flag):
                     source, data = await merge_queue.get()
@@ -244,6 +292,8 @@ async def stream_generate(request: GenerateRequest):
                         graph_done_flag = True
                         event_bus.close()
                     else:
+                        # Accumulate tool calls for persistence
+                        _accumulate_tool_call(data, tool_calls_accumulated)
                         yield to_sse_data(data)
 
                 # Cleanup
@@ -274,7 +324,7 @@ async def stream_generate(request: GenerateRequest):
                             "conversation_id": trace_ctx.conversation_id,
                             "role": "assistant",
                             "content": extract_last_assistant_text(final_state),
-                            "toolCalls": final_state.get("tool_steps", []),
+                            "toolCalls": list(tool_calls_accumulated.values()),
                             "status": "done",
                             "agentId": trace_ctx.agent_id,
                         }
