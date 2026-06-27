@@ -64,24 +64,18 @@ export function MessageList() {
   }
 
   return (
-    <div className="flex-1 relative">
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="absolute inset-0 overflow-y-auto px-4 py-2"
-      >
-        {orderedMessages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
-        <div ref={bottomRef} />
-      </div>
+    <div className="h-full overflow-y-auto px-4 py-2" ref={scrollRef} onScroll={handleScroll}>
+      {orderedMessages.map((msg) => (
+        <MessageBubble key={msg.id} message={msg} />
+      ))}
+      <div ref={bottomRef} />
       {userScrolledUp && (
         <button
           onClick={() => {
             scrollToBottom(true);
             setUserScrolledUp(false);
           }}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors z-10"
+          className="sticky bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors z-10"
         >
           ↓ 回到底部
         </button>
