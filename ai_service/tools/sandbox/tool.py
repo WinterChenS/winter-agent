@@ -80,6 +80,13 @@ class CodeSandboxTool(BaseTool):
         lines.append(f"import sys; sys.path.insert(0, {ai_service_dir!r})")
         lines.append("")
 
+        # ── Disable SSL verification for external API calls ──
+        lines.append("import ssl; ssl._create_default_https_context = ssl._create_unverified_context")
+        lines.append("try:")
+        lines.append("    import urllib3; urllib3.disable_warnings()")
+        lines.append("except: pass")
+        lines.append("")
+
         # ── Chart theme (font, DPI, style) ──
         lines.append("from chart.chart_theme import ChartTheme")
         lines.append("ChartTheme.initialize()")
