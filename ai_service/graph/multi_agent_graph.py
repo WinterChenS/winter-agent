@@ -22,11 +22,15 @@ async def router_node(state: State, *, router: RouterAgent) -> dict:
             user_query = msg.content or ""
             break
 
+    logger.info("[ROUTER] analyzing query: %s", user_query[:80])
     result = await router.route(user_query)
+    agent_names = [a.name for a in result.agents]
+    logger.info("[ROUTER] selected %d agent(s): %s (strategy=%s source=%s)",
+                len(agent_names), agent_names, result.strategy, result.source)
 
     return {
         "router_result": {
-            "agent_names": [a.name for a in result.agents],
+            "agent_names": agent_names,
             "strategy": result.strategy,
             "source": result.source,
         },
@@ -56,6 +60,7 @@ async def collaboration_node(state: State, *, engine: CollaborationEngine) -> di
     """Execute multi-agent collaboration."""
     runtimes = state.get("runtimes", [])
     strategy = state.get("selected_strategy", "sequential")
+    logger.info("[COLLAB] executing with %d agent(s) strategy=%s", len(runtimes), strategy)
 
     user_query = ""
     for msg in reversed(list(state.get("messages", []))):
