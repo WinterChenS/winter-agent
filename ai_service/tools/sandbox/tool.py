@@ -155,7 +155,7 @@ class CodeSandboxTool(BaseTool):
                 logger.warning("MinIO upload not available: %s", e)
                 _upload = None
             png_patterns = [
-                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\]+)',
+                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\\'\"\}\,\)]+)',
                 r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))',
             ]
             uploaded: dict[str, str] = {}
