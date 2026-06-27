@@ -46,6 +46,7 @@ from domain.event_envelope import (
     envelope_error,
     envelope_message_delta,
     envelope_message_done,
+    envelope_message_tool_call,
     envelope_token,
     to_sse_data,
 )
@@ -101,6 +102,23 @@ async def stream_generate(request: GenerateRequest):
         event_ctx = EventMapContext(trace_ctx=trace_ctx, known_tools=_tool_names())
         try:
             if not settings.api_key:
+                # Simulated tool call for UI demonstration
+                tc_id = uuid.uuid4().hex[:12]
+                # tool call: running
+                yield to_sse_data(envelope_message_tool_call(trace_ctx, message_id, {
+                    "id": tc_id, "name": "search",
+                    "arguments": {"query": request.message[:50]},
+                    "status": "running",
+                }))
+                await asyncio.sleep(0.3)
+                # tool call: done
+                yield to_sse_data(envelope_message_tool_call(trace_ctx, message_id, {
+                    "id": tc_id, "name": "search",
+                    "status": "done",
+                    "result": "Mock search results: found 3 relevant documents about '{}'.".format(request.message[:30]),
+                }))
+                await asyncio.sleep(0.2)
+
                 response = random.choice(MOCK_RESPONSES)
                 for char in response:
                     yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
