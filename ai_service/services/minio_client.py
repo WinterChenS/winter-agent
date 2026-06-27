@@ -16,8 +16,10 @@ from minio.error import S3Error
 
 logger = logging.getLogger(__name__)
 
-# Workspace root where execute_python saves images
-WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
+# AI service root where execute_python saves images (ai_service/)
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+# Also check parent project root for images saved from different CWDs
+PROJECT_ROOT = WORKSPACE_ROOT.parent
 
 
 def _get_client() -> Minio | None:
@@ -125,6 +127,9 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
         r'保存[到至][：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'→\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'=>\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r"savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
+        r"\.savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
+        r'(\S+\.png)',  # Any .png filename in output
     ]
 
     found_files = set()
@@ -132,20 +137,20 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
         for match in re.finditer(pattern, output_text, re.IGNORECASE):
             found_files.add(match.group(1))
 
-    # Also scan workspace root for recently created .png files
+    # Also scan both directories for recently created .png files
     try:
-        for p in WORKSPACE_ROOT.glob("*.png"):
-            if p.name not in found_files:
-                # Check if this file was created in the last 60 seconds
-                mtime = p.stat().st_mtime
-                if (__import__("time").time() - mtime) < 60:
-                    found_files.add(p.name)
+        for root_dir in (WORKSPACE_ROOT, PROJECT_ROOT):
+            for p in root_dir.glob("*.png"):
+                if p.name not in found_files:
+                    mtime = p.stat().st_mtime
+                    if (__import__("time").time() - mtime) < 120:
+                        found_files.add(str(p))  # Full path
     except Exception:
         pass
 
-    for filename in found_files:
-        url = upload_image(str(WORKSPACE_ROOT / filename))
+    for filepath in found_files:
+        url = upload_image(filepath)
         if url:
-            uploaded[filename] = url
+            uploaded[Path(filepath).name] = url
 
     return uploaded
