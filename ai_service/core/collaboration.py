@@ -219,7 +219,13 @@ class CollaborationEngine:
                 f"Original request: {user_query}"
             )
 
-        final = agent_results[-1].get("output", "") if agent_results else ""
+        # Merge outputs from all agents, not just the last one
+        parts = []
+        for r in agent_results:
+            out = r.get("output", "")
+            if out:
+                parts.append(f"## {r.get('agent', 'agent')}\n\n{out}")
+        final = "\n\n".join(parts) if parts else ""
         all_images = {}
         for r in agent_results:
             if isinstance(r.get("images"), dict):

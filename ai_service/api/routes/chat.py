@@ -250,17 +250,14 @@ async def stream_generate(request: GenerateRequest):
                 await asyncio.gather(graph_task, bus_task, return_exceptions=True)
 
                 # If collaboration produced a result, stream it directly (skip answer_node)
-                logging.info("[CHAT] final_state keys: %s, has_collab=%s",
                              list(final_state.keys()) if final_state else None,
                              bool(final_state and final_state.get("collab_result")))
                 if final_state and final_state.get("collab_result"):
                     collab_text = str(final_state["collab_result"])
-                    logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
                     for char in collab_text:
                         yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
                         await asyncio.sleep(0.01)
                 else:
-                    logging.warning("[CHAT] no collab_result in final_state — nothing to stream")
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
