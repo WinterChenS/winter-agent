@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { ChatInput } from '../components/ChatInput';
-import { MessageList } from '../components/MessageList';
 import { Sidebar } from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
-import { useChat } from '../hooks/useChat';
 import { useSessions } from '../hooks/useSessions';
+import { useChatStore } from '../features/ai-chat/store/chatStore';
+import { useChatStream } from '../features/ai-chat/hooks/useChatStream';
+import { useConversation } from '../features/ai-chat/hooks/useConversation';
+import { MessageList } from '../features/ai-chat/components/MessageList';
+import { InputBox } from '../features/ai-chat/components/InputBox';
 
 export function ChatInterface() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -15,16 +17,12 @@ export function ChatInterface() {
   const isNewSessionRef = useRef(false);
 
   const { sessions, createSession, removeSession, updateSessionTitle } = useSessions();
-const { username, logout } = useAuth();
-
-  const {
-    messages,
-    isSending,
-    sendMessage: originalSendMessage,
-    clearMessages,
-    loadHistory,
-    setConversationId,
-  } = useChat();
+  const { username, logout } = useAuth();
+  const { send, isSending } = useChatStream();
+  const { loadHistory } = useConversation();
+  const messages = useChatStore(s => s.messageOrder.map(id => s.messages[id]));
+  const setConversationId = useChatStore(s => s.setConversationId);
+  const clearMessages = useChatStore(s => s.clearMessages);
 
   // Route 与会话状态同步：切换 URL 时按会话加载历史
   useEffect(() => {
@@ -66,7 +64,7 @@ const { username, logout } = useAuth();
       updateSessionTitle(currentSessionId, content.slice(0, 15) + (content.length > 15 ? '...' : ''));
     }
 
-    await originalSendMessage(content, currentSessionId);
+    await send(content);
   };
 
   return (
@@ -119,12 +117,12 @@ const { username, logout } = useAuth();
         </header>
 
         <main className="flex-1 overflow-hidden relative">
-          <MessageList messages={messages} isSending={isSending} />
+          <MessageList />
         </main>
 
         <footer className="bg-white px-4 py-4 shrink-0 shadow-[0_-1px_2px_rgba(0,0,0,0.05)] w-full">
           <div className="max-w-4xl mx-auto w-full">
-            <ChatInput onSend={handleSendMessage} disableSend={isSending} />
+            <InputBox onSend={handleSendMessage} disabled={isSending} />
             <p className="text-xs text-center text-gray-400 mt-2">AI 可能会产生错误信息，请核实重要内容。</p>
           </div>
         </footer>
@@ -132,4 +130,3 @@ const { username, logout } = useAuth();
     </div>
   );
 }
-

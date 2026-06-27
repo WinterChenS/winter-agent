@@ -12,10 +12,10 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={
-          <PrivateRoute><ChatContainer /></PrivateRoute>
+          <PrivateRoute><ChatInterface /></PrivateRoute>
         } />
         <Route path="/chat/:id" element={
-          <PrivateRoute><ChatContainer /></PrivateRoute>
+          <PrivateRoute><ChatInterface /></PrivateRoute>
         } />
         <Route path="/admin/agents" element={
           <PrivateRoute><AdminAgents /></PrivateRoute>
