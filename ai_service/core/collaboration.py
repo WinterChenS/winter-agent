@@ -112,84 +112,83 @@ class CollaborationEngine:
             for round_idx in range(max_rounds):
                 response = await llm.ainvoke(messages)
 
-            # Check for tool calls
-            tool_calls = getattr(response, 'tool_calls', None)
-            if not tool_calls:
-                # No more tools — final answer
-                elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
-                self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
-                # Scan for generated images and upload to MinIO
-                final_output = str(response.content).strip()
-                images = self._scan_and_upload_images(final_output)
-                for filename, url in images.items():
-                    self._emit("image.uploaded", filename=filename, url=url)
-                    final_output = final_output.replace(filename, url)
+                # Check for tool calls
+                tool_calls = getattr(response, 'tool_calls', None)
+                if not tool_calls:
+                    # No more tools — final answer
+                    elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+                    self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+                    # Scan for generated images and upload to MinIO
+                    final_output = str(response.content).strip()
+                    images = self._scan_and_upload_images(final_output)
+                    for filename, url in images.items():
+                        self._emit("image.uploaded", filename=filename, url=url)
+                        final_output = final_output.replace(filename, url)
+                        final_output = re.sub(
+                            rf'https?://[^\s)]*{re.escape(filename)}', url,
+                            final_output
+                        )
+                    # Strip any remaining localhost image URLs that weren't uploaded
                     final_output = re.sub(
-                        rf'https?://[^\s)]*{re.escape(filename)}', url,
+                        r'https?://localhost[^\s)]*\.(?:png|jpg|jpeg|gif|svg)', '',
                         final_output
                     )
-                # Strip any remaining localhost image URLs that weren't uploaded
-                final_output = re.sub(
-                    r'https?://localhost[^\s)]*\.(?:png|jpg|jpeg|gif|svg)', '',
-                    final_output
-                )
-                final_output = re.sub(
-                    r'!\[.*?\]\([^)]*localhost[^)]*\)', '', final_output
-                )
-                return {
-                    "agent": agent_name,
-                    "status": "ok",
-                    "output": final_output,
-                    "tool_calls": tool_call_history,
-                    "images": images,
-                }
+                    final_output = re.sub(
+                        r'!\[.*?\]\([^)]*localhost[^)]*\)', '', final_output
+                    )
+                    return {
+                        "agent": agent_name,
+                        "status": "ok",
+                        "output": final_output,
+                        "tool_calls": tool_call_history,
+                        "images": images,
+                    }
 
-            # Process tool calls
-            messages.append(response)
-            for tc in tool_calls:
-                tc_id = tc.get("id", f"tc-{round_idx}")
-                tc_name = tc.get("name", "unknown")
-                tc_args = tc.get("args", {})
+                # Process tool calls
+                messages.append(response)
+                for tc in tool_calls:
+                    tc_id = tc.get("id", f"tc-{round_idx}")
+                    tc_name = tc.get("name", "unknown")
+                    tc_args = tc.get("args", {})
 
-                self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
-                          agent=agent_name, arguments=tc_args)
+                    self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
+                              agent=agent_name, arguments=tc_args)
 
-                # Execute tool via BaseTool.execute() — pass args directly
-                tool_obj = _find_tool(runtime.tools, tc_name)
-                if tool_obj and hasattr(tool_obj, 'execute'):
-                    try:
-                        result = await tool_obj.execute(dict(tc_args))
-                        result_str = str(result)
-                        self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
-                                  agent=agent_name, result=result_str[:500],
-                                  status="done")
-                        # Parse [图片已上传] section from tool result for image.uploaded events
-                        _parse_and_emit_images(self, result_str)
-                    except Exception as e:
-                        result_str = f"Tool error: {e}"
+                    # Execute tool via BaseTool.execute() — pass args directly
+                    tool_obj = _find_tool(runtime.tools, tc_name)
+                    if tool_obj and hasattr(tool_obj, 'execute'):
+                        try:
+                            result = await tool_obj.execute(dict(tc_args))
+                            result_str = str(result)
+                            self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
+                                      agent=agent_name, result=result_str[:500],
+                                      status="done")
+                            # Parse [图片已上传] section from tool result for image.uploaded events
+                            _parse_and_emit_images(self, result_str)
+                        except Exception as e:
+                            result_str = f"Tool error: {e}"
+                            self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
+                                      agent=agent_name, error=str(e), status="failed")
+                    else:
+                        result_str = f"Tool '{tc_name}' not found in runtime tools."
                         self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
-                                  agent=agent_name, error=str(e), status="failed")
-                else:
-                    result_str = f"Tool '{tc_name}' not found in runtime tools."
-                    self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
-                              agent=agent_name, error=f"Tool not found: {tc_name}",
-                              status="failed")
+                                  agent=agent_name, error=f"Tool not found: {tc_name}",
+                                  status="failed")
 
-                tool_call_history.append({
-                    "id": tc_id, "name": tc_name,
-                    "arguments": tc_args, "status": "done",
-                    "result": result_str[:500],
-                })
-                messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
+                    tool_call_history.append({
+                        "id": tc_id, "name": tc_name,
+                        "arguments": tc_args, "status": "done",
+                        "result": result_str[:500],
+                    })
+                    messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
 
             # Max rounds reached
             elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
             self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
-            last_response = response if 'response' in dir() else None
             return {
                 "agent": agent_name,
                 "status": "ok",
-                "output": str(last_response.content).strip() if last_response else "",
+                "output": str(response.content).strip() if response else "",
                 "tool_calls": tool_call_history,
             }
         except Exception as e:
