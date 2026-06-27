@@ -953,6 +953,8 @@ async def planning_node(state: State) -> dict:
     4. On failure: retry once with error feedback -> fallback plan
     5. Set plan_phase to "executing" (or "composing" if empty)
     """
+    logger.info("[PLANNING] ===== NODE START =====")
+
     # Extract user query
     user_query = ""
     for msg in reversed(list(state.get("messages", []))):
@@ -960,9 +962,11 @@ async def planning_node(state: State) -> dict:
             user_query = (msg.content or "").strip()
             break
 
+    logger.info("[PLANNING] query='%s'", user_query[:100])
+
     # Fast path: trivial query
     if _is_trivial_query(user_query):
-        logger.info("[PLANNING] trivial query detected — skipping planning")
+        logger.info("[PLANNING] trivial query detected — skipping planning, routing to composer")
         return {
             "execution_plan": None,
             "plan_phase": "composing",
@@ -1112,11 +1116,16 @@ async def execution_node(state: State) -> dict:
     plan = state.get("execution_plan")
     step_idx = state.get("current_plan_step", 0)
 
+    logger.info("[EXECUTION] ===== NODE START: step_idx=%d, plan_has_steps=%s, artifacts_count=%d =====",
+                step_idx, bool(plan and plan.get("steps")), len(state.get("artifacts", [])))
+
     if not plan or not plan.get("steps"):
+        logger.info("[EXECUTION] no plan or empty steps → routing to composer")
         return {"plan_phase": "composing"}
 
     steps = plan["steps"]
     if step_idx >= len(steps):
+        logger.info("[EXECUTION] step_idx(%d) >= len(steps)(%d) → routing to composer", step_idx, len(steps))
         return {"plan_phase": "composing"}
 
     step = steps[step_idx]
@@ -1326,6 +1335,10 @@ async def composer_node(state: State) -> dict:
     results = state.get("execution_results", [])
     artifacts = state.get("artifacts", [])
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    logger.info("[COMPOSER] ===== NODE START: plan=%s, results_count=%d, artifacts_count=%d =====",
+                bool(plan), len(results), len(artifacts))
+    logger.info("[COMPOSER] building report from %d result step(s)", len(results))
 
     system_prompt = _build_composer_system_prompt(plan, results, artifacts, now_str)
 

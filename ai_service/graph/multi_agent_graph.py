@@ -19,17 +19,25 @@ def _route_from_planning(state: State) -> str:
     phase = state.get("plan_phase", "")
     plan = state.get("execution_plan")
     if phase == "executing" and plan and plan.get("steps"):
+        logger.info("[ROUTE] planning -> execution (phase=%s, steps=%d)", phase, len(plan.get("steps", [])))
         return "execution"
+    logger.info("[ROUTE] planning -> composer (phase=%s, has_plan=%s)", phase, bool(plan))
     return "composer"
 
 
 def _route_from_execution(state: State) -> str:
     """Route execution -> itself (more steps) or -> composer (all done)."""
     phase = state.get("plan_phase", "")
+    step_idx = state.get("current_plan_step", 0)
+    plan = state.get("execution_plan")
+    total_steps = len(plan.get("steps", [])) if plan else 0
     if phase == "composing":
+        logger.info("[ROUTE] execution -> composer (phase=composing, step=%d/%d)", step_idx, total_steps)
         return "composer"
     if phase == "executing":
+        logger.info("[ROUTE] execution -> execution (phase=executing, step=%d/%d)", step_idx, total_steps)
         return "execution"
+    logger.info("[ROUTE] execution -> composer (unknown phase='%s')", phase)
     return "composer"
 
 

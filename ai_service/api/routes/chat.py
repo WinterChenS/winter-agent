@@ -194,6 +194,8 @@ async def stream_generate(request: GenerateRequest):
                 graph = create_plan_execute_graph(checkpointer=checkpointer)
 
                 logging.info("[CHAT] streaming plan-execute-compose graph")
+                logging.info("[CHAT] request: message_id=%s agent_id=%s query='%s'",
+                             message_id, active_agent, request.message[:100])
 
                 inputs = {
                     "messages": [HumanMessage(content=request.message)],
@@ -235,6 +237,10 @@ async def stream_generate(request: GenerateRequest):
                             if captured is not None:
                                 nonlocal final_state
                                 final_state = captured
+                                logging.info("[CHAT] final_state captured: plan_phase=%s, execution_results=%d, artifacts=%d",
+                                             captured.get("plan_phase", "?"),
+                                             len(captured.get("execution_results", [])),
+                                             len(captured.get("artifacts", [])))
                             for envelope in mapped:
                                 if envelope.get("type") == "message.delta":
                                     nonlocal assistant_text_emitted
@@ -272,7 +278,9 @@ async def stream_generate(request: GenerateRequest):
                 await asyncio.gather(graph_task, return_exceptions=True)
 
                 # Composer node handles output generation via graph streaming
-                logging.info("[CHAT] composer output streamed via astream_events")
+                logging.info("[CHAT] stream complete: content_length=%d, tool_calls=%d, plan_phase=%s",
+                             len(content_accumulated), len(tool_calls_accumulated),
+                             final_state.get("plan_phase", "?") if final_state else "?")
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
