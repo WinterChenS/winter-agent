@@ -1186,11 +1186,7 @@ async def execution_node(state: State, event_bus=None) -> dict:
         tool_call_id = f"{tool_name}_{step_id}_{int(_time.time()*1000)}"
         # Emit tool.started event for frontend display
         if event_bus:
-            await event_bus.emit("tool.started", {
-                "tool_call_id": tool_call_id,
-                "tool": tool_name,
-                "arguments": {"query": search_query},
-            })
+            event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name, arguments={"query": search_query})
         try:
             result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
             tool_results.append({
@@ -1207,11 +1203,7 @@ async def execution_node(state: State, event_bus=None) -> dict:
                     logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
                     step_status = "error"
                     if event_bus:
-                        await event_bus.emit("tool.failed", {
-                            "tool_call_id": tool_call_id,
-                            "tool": tool_name,
-                            "error": str(error_info.get("message", error_info.get("code", "unknown error"))),
-                        })
+                        event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(error_info.get("message", error_info.get("code", "unknown error"))))
                 else:
                     # Retry once
                     logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
@@ -1225,21 +1217,10 @@ async def execution_node(state: State, event_bus=None) -> dict:
             if result.get("status") == "error":
                 step_status = "error"
                 if event_bus:
-                    await event_bus.emit("tool.failed", {
-                        "tool_call_id": tool_call_id,
-                        "tool": tool_name,
-                        "error": str(result.get("error_msg", "tool execution failed")),
-                    })
+                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "tool execution failed")))
             else:
                 if event_bus:
-                    await event_bus.emit("tool.finished", {
-                        "tool_call_id": tool_call_id,
-                        "tool": tool_name,
-                        "result": {
-                            "status": result.get("status", "completed"),
-                            "elapsed_ms": result.get("elapsed_ms", 0),
-                        },
-                    })
+                    event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": result.get("status", "completed"), "elapsed_ms": result.get("elapsed_ms", 0)})
                 accumulated_reasons.append(_reason_record(
                     "execution_node", "TOOL_EXECUTION_FAILURE",
                     f"Tool '{tool_name}' failed after retry for step {step_id}",
