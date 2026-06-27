@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>陈冬华 - 简历</title>
+  <style>
+    :root {
+      --bg: #eef2f5;
+      --paper: #ffffff;
+      --ink: #1e2933;
+      --muted: #5c6875;
+      --line: #dce4ea;
+      --accent: #0f766e;
+      --accent-soft: #e7f4f2;
+      --heading: #0f2433;
+      --shadow: 0 18px 50px rgba(20, 35, 50, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.62;
+      background:
+        linear-gradient(180deg, rgba(15, 118, 110, 0.08), transparent 260px),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(238, 242, 245, 0.86);
+      border-bottom: 1px solid rgba(220, 228, 234, 0.78);
+      backdrop-filter: blur(14px);
+    }
+
+    .toolbar-inner {
+      width: min(100%, 980px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      color: var(--heading);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid rgba(15, 118, 110, 0.25);
+      border-radius: 8px;
+      color: var(--accent);
+      background: var(--paper);
+      font-size: 15px;
+      box-shadow: 0 8px 20px rgba(15, 118, 110, 0.08);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--muted);
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: border-color 160ms ease, color 160ms ease, background 160ms ease,
+        transform 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      color: var(--heading);
+      border-color: rgba(15, 118, 110, 0.35);
+    }
+
+    button[aria-pressed="true"],
+    .print-button {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .shell {
+      padding: 28px 18px 56px;
+    }
+
+    .resume {
+      display: none;
+      width: min(100%, 210mm);
+      margin: 0 auto;
+      padding: 18mm 18mm 16mm;
+      background: var(--paper);
+      border: 1px solid rgba(220, 228, 234, 0.9);
+      box-shadow: var(--shadow);
+    }
+
+    .resume.active {
+      display: block;
+    }
+
+    .resume h1,
+    .resume h2,
+    .resume h3 {
+      color: var(--heading);
+      line-height: 1.28;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    .resume h1 {
+      margin: 0 0 8px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--accent);
+      font-size: 34px;
+      letter-spacing: 0;
+    }
+
+    .resume h1 + p {
+      color: var(--heading);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .resume h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0 10px;
+      font-size: 18px;
+    }
+
+    .resume h2::before {
+      content: "";
+      width: 4px;
+      height: 18px;
+      border-radius: 2px;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .resume h3 {
+      margin: 16px 0 6px;
+      font-size: 15px;
+    }
+
+    .resume p {
+      margin: 5px 0;
+    }
+
+    .resume strong {
+      color: var(--heading);
+      font-weight: 750;
+    }
+
+    .resume a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.25);
+    }
+
+    .resume ul {
+      margin: 7px 0 10px;
+      padding-left: 18px;
+    }
+
+    .resume li {
+      margin: 3px 0;
+      padding-left: 2px;
+    }
+
+    .resume table {
+      width: 100%;
+      margin: 10px 0 14px;
+      border-collapse: collapse;
+      font-size: 13px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .resume th,
+    .resume td {
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .resume th {
+      color: var(--heading);
+      background: var(--accent-soft);
+      font-weight: 750;
+      width: 22%;
+    }
+
+    .resume h3,
+    .resume h3 + p,
+    .resume h3 + p + ul,
+    .resume table,
+    .resume li {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .resume h2 + p,
+    .resume h2 + ul,
+    .resume h2 + table {
+      break-before: avoid;
+      page-break-before: avoid;
+    }
+
+    .resume section {
+      break-inside: auto;
+    }
+
+    .resume .section-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        font-size: 13px;
+      }
+
+      .toolbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      button {
+        flex: 1 1 auto;
+      }
+
+      .shell {
+        padding: 14px 10px 32px;
+      }
+
+      .resume {
+        padding: 20px 18px;
+      }
+
+      .resume h1 {
+        font-size: 28px;
+      }
+    }
+
+    @page {
+      size: A4;
+      margin: 13mm 14mm;
+    }
+
+    @media print {
+      :root {
+        --paper: #fff;
+        --ink: #1e2933;
+        --muted: #5c6875;
+        --line: #d6e0e7;
+        --accent: #0f766e;
+        --accent-soft: #e7f4f2;
+        --heading: #0f2433;
+      }
+
+      html,
+      body {
+        width: 210mm;
+        background: #fff !important;
+      }
+
+      body {
+        margin: 0;
+        font-size: 11.2pt;
+        line-height: 1.5;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+
+      .toolbar {
+        display: none !important;
+      }
+
+      .shell {
+        padding: 0;
+      }
+
+      .resume {
+        display: none !important;
+        width: auto;
+        min-height: auto;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        box-shadow: none;
+      }
+
+      .resume.active {
+        display: block !important;
+      }
+
+      .resume h1 {
+        font-size: 25pt;
+        margin-bottom: 6pt;
+        padding-bottom: 8pt;
+      }
+
+      .resume h2 {
+        margin-top: 15pt;
+        margin-bottom: 6pt;
+        font-size: 14pt;
+      }
+
+      .resume h3 {
+        margin-top: 10pt;
+        font-size: 11.6pt;
+      }
+
+      .resume p,
+      .resume li {
+        orphans: 3;
+        widows: 3;
+      }
+
+      .resume a {
+        color: var(--accent);
+        border-bottom: 0;
+      }
+
+      .resume table {
+        font-size: 10pt;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-inner">
+      <div class="brand">
+        <span class="brand-mark">陈</span>
+        <span>陈冬华 · 简历</span>
+      </div>
+      <div class="actions" role="group" aria-label="简历版本切换">
+        <button type="button" data-switch="lead" aria-pressed="true">技术负责人</button>
+        <button type="button" data-switch="fullstack" aria-pressed="false">全栈开发</button>
+        <button type="button" class="print-button" id="printBtn">导出 PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <article class="resume active" id="resume-lead" aria-label="技术负责人简历"></article>
+    <article class="resume" id="resume-fullstack" aria-label="全栈开发简历"></article>
+  </main>
+
+  <template id="md-lead">
+# 陈冬华
+
+**应聘方向：技术负责人 / 后端技术负责人 / AI Agent 工程负责人**  
+浙江杭州 | 9 年后端与分布式系统经验 | 本科 | 随时到岗  
+电话：15258800630 | 邮箱：winterchq@foxmail.com  
+GitHub：[https://github.com/WinterChenS](https://github.com/WinterChenS)  
+个人网站：[https://blog.662661.xyz](https://blog.662661.xyz)  
+CSDN：[https://blog.csdn.net/Winter_chen001](https://blog.csdn.net/Winter_chen001)
+
+## 个人摘要
+
+9 年 Java / 分布式系统 / 医疗大数据平台研发经验，长期在一线负责复杂业务系统的架构设计、核心代码开发、性能治理和技术团队协作。曾担任医疗大数据公司技术负责人，主导国家卫健委相关国家级医疗质量平台、单病种质控平台、不良事件平台、脑血管监测与超声质控等多个大型系统的架构设计与核心研发。
+
+具备从 0 到 1 搭建平台、从历史系统中重构核心链路、将系统性能提升一个数量级以上的完整经验。擅长 Spring Cloud 微服务、高并发系统、MongoDB 文档模型、Elasticsearch 指标分析、Redis 缓存治理、数据中台与医疗数据治理。
+
+近年持续将 AI 工具和大模型能力引入真实研发与业务交付：日常使用 Claude Code、Codex 辅助需求拆解、领域建模、代码生成、重构、测试设计、文档沉淀与工程方案推演；具备 AI Agent、LangChain / LangGraph、RAG、流式对话、工具调用、长期记忆、链路观测等 AI 工程化项目经验，能够把 AI 从 Demo 推进到可维护、可部署、可迭代的业务系统。
+
+开源项目维护者，GitHub 开源项目累计 3k+ Star，CSDN 阅读量 150W+，具备较强的技术表达、方案沉淀和工程影响力。
+
+## 核心能力
+
+- **技术负责人能力**：系统架构设计、技术选型、核心模块研发、Code Review、技术规范建设、跨团队协作、交付风险控制。
+- **后端与分布式系统**：Spring Boot、Spring Cloud、WebFlux、MyBatis / MyBatis-Plus、Redis、RabbitMQ、Nacos、Apollo、Docker、Kubernetes。
+- **数据与中台架构**：医疗数据治理、指标体系设计、标签中心、用户画像、MongoDB 大规模文档模型、Elasticsearch 分析与搜索。
+- **性能与稳定性治理**：慢查询优化、缓存设计、JVM 调优、链路追踪、分布式事务、异步化改造、历史系统重构。
+- **AI 工程化与 Agent**：LLM 应用集成、AI Agent 架构、LangChain、LangGraph、RAG 场景实践、SSE 流式输出、PostgreSQL Checkpointer、LangSmith 链路观测。
+- **AI 辅助研发实践**：日常使用 Claude Code、Codex 进行需求分析、架构推演、代码生成、Bug 定位、测试补充、技术文档生成与项目脚手架搭建。
+- **全栈与客户端探索**：React、Vue、TypeScript、Tailwind CSS、SwiftUI/AppKit、Tauri、Rust、Golang、Python、GCP。
+
+## 技术栈
+
+| 分类 | 技术 |
+| --- | --- |
+| 后端 | Java 8-21、Spring Boot、Spring Cloud、WebFlux、MyBatis、MyBatis-Plus |
+| 数据库 / 搜索 | MySQL、MongoDB、Elasticsearch、PostgreSQL |
+| 中间件 | Redis、RabbitMQ、Kafka、Nacos、Apollo、MinIO |
+| AI / Agent | Claude Code、Codex、Spring AI、LangChain、LangGraph、RAG、LangSmith、FastAPI |
+| 前端 | React、Vue、TypeScript、Vite、Tailwind CSS、Ant Design |
+| 工程与运维 | Docker、Kubernetes、Linux、Maven、Git、CI/CD |
+| 其他 | Python、Golang、Rust、Swift、Tauri、GCP |
+
+## 工作经历
+
+### 万古恒信科技有限公司 | AI Agent 应用开发 / Java 后端
+
+**2025.12 - 至今 | 领克交付助手：经销商 4S 店车辆交付全流程管理应用**
+
+- 参与领克交付助手核心业务建设，围绕车辆交付计划、交付准备、资料校验、任务流转、异常处理与门店协同，构建经销商 4S 店车辆交付全流程管理应用。
+- 项目采用 DDD + COLA 架构，按领域模型拆分交付、车辆、客户、门店、流程等业务能力，提升系统扩展性、业务可理解性和代码可维护性。
+- 日常将 Claude Code 融入需求拆解、领域建模、代码生成、单测补齐、重构建议和 Code Review，形成 AI 辅助研发工作流，提升需求到交付的迭代效率。
+- 在近期项目中持续沉淀 AI Agent 应用模式，将大模型能力用于业务规则理解、数据质量检查、交付异常摘要和智能提示等场景。
+
+**技术栈**：Java、DDD、COLA、Claude Code、AI Agent
+
+### 医惠科技有限公司 | 技术总监 / 技术负责人
+
+**2020.10 - 2025.07 | 国家级医疗质量与安全平台**
+
+- 作为核心技术负责人，负责国家单病种、不良事件、脑血管监测、超声质控等多个国家级医疗质量系统的架构设计、核心研发和技术选型。
+- 构建统一 API 与数据模型，支撑院内、区域、国家三级数据上报体系，适配不同医院信息化水平和多源异构数据接入场景。
+- 主导历史系统架构重构与性能治理，解决复杂指标体系下的扩展性、查询性能和稳定性瓶颈。
+- 基于 MongoDB 设计高扩展文档模型，应对医疗指标频繁变化、表单结构复杂、质控规则动态调整等问题。
+- 使用 Elasticsearch 构建指标分析、质控报告、检索与多维统计能力，提升数据分析和报告生成效率。
+- 推动代码规范、Code Review、核心技术方案沉淀和组件化复用，降低后续项目交付成本。
+- 负责 AI 大模型在医疗质控与报告场景中的工程化落地，包括质控规则生成、异常辅助分析、质控报告自动生成与数据解读。
+
+**代表成果**
+
+- 单病种采集与质控系统性能提升约 20 倍，彻底解决核心页面卡顿、接口超时和数据分析慢的问题。
+- 平台稳定支撑多省市、数百家医院并发接入和持续上报。
+- 沉淀统一数据治理与指标体系，提高同类项目复用能力，降低后续交付成本。
+- 将 AI 能力嵌入真实业务链路，而不是停留在演示层面，推动大模型在质控报告和辅助分析场景中可用、可控、可维护。
+
+**技术栈**：Spring Boot、Spring Cloud、Spring AI、MongoDB、Redis、Elasticsearch、RabbitMQ、MinIO、Vue
+
+### 吉利控股集团 | Java 开发工程师
+
+**2018.01 - 2020.09 | 交易中台订单与支付系统**
+
+- 主导交易中台订单与支付模块设计开发，参与核心业务链路建模、接口设计和系统落地。
+- 使用 Saga 模式与 MQ 实现分布式事务，保障订单、支付、库存等链路的最终一致性。
+- 抽象多支付渠道接入架构，提高支付系统可扩展性和后续渠道接入效率。
+- 解决 Kubernetes 环境下滚动发布、日志链路追踪、JVM 调优等工程问题。
+- 优化报表 SQL 与索引设计，将核心查询耗时从约 2 分钟降低到约 10 秒。
+
+**技术栈**：Spring Cloud、MyBatis、MySQL、Redis、RabbitMQ、Docker、Kubernetes
+
+### 杭州三重奏科技有限公司 | Java 开发工程师
+
+**2017.03 - 2017.12 | SaaS 平台**
+
+- 负责 SaaS 平台业务代码开发和维护，独立编写定时任务服务处理报表数据，解决查询等待时间过长的问题。
+- 预研 Spring Boot 并推动在新项目中使用，减少繁杂配置，提高开发效率和业务交付速度。
+
+### 江西美和科技有限公司 | Java 开发工程师
+
+**2016.04 - 2017.02 | ERP 系统**
+
+- 负责 ERP 系统业务代码开发，使用缓存优化业务访问性能。
+- 参与系统重构，对面向对象设计、Java 数据结构、并发与阻塞场景有实际开发经验。
+
+## 精选项目经验
+
+### AI Chat / Agent 平台原型
+
+**GitHub**：[WinterChenS/winter-agent](https://github.com/WinterChenS/winter-agent)
+
+项目定位：智能对话系统与 AI Agent 平台原型，实现前端、后端、AI 服务的全链路流式对话、历史会话和可观测能力。
+
+- 设计前端、Java BFF、Python AI Service 三层架构，前端负责对话体验，后端负责接口代理与会话转发，AI 服务负责 Agent 编排。
+- 使用 React 18、Vite、TypeScript、Tailwind CSS 构建对话 UI，支持 Markdown 渲染、代码高亮、自动滚动和响应式布局。
+- 使用 Spring Boot 3 + WebFlux 实现非阻塞式流式接口转发，支持 SSE 流式对话。
+- 使用 FastAPI、LangChain、LangGraph 构建 AI 服务，结合 PostgreSQL Checkpointer 实现多轮对话历史记忆。
+- 引入 LangSmith 做链路观测和调试，便于分析 Agent 决策过程、上下文传递和响应质量。
+- 规划多工具集成、数据库查询、模型切换、用户认证和权限等后续能力，具备从 Agent Demo 走向平台化的演进思路。
+
+**技术栈**：React、TypeScript、Spring Boot 3、WebFlux、FastAPI、LangChain、LangGraph、PostgreSQL、Docker Compose
+
+### 区域与院内单病种质量控制平台
+
+**角色：技术负责人 | 2024.03 - 2025.07**
+
+- 负责院内上报区域、区域上报国家端的数据质控平台建设，在院内和区域侧对医疗数据进行多维质控。
+- 基于大模型实现质控规则生成与异常辅助分析，提高规则配置、问题识别和数据解读效率。
+- 引入 AI Agent 自动生成质控报告与数据解读，让平台具备“自动分析、自动总结、辅助决策”的能力。
+- 负责数据质控、数据上报、规则引擎、指标分析等核心模块设计和落地。
+
+**技术栈**：Spring AI、Spring Cloud、Redis、MongoDB、Elasticsearch
+
+### 国家单病种质量管理与控制平台
+
+**角色：技术负责人 | 2022.09 - 2025.07**
+
+- 设计支持“表单 + 接口”双模式的数据采集体系，适配不同医院信息化水平。
+- 基于 MongoDB 设计可扩展文档模型，应对复杂且频繁变化的医疗指标结构。
+- 使用 Elasticsearch 构建指标分析、质控报告和多维检索能力。
+- 主导平台性能优化与历史系统重构，将关键链路性能提升约 20 倍。
+
+**关键词**：分布式架构、数据治理、高并发、MongoDB、Elasticsearch、医疗质控
+
+### 医疗大数据中台（标签中心 & 用户画像）
+
+**角色：技术负责人 | 2020.10 - 2021.03**
+
+- 参与医疗大数据平台业务系统架构选型和设计，负责标签中心与用户画像系统整体研发。
+- 对接 Hadoop 相关组件，实现通过业务系统动态配置与调用大数据任务。
+- 实现 Oozie 任务调度、Hive 数据查询、用户数据筛选、标签计算和用户画像生成。
+- 沉淀标签体系和画像能力，为上层业务系统提供可复用的数据服务。
+
+**技术栈**：Spring Cloud、MyBatis-Plus、Redis、MongoDB、Hadoop、Hive、Oozie、Vue
+
+## 开源与个人项目
+
+### ClipMate Windows
+
+**GitHub**：[WinterChenS/Clipmate-windows](https://github.com/WinterChenS/Clipmate-windows)
+
+- 仿 macOS Paste 的 Windows 剪贴板管理器，基于 Tauri 2 + Rust + Vite 构建。
+- 支持全局快捷键、双布局模式、文本/图片/链接识别、智能搜索、Pin 固定、系统托盘、开机自启和单实例锁。
+- 使用 PNG 文件化存储替代 base64，显著降低图片剪贴板历史的内存占用；通过 MD5 指纹进行图片去重。
+- 具备桌面客户端工程能力，包括 Rust 后端命令、剪贴板监听、全局快捷键、安装包构建和跨平台 UI 体验设计。
+
+### ClipMate macOS
+
+**GitHub**：[WinterChenS/ClipMate](https://github.com/WinterChenS/ClipMate)
+
+- 高保真 macOS 剪贴板管理器，使用 Swift 6 + SwiftUI / AppKit 原生开发。
+- 支持实时剪贴板监听、文本/图片/文件/链接/富文本、FTS5 全文搜索、Pinboard、收藏夹、全局快捷键、敏感应用排除、偏好设置和 iCloud 同步。
+- 支持无需 Xcode 的命令行构建方式，可生成 Apple Silicon / Intel / Universal DMG。
+
+### 企业官网全栈项目
+
+**GitHub**：[WinterChenS/company-website](https://github.com/WinterChenS/company-website)
+
+- 完整企业级网站项目，采用 React 18 + TypeScript + Spring Boot 前后端分离架构。
+- 支持中英文国际化、多主题系统、响应式设计、SEO 优化、内容管理、案例管理、消息管理和站点配置。
+- 后端提供 RESTful API、JWT 认证、Spring Security 集成和内容管理能力。
+
+### 个人网站
+
+**GitHub**：[WinterChenS/personal-website](https://github.com/WinterChenS/personal-website)
+
+- 现代化个人网站，使用 React 18 + Spring Boot 3.2 + Java 21 构建。
+- 支持个人主页、博客文章、项目展示、响应式设计和管理后台。
+- 管理后台支持数据概览、文章管理、项目管理、技能管理和个人信息管理。
+
+### my-site
+
+**GitHub**：[WinterChenS/my-site](https://github.com/WinterChenS/my-site)
+
+- Docker + Spring Boot + MyBatis + Thymeleaf 实现的个人主页网站，GitHub 3k+ Star。
+- 项目风格简洁，适合新手学习和二次开发，具备良好的社区传播度。
+
+### trace-spring-boot
+
+**GitHub**：[WinterChenS/trace-spring-boot](https://github.com/WinterChenS/trace-spring-boot)
+
+- 基于 MDC 实现的 Java 日志链路追踪组件，封装为 Spring Boot Starter，开箱即用。
+- 支持 Dubbo、Feign、HTTP 调用等常见链路，并对 Hystrix 熔断组件提供支持。
+
+### delay-server
+
+**GitHub**：[WinterChenS/delay-server](https://github.com/WinterChenS/delay-server)
+
+- 基于 RabbitMQ 死信队列实现的延迟服务。
+- 设计为可扩展的公共延迟回调服务，强调消息可靠性与业务复用。
+
+## AI 使用与工程化实践
+
+- **日常 AI 编程工作流**：使用 Claude Code、Codex 进行需求澄清、方案对比、代码生成、重构、测试补充、Bug 定位和技术文档生成。
+- **Agent 项目搭建**：能够从前端对话 UI、后端 BFF、AI 服务、记忆存储、流式响应、工具调用、链路观测等维度搭建 AI Agent 项目。
+- **业务 AI 落地**：在医疗质控与在线问诊业务中，将大模型能力用于规则生成、异常分析、报告生成、满意度分析等场景。
+- **工程化意识**：关注模型调用稳定性、上下文管理、结构化输出、可观测性、权限边界、数据安全和持续迭代能力。
+- **团队赋能**：能够把 AI 工具引入研发流程，帮助团队提升需求拆解、编码、测试、文档和知识沉淀效率。
+
+## 社区影响力
+
+- GitHub：开源项目累计 3k+ Star。
+- CSDN：阅读量 151W+，粉丝 1.7K+。
+- 长期维护技术博客与开源项目，具备技术方案表达、开源项目运营和知识传播能力。
+
+## 教育背景
+
+### 南昌航空大学
+
+**本科 | 2011.09 - 2015.06**
+  </template>
+
+  <template id="md-fullstack">
+# 陈冬华
+
+**应聘方向：AI Agent 开发工程师 / 全栈开发工程师**  
+浙江杭州 | 9 年后端与分布式系统经验 | 本科 | 随时到岗  
+电话：15258800630 | 邮箱：winterchq@foxmail.com
+GitHub：[https://github.com/WinterChenS](https://github.com/WinterChenS)  
+个人网站：[https://blog.662661.xyz](https://blog.662661.xyz)  
+CSDN：[https://blog.csdn.net/Winter_chen001](https://blog.csdn.net/Winter_chen001)
+
+## 个人摘要
+
+9 年 Java / 分布式系统 / 医疗大数据平台研发经验，长期在一线负责复杂业务系统的架构设计、核心代码开发、性能治理和技术团队协作。曾担任医疗大数据公司技术负责人，主导国家卫健委相关国家级医疗质量平台、单病种质控平台、不良事件平台、脑血管监测与超声质控等多个大型系统的架构设计与核心研发。
+
+具备从 0 到 1 搭建平台、从历史系统中重构核心链路、将系统性能提升一个数量级以上的完整经验。擅长 Spring Cloud 微服务、高并发系统、MongoDB 文档模型、Elasticsearch 指标分析、Redis 缓存治理、数据中台与医疗数据治理。
+
+近年持续将 AI 工具和大模型能力引入真实研发与业务交付：日常使用 Claude Code、Codex 辅助需求拆解、领域建模、代码生成、重构、测试设计、文档沉淀与工程方案推演；具备 AI Agent、LangChain / LangGraph、RAG、流式对话、工具调用、长期记忆、链路观测等 AI 工程化项目经验，能够把 AI 从 Demo 推进到可维护、可部署、可迭代的业务系统。
+
+开源项目维护者，GitHub 开源项目累计 3k+ Star，CSDN 阅读量 150W+，具备较强的技术表达、方案沉淀和工程影响力。
+
+## 核心能力
+
+- **技术负责人能力**：系统架构设计、技术选型、核心模块研发、Code Review、技术规范建设、跨团队协作、交付风险控制。
+- **后端与分布式系统**：Spring Boot、Spring Cloud、WebFlux、MyBatis / MyBatis-Plus、Redis、RabbitMQ、Nacos、Apollo、Docker、Kubernetes。
+- **数据与中台架构**：医疗数据治理、指标体系设计、标签中心、用户画像、MongoDB 大规模文档模型、Elasticsearch 分析与搜索。
+- **性能与稳定性治理**：慢查询优化、缓存设计、JVM 调优、链路追踪、分布式事务、异步化改造、历史系统重构。
+- **AI 工程化与 Agent**：LLM 应用集成、AI Agent 架构、LangChain、LangGraph、RAG 场景实践、SSE 流式输出、PostgreSQL Checkpointer、LangSmith 链路观测。
+- **AI 辅助研发实践**：日常使用 Claude Code、Codex 进行需求分析、架构推演、代码生成、Bug 定位、测试补充、技术文档生成与项目脚手架搭建。
+- **全栈与客户端探索**：React、Vue、TypeScript、Tailwind CSS、SwiftUI/AppKit、Tauri、Rust、Golang、Python、GCP。
+
+## 技术栈
+
+| 分类 | 技术 |
+| --- | --- |
+| 后端 | Java 8-21、Spring Boot、Spring Cloud、WebFlux、MyBatis、MyBatis-Plus |
+| 数据库 / 搜索 | MySQL、MongoDB、Elasticsearch、PostgreSQL |
+| 中间件 | Redis、RabbitMQ、Kafka、Nacos、Apollo、MinIO |
+| AI / Agent | Claude Code、Codex、Spring AI、LangChain、LangGraph、RAG、LangSmith、FastAPI |
+| 前端 | React、Vue、TypeScript、Vite、Tailwind CSS、Ant Design |
+| 工程与运维 | Docker、Kubernetes、Linux、Maven、Git、CI/CD |
+| 其他 | Python、Golang、Rust、Swift、Tauri、GCP |
+
+## 工作经历
+
+### 万古恒信科技有限公司 | AI Agent 应用开发 / Java 后端
+
+**2025.12 - 至今 | 领克交付助手：经销商 4S 店车辆交付全流程管理应用**
+
+- 参与领克交付助手核心业务建设，围绕车辆交付计划、交付准备、资料校验、任务流转、异常处理与门店协同，构建经销商 4S 店车辆交付全流程管理应用。
+- 项目采用 DDD + COLA 架构，按领域模型拆分交付、车辆、客户、门店、流程等业务能力，提升系统扩展性、业务可理解性和代码可维护性。
+- 日常将 Claude Code 融入需求拆解、领域建模、代码生成、单测补齐、重构建议和 Code Review，形成 AI 辅助研发工作流，提升需求到交付的迭代效率。
+- 在近期项目中持续沉淀 AI Agent 应用模式，将大模型能力用于业务规则理解、数据质量检查、交付异常摘要和智能提示等场景。
+
+**技术栈**：Java、DDD、COLA、Claude Code、AI Agent
+
+### Mindful Health | 全栈开发
+
+**2025.07 - 2025.12 | 在线 ADHD 问诊与处方平台（海外业务）**
+
+- 负责在线问诊平台核心业务的前后端研发与系统稳定性保障，覆盖排班、预约、在线问诊、即时通信、处方相关模块。
+- 主导排班预约系统设计与落地，替代不稳定第三方方案，降低外部依赖风险、系统故障率和使用成本。
+- 参与用户满意度分析中的 AI 能力落地，将非结构化反馈转化为可分析、可追踪的业务指标。
+- 在日常研发中使用 Claude Code、Codex 辅助需求拆解、代码实现、测试补充和技术文档沉淀，提高迭代效率。
+
+**技术栈**：Java、React、GCP、AI Analysis
+
+### 医惠科技有限公司 | 技术总监 / 技术负责人
+
+**2020.10 - 2025.07 | 国家级医疗质量与安全平台**
+
+- 作为核心技术负责人，负责国家单病种、不良事件、脑血管监测、超声质控等多个国家级医疗质量系统的架构设计、核心研发和技术选型。
+- 构建统一 API 与数据模型，支撑院内、区域、国家三级数据上报体系，适配不同医院信息化水平和多源异构数据接入场景。
+- 主导历史系统架构重构与性能治理，解决复杂指标体系下的扩展性、查询性能和稳定性瓶颈。
+- 基于 MongoDB 设计高扩展文档模型，应对医疗指标频繁变化、表单结构复杂、质控规则动态调整等问题。
+- 使用 Elasticsearch 构建指标分析、质控报告、检索与多维统计能力，提升数据分析和报告生成效率。
+- 推动代码规范、Code Review、核心技术方案沉淀和组件化复用，降低后续项目交付成本。
+- 负责 AI 大模型在医疗质控与报告场景中的工程化落地，包括质控规则生成、异常辅助分析、质控报告自动生成与数据解读。
+
+**代表成果**
+
+- 单病种采集与质控系统性能提升约 20 倍，彻底解决核心页面卡顿、接口超时和数据分析慢的问题。
+- 平台稳定支撑多省市、数百家医院并发接入和持续上报。
+- 沉淀统一数据治理与指标体系，提高同类项目复用能力，降低后续交付成本。
+- 将 AI 能力嵌入真实业务链路，而不是停留在演示层面，推动大模型在质控报告和辅助分析场景中可用、可控、可维护。
+
+**技术栈**：Spring Boot、Spring Cloud、Spring AI、MongoDB、Redis、Elasticsearch、RabbitMQ、MinIO、Vue
+
+### 吉利控股集团 | Java 开发工程师
+
+**2018.01 - 2020.09 | 交易中台订单与支付系统**
+
+- 主导交易中台订单与支付模块设计开发，参与核心业务链路建模、接口设计和系统落地。
+- 使用 Saga 模式与 MQ 实现分布式事务，保障订单、支付、库存等链路的最终一致性。
+- 抽象多支付渠道接入架构，提高支付系统可扩展性和后续渠道接入效率。
+- 解决 Kubernetes 环境下滚动发布、日志链路追踪、JVM 调优等工程问题。
+- 优化报表 SQL 与索引设计，将核心查询耗时从约 2 分钟降低到约 10 秒。
+
+**技术栈**：Spring Cloud、MyBatis、MySQL、Redis、RabbitMQ、Docker、Kubernetes
+
+### 杭州三重奏科技有限公司 | Java 开发工程师
+
+**2017.03 - 2017.12 | SaaS 平台**
+
+- 负责 SaaS 平台业务代码开发和维护，独立编写定时任务服务处理报表数据，解决查询等待时间过长的问题。
+- 预研 Spring Boot 并推动在新项目中使用，减少繁杂配置，提高开发效率和业务交付速度。
+
+### 江西美和科技有限公司 | Java 开发工程师
+
+**2016.04 - 2017.02 | ERP 系统**
+
+- 负责 ERP 系统业务代码开发，使用缓存优化业务访问性能。
+- 参与系统重构，对面向对象设计、Java 数据结构、并发与阻塞场景有实际开发经验。
+
+## 精选项目经验
+
+### AI Chat / Agent 平台原型
+
+**GitHub**：[WinterChenS/winter-agent](https://github.com/WinterChenS/winter-agent)
+
+项目定位：智能对话系统与 AI Agent 平台原型，实现前端、后端、AI 服务的全链路流式对话、历史会话和可观测能力。
+
+- 设计前端、Java BFF、Python AI Service 三层架构，前端负责对话体验，后端负责接口代理与会话转发，AI 服务负责 Agent 编排。
+- 使用 React 18、Vite、TypeScript、Tailwind CSS 构建对话 UI，支持 Markdown 渲染、代码高亮、自动滚动和响应式布局。
+- 使用 Spring Boot 3 + WebFlux 实现非阻塞式流式接口转发，支持 SSE 流式对话。
+- 使用 FastAPI、LangChain、LangGraph 构建 AI 服务，结合 PostgreSQL Checkpointer 实现多轮对话历史记忆。
+- 引入 LangSmith 做链路观测和调试，便于分析 Agent 决策过程、上下文传递和响应质量。
+- 规划多工具集成、数据库查询、模型切换、用户认证和权限等后续能力，具备从 Agent Demo 走向平台化的演进思路。
+
+**技术栈**：React、TypeScript、Spring Boot 3、WebFlux、FastAPI、LangChain、LangGraph、PostgreSQL、Docker Compose
+
+### 区域与院内单病种质量控制平台
+
+**角色：技术负责人 | 2024.03 - 2025.07**
+
+- 负责院内上报区域、区域上报国家端的数据质控平台建设，在院内和区域侧对医疗数据进行多维质控。
+- 基于大模型实现质控规则生成与异常辅助分析，提高规则配置、问题识别和数据解读效率。
+- 引入 AI Agent 自动生成质控报告与数据解读，让平台具备“自动分析、自动总结、辅助决策”的能力。
+- 负责数据质控、数据上报、规则引擎、指标分析等核心模块设计和落地。
+
+**技术栈**：Spring AI、Spring Cloud、Redis、MongoDB、Elasticsearch
+
+### 国家单病种质量管理与控制平台
+
+**角色：技术负责人 | 2022.09 - 2025.07**
+
+- 设计支持“表单 + 接口”双模式的数据采集体系，适配不同医院信息化水平。
+- 基于 MongoDB 设计可扩展文档模型，应对复杂且频繁变化的医疗指标结构。
+- 使用 Elasticsearch 构建指标分析、质控报告和多维检索能力。
+- 主导平台性能优化与历史系统重构，将关键链路性能提升约 20 倍。
+
+**关键词**：分布式架构、数据治理、高并发、MongoDB、Elasticsearch、医疗质控
+
+### 医疗大数据中台（标签中心 & 用户画像）
+
+**角色：技术负责人 | 2020.10 - 2021.03**
+
+- 参与医疗大数据平台业务系统架构选型和设计，负责标签中心与用户画像系统整体研发。
+- 对接 Hadoop 相关组件，实现通过业务系统动态配置与调用大数据任务。
+- 实现 Oozie 任务调度、Hive 数据查询、用户数据筛选、标签计算和用户画像生成。
+- 沉淀标签体系和画像能力，为上层业务系统提供可复用的数据服务。
+
+**技术栈**：Spring Cloud、MyBatis-Plus、Redis、MongoDB、Hadoop、Hive、Oozie、Vue
+
+### 在线 ADHD 问诊与处方平台
+
+**角色：全栈工程师 | 2025.07 - 2025.12**
+
+- 负责在线问诊、排班预约、即时通信等核心业务模块开发。
+- 参与 AI 用户满意度分析能力建设，辅助业务侧理解用户反馈和服务质量。
+- 持续优化系统稳定性、接口性能和用户体验。
+
+**技术栈**：Java、React、GCP
+
+## 开源与个人项目
+
+### ClipMate Windows
+
+**GitHub**：[WinterChenS/Clipmate-windows](https://github.com/WinterChenS/Clipmate-windows)
+
+- 仿 macOS Paste 的 Windows 剪贴板管理器，基于 Tauri 2 + Rust + Vite 构建。
+- 支持全局快捷键、双布局模式、文本/图片/链接识别、智能搜索、Pin 固定、系统托盘、开机自启和单实例锁。
+- 使用 PNG 文件化存储替代 base64，显著降低图片剪贴板历史的内存占用；通过 MD5 指纹进行图片去重。
+- 具备桌面客户端工程能力，包括 Rust 后端命令、剪贴板监听、全局快捷键、安装包构建和跨平台 UI 体验设计。
+
+### ClipMate macOS
+
+**GitHub**：[WinterChenS/ClipMate](https://github.com/WinterChenS/ClipMate)
+
+- 高保真 macOS 剪贴板管理器，使用 Swift 6 + SwiftUI / AppKit 原生开发。
+- 支持实时剪贴板监听、文本/图片/文件/链接/富文本、FTS5 全文搜索、Pinboard、收藏夹、全局快捷键、敏感应用排除、偏好设置和 iCloud 同步。
+- 支持无需 Xcode 的命令行构建方式，可生成 Apple Silicon / Intel / Universal DMG。
+
+### 企业官网全栈项目
+
+**GitHub**：[WinterChenS/company-website](https://github.com/WinterChenS/company-website)
+
+- 完整企业级网站项目，采用 React 18 + TypeScript + Spring Boot 前后端分离架构。
+- 支持中英文国际化、多主题系统、响应式设计、SEO 优化、内容管理、案例管理、消息管理和站点配置。
+- 后端提供 RESTful API、JWT 认证、Spring Security 集成和内容管理能力。
+
+### 个人网站
+
+**GitHub**：[WinterChenS/personal-website](https://github.com/WinterChenS/personal-website)
+
+- 现代化个人网站，使用 React 18 + Spring Boot 3.2 + Java 21 构建。
+- 支持个人主页、博客文章、项目展示、响应式设计和管理后台。
+- 管理后台支持数据概览、文章管理、项目管理、技能管理和个人信息管理。
+
+### my-site
+
+**GitHub**：[WinterChenS/my-site](https://github.com/WinterChenS/my-site)
+
+- Docker + Spring Boot + MyBatis + Thymeleaf 实现的个人主页网站，GitHub 3k+ Star。
+- 项目风格简洁，适合新手学习和二次开发，具备良好的社区传播度。
+
+### trace-spring-boot
+
+**GitHub**：[WinterChenS/trace-spring-boot](https://github.com/WinterChenS/trace-spring-boot)
+
+- 基于 MDC 实现的 Java 日志链路追踪组件，封装为 Spring Boot Starter，开箱即用。
+- 支持 Dubbo、Feign、HTTP 调用等常见链路，并对 Hystrix 熔断组件提供支持。
+
+### delay-server
+
+**GitHub**：[WinterChenS/delay-server](https://github.com/WinterChenS/delay-server)
+
+- 基于 RabbitMQ 死信队列实现的延迟服务。
+- 设计为可扩展的公共延迟回调服务，强调消息可靠性与业务复用。
+
+## AI 使用与工程化实践
+
+- **日常 AI 编程工作流**：使用 Claude Code、Codex 进行需求澄清、方案对比、代码生成、重构、测试补充、Bug 定位和技术文档生成。
+- **Agent 项目搭建**：能够从前端对话 UI、后端 BFF、AI 服务、记忆存储、流式响应、工具调用、链路观测等维度搭建 AI Agent 项目。
+- **业务 AI 落地**：在医疗质控与在线问诊业务中，将大模型能力用于规则生成、异常分析、报告生成、满意度分析等场景。
+- **工程化意识**：关注模型调用稳定性、上下文管理、结构化输出、可观测性、权限边界、数据安全和持续迭代能力。
+- **团队赋能**：能够把 AI 工具引入研发流程，帮助团队提升需求拆解、编码、测试、文档和知识沉淀效率。
+
+## 社区影响力
+
+- GitHub：开源项目累计 3k+ Star。
+- CSDN：阅读量 151W+，粉丝 1.7K+。
+- 长期维护技术博客与开源项目，具备技术方案表达、开源项目运营和知识传播能力。
+
+## 教育背景
+
+### 南昌航空大学
+
+**本科 | 2011.09 - 2015.06**
+  </template>
+
+  <script>
+    const resumes = {
+      lead: {
+        button: document.querySelector('[data-switch="lead"]'),
+        article: document.getElementById("resume-lead"),
+        markdown: document.getElementById("md-lead").innerHTML.trim(),
+        title: "陈冬华-杭州-技术负责人"
+      },
+      fullstack: {
+        button: document.querySelector('[data-switch="fullstack"]'),
+        article: document.getElementById("resume-fullstack"),
+        markdown: document.getElementById("md-fullstack").innerHTML.trim(),
+        title: "陈冬华-杭州-全栈开发"
+      }
+    };
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function inlineMarkdown(value) {
+      return escapeHtml(value)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/：/g, "：")
+        .replace(/([^!])\[([^\]]+)\]\(([^)]+)\)/g, '$1<a href="$3" target="_blank" rel="noreferrer">$2</a>');
+    }
+
+    function parseTable(lines, start) {
+      const rows = [];
+      let index = start;
+      while (index < lines.length && /^\s*\|.+\|\s*$/.test(lines[index])) {
+        rows.push(lines[index].trim());
+        index += 1;
+      }
+
+      if (rows.length < 2 || !/^\|\s*:?-{3,}:?\s*\|/.test(rows[1])) {
+        return null;
+      }
+
+      const cells = row => row
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map(cell => inlineMarkdown(cell.trim()));
+
+      const head = cells(rows[0]);
+      const body = rows.slice(2).map(cells);
+      const html = [
+        "<table>",
+        "<thead><tr>",
+        ...head.map(cell => `<th>${cell}</th>`),
+        "</tr></thead>",
+        "<tbody>",
+        ...body.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>`),
+        "</tbody></table>"
+      ].join("");
+
+      return { html, next: index };
+    }
+
+    function parseMarkdown(markdown) {
+      const lines = markdown.split(/\r?\n/);
+      const parts = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const raw = lines[i];
+        const line = raw.trim();
+
+        if (!line) {
+          i += 1;
+          continue;
+        }
+
+        const table = parseTable(lines, i);
+        if (table) {
+          parts.push(table.html);
+          i = table.next;
+          continue;
+        }
+
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          const level = heading[1].length;
+          parts.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+          i += 1;
+          continue;
+        }
+
+        if (/^-\s+/.test(line)) {
+          const items = [];
+          while (i < lines.length && /^-\s+/.test(lines[i].trim())) {
+            items.push(`<li>${inlineMarkdown(lines[i].trim().replace(/^-\s+/, ""))}</li>`);
+            i += 1;
+          }
+          parts.push(`<ul>${items.join("")}</ul>`);
+          continue;
+        }
+
+        parts.push(`<p>${inlineMarkdown(line.replace(/\s{2,}$/, ""))}</p>`);
+        i += 1;
+      }
+
+      return parts.join("\n");
+    }
+
+    function activate(kind) {
+      Object.entries(resumes).forEach(([key, resume]) => {
+        const active = key === kind;
+        resume.article.classList.toggle("active", active);
+        resume.button.setAttribute("aria-pressed", String(active));
+        if (active) {
+          document.title = resume.title;
+          localStorage.setItem("preferred-resume", kind);
+        }
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    Object.values(resumes).forEach(resume => {
+      resume.article.innerHTML = parseMarkdown(resume.markdown);
+    });
+
+    document.querySelectorAll("[data-switch]").forEach(button => {
+      button.addEventListener("click", () => activate(button.dataset.switch));
+    });
+
+    document.getElementById("printBtn").addEventListener("click", () => {
+      window.print();
+    });
+
+    activate(localStorage.getItem("preferred-resume") || "lead");
+  </script>
+</body>
+</html>

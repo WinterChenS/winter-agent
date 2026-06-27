@@ -9,6 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from tools.base import BaseTool, ToolResult
+from tools.schema import tool, ToolSchema
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ _ARTICLE_SELECTORS = [
 ]
 
 
+@tool
 class BrowserUseTool(BaseTool):
     name = "browser"
     description = (
@@ -63,6 +65,23 @@ class BrowserUseTool(BaseTool):
         },
         "required": ["url"],
     }
+    schema: ToolSchema = ToolSchema(
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The full URL of the web page to visit and extract content from",
+                },
+                "extract_mode": {
+                    "type": "string",
+                    "enum": ["article", "full"],
+                    "description": "Extraction mode: 'article' tries to find the main content (default), 'full' extracts all visible text",
+                },
+            },
+            "required": ["url"],
+        },
+    )
 
     async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
         url = str(input_payload.get("url") or input_payload.get("query") or "").strip()

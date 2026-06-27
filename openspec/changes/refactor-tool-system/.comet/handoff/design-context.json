@@ -1,0 +1,17 @@
+{
+  "change": "refactor-tool-system",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "ff828e927fa6d59e2e3597a1d2246eb2f2a625bfbc125dda6d6a5900ddf6031d",
+  "files": [
+    { "path": "openspec/changes/refactor-tool-system/proposal.md", "sha256": "134ba78c24136f13d2de9cde14abd2fd0823e31790126245062cc19ffc603df6" },
+    { "path": "openspec/changes/refactor-tool-system/design.md", "sha256": "982e421993ce8060822b4e3674812119b9cd2edcadcd996c2eb1efabcba65c88" },
+    { "path": "openspec/changes/refactor-tool-system/tasks.md", "sha256": "59161d0a784ddce804cae53c4b506579b87b6724601092d8f885bf4d13844c1c" },
+    { "path": "openspec/changes/refactor-tool-system/specs/code-sandbox/spec.md", "sha256": "0d997b51ae6b681342c1e0de7f121d31b0498e1e09d1faa0cfad66eb75865b02" },
+    { "path": "openspec/changes/refactor-tool-system/specs/parallel-tool-execution/spec.md", "sha256": "921cfcdad70a5c11c8075a105c46f157d0c3a0f2e33505a3b8dc3cb78ab13bb1" },
+    { "path": "openspec/changes/refactor-tool-system/specs/tool-auto-discovery/spec.md", "sha256": "74756bec3d011ebdf138998b921c0a8a6ad89ea069cf0bcb3fa28fa8a303754f" },
+    { "path": "openspec/changes/refactor-tool-system/specs/tool-schema-standard/spec.md", "sha256": "559924c1b4651ff8e8ed7582a7dd1a5d39aad706dbdf9795ef79af78cadd2a1c" }
+  ]
+}

@@ -15,3 +15,8 @@ tavily-python>=0.7.24
 pytz>=2026.2
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
+
+# Code sandbox — required by CodeSandboxTool for data analysis workloads
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0

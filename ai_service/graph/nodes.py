@@ -33,8 +33,8 @@ You are a ReAct agent. Your response MUST be a single valid JSON object.
 
 CRITICAL: Output ONLY the JSON object. No markdown wrapping, no explanation.
 
-Tool call format:
-{"action":"tool","tool":"<name>","query":"<query>"}
+Tool call (single): {"action":"tool","tool":"<name>","query":"<query>"}
+Tool call (parallel): {"actions":[{"tool":"...","query":"..."}, ...]} — max 3
 
 Final answer ready (data collection complete):
 {"action":"final_answer"}
@@ -50,6 +50,7 @@ Rules:
 3. After search returns results, open at least one URL with browser to read the actual content.
 4. If browser returns an error, use search snippets directly — do NOT retry browser.
 5. Call final_answer ONLY after you have collected evidence via tools. If you haven't used any tools, do NOT output final_answer.
+6. Use parallel format when you need multiple independent pieces of information at the same time.
 """
 
 
@@ -192,9 +193,54 @@ async def agent_node(state: State) -> dict:
         logger.warning("agent_node: JSON parse failed, forcing final answer: %s", e)
         return _force_final_answer(state, tool_result)
 
+    # 4a. Handle parallel tool calls (new format)
+    if "actions" in parsed and isinstance(parsed["actions"], list):
+        actions = parsed["actions"][:3]
+        if not actions:
+            return _force_final_answer(state, tool_result)
+
+        # Guard: max iterations
+        if current_iteration >= MAX_ITERATIONS:
+            reason = _reason_record("agent_node", "MAX_ITERATIONS_REACHED",
+                f"Iteration limit ({MAX_ITERATIONS}) reached; forcing final answer.")
+            return _force_final_answer(state, tool_result, reason)
+
+        first_tool_name = str(actions[0].get("tool", "")).strip().lower()
+        if not first_tool_name:
+            return _force_final_answer(state, tool_result)
+
+        # Count consecutive searches from all parallel actions
+        consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+        parallel_search_count = sum(1 for a in actions if str(a.get("tool", "")).strip().lower() == "search")
+        next_consecutive = consecutive_search_count + parallel_search_count if parallel_search_count > 0 else 0
+
+        # Guard: max consecutive search
+        max_search = _max_consecutive_search_calls()
+        search_extra = {"parallel_search_count": parallel_search_count, "consecutive_search_count": next_consecutive, "limit": max_search}
+        if parallel_search_count > 0 and next_consecutive > max_search:
+            reason = _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
+                f"Consecutive search limit ({max_search}) reached in parallel call; forcing final answer.",
+                extra=search_extra)
+            return _force_final_answer(state, tool_result, reason)
+
+        reason = _reason_record("agent_node", "PARALLEL_TOOL_CALL",
+            f"Parallel tool call: {len(actions)} tools",
+            extra={"tools": [a.get("tool") for a in actions]})
+        return {
+            "current_tool": first_tool_name,
+            "tool_input": {"actions": actions},
+            "tool_result": None,
+            "iteration_count": current_iteration + 1,
+            "last_tool_name": first_tool_name,
+            "last_tool_query": str(actions[0].get("query", "")).strip(),
+            "consecutive_search_count": next_consecutive,
+            "reasoning_steps": _append_reason(state, reason),
+            "route": "tool",
+        }
+
     action = str(parsed.get("action", "")).strip().lower()
 
-    # 4. Handle tool call
+    # 4b. Handle tool call
     if action == "tool":
         tool_name = str(parsed.get("tool", "")).strip().lower()
         query = str(parsed.get("query", "")).strip()
@@ -289,11 +335,186 @@ async def agent_node(state: State) -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# _execute_single_tool：执行单个工具并返回结果 + 计时元数据
+# ────────────────────────────────────────────────────────────────────────────
+async def _execute_single_tool(
+    tool_name: str,
+    tool_input: dict,
+    gate: PolicyGate,
+    context: PolicyContext,
+) -> dict:
+    """Execute a single tool, return dict with 'result', 'elapsed_ms', 'status', 'error_msg'."""
+    call = CapabilityCall(capability_name=tool_name, input_payload=tool_input)
+    step_start = time.time()
+
+    decision = gate.evaluate(call, context=context)
+    if decision.action != "allow":
+        return {
+            "result": {
+                "ok": False,
+                "error": {
+                    "code": decision.code or "POLICY_DENIED",
+                    "message": decision.reason or "Blocked by policy gate",
+                    "retryable": False,
+                },
+            },
+            "elapsed_ms": int((time.time() - step_start) * 1000),
+            "status": "error",
+            "error_msg": decision.reason or decision.code,
+        }
+
+    registry = get_tool_registry()
+    if not registry:
+        return {
+            "result": {"ok": False, "error": {"code": "REGISTRY_NOT_READY", "message": "ToolRegistry not initialized"}},
+            "elapsed_ms": int((time.time() - step_start) * 1000),
+            "status": "error",
+            "error_msg": "ToolRegistry not initialized",
+        }
+
+    try:
+        timeout_ms = gate.timeout_override_ms
+        if timeout_ms and timeout_ms > 0:
+            result = await asyncio.wait_for(
+                registry.invoke_capability(call),
+                timeout=timeout_ms / 1000,
+            )
+        else:
+            result = await registry.invoke_capability(call)
+    except asyncio.TimeoutError:
+        result = {
+            "ok": False,
+            "error": {"code": "TOOL_TIMEOUT", "message": "tool invocation timeout", "retryable": True},
+        }
+    except Exception as exc:
+        logger.exception("tool execution failed for tool=%s", tool_name)
+        result = {
+            "ok": False,
+            "error": {
+                "code": "TOOL_INVOKE_EXCEPTION",
+                "message": f"tool invoke exception: {str(exc)[:200]}",
+                "retryable": False,
+            },
+        }
+
+    elapsed_ms = int((time.time() - step_start) * 1000)
+    ok = bool(result.get("ok", False))
+    status = "completed" if ok else "error"
+    error_msg = _error_text(result.get("error")) if not ok else None
+    return {"result": result, "elapsed_ms": elapsed_ms, "status": status, "error_msg": error_msg}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# _parallel_tool_execution：并行执行多个工具并合并结果
+# ────────────────────────────────────────────────────────────────────────────
+async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
+    """Execute all tools in ``actions`` concurrently and merge results."""
+    # Guard: remaining iterations must cover parallel actions
+    current_iteration = int(state.get("iteration_count", 0) or 0)
+    remaining = MAX_ITERATIONS - current_iteration
+    if len(actions) > remaining:
+        logger.warning(
+            "_parallel_tool_execution: %d parallel tools exceed remaining %d iterations; truncating to %d",
+            len(actions), remaining, remaining,
+        )
+        actions = actions[:remaining]
+        if not actions:
+            result_str = json.dumps({
+                "ok": False,
+                "error": {"code": "ITERATION_BUDGET_EXCEEDED", "message": "No remaining iterations for parallel execution", "retryable": False},
+            }, ensure_ascii=False)
+            return {
+                "tool_result": result_str,
+                "tool_steps": state.get("tool_steps", []),
+                "current_tool": None,
+                "tool_input": None,
+                "last_tool_name": None,
+                "last_tool_query": None,
+                "reasoning_steps": state.get("reasoning_steps", []),
+                "route": "agent",
+            }
+
+    gate = _build_policy_gate()
+    context = PolicyContext(
+        conversation_id=str(state.get("conversation_id") or ""),
+        agent_id=str(state.get("active_agent") or "agent.main"),
+    )
+
+    raw_results = await asyncio.gather(
+        *[_execute_single_tool(
+            str(a.get("tool", "")).strip().lower(),
+            {"query": a.get("query", "")},
+            gate,
+            context,
+        ) for a in actions],
+        return_exceptions=True,
+    )
+
+    results = []
+    new_steps = list(state.get("tool_steps", []))
+    reasoning_msgs = []
+
+    for i, action in enumerate(actions):
+        raw = raw_results[i]
+        if isinstance(raw, BaseException):
+            result = {
+                "ok": False,
+                "error": {"code": "PARALLEL_EXCEPTION", "message": str(raw)[:200], "retryable": False},
+            }
+            elapsed_ms = 0
+            status = "error"
+            error_msg = str(raw)[:200]
+        else:
+            result = raw["result"]
+            elapsed_ms = raw["elapsed_ms"]
+            status = raw["status"]
+            error_msg = raw.get("error_msg")
+
+        results.append(result)
+
+        tool_name = str(action.get("tool", "")).strip().lower()
+        step_record = normalize_tool_step_record(
+            tool_name=tool_name,
+            tool_input=action,
+            status=status,
+            elapsed_ms=elapsed_ms,
+            timestamp=time.time(),
+            error=error_msg,
+        )
+        new_steps.append(step_record)
+
+        if status == "completed":
+            reasoning_msgs.append(f"[tool_node] Tool '{tool_name}' executed successfully.")
+        else:
+            reasoning_msgs.append(f"[tool_node] Tool '{tool_name}' returned error: {error_msg}")
+
+    merged = {"parallel": True, "results": results}
+    result_str = json.dumps(merged, ensure_ascii=False)
+
+    return {
+        "tool_result": result_str,
+        "tool_steps": new_steps,
+        "current_tool": None,
+        "tool_input": None,
+        "last_tool_name": None,
+        "last_tool_query": None,
+        "reasoning_steps": state.get("reasoning_steps", []) + reasoning_msgs,
+        "route": "agent",
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # tool_node：工具执行节点
 # ────────────────────────────────────────────────────────────────────────────
 async def tool_node(state: State) -> dict:
-    tool_name = state.get("current_tool") or ""
     tool_input = state.get("tool_input") or {}
+
+    # ── Parallel execution path ──
+    if "actions" in tool_input:
+        return await _parallel_tool_execution(state, tool_input["actions"])
+
+    # ── Single-tool execution path (unchanged) ──
+    tool_name = state.get("current_tool") or ""
     start_time = time.time()
     gate = _build_policy_gate()
     call = CapabilityCall(capability_name=tool_name, input_payload=tool_input)
@@ -322,7 +543,7 @@ async def tool_node(state: State) -> dict:
     else:
         registry = get_tool_registry()
         if not registry:
-            result = {"ok": False, "error": "ToolRegistry not initialized", "code": "REGISTRY_NOT_READY"}
+            result = {"ok": False, "error": {"code": "REGISTRY_NOT_READY", "message": "ToolRegistry not initialized"}}
             result_str = json.dumps(result, ensure_ascii=False)
             step = f"[tool_node] ERROR: registry not available, skipped '{tool_name}'"
             status = "error"
