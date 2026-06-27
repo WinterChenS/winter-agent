@@ -21,6 +21,7 @@ export interface Message {
   conversationId?: string;
   createdAt?: number;
   images?: Record<string, string>;  // filename → url
+  charts?: Record<string, unknown>[];  // ChartSpec array
 }
 
 // Keep old types for backward compat with Sidebar/system components
