@@ -6,6 +6,7 @@ export function MessageList() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
+  const [contentOverflows, setContentOverflows] = useState(false);
   const isSending = useChatStore((s) => s.isSending);
 
   const messageOrder = useChatStore((s) => s.messageOrder);
@@ -30,12 +31,12 @@ export function MessageList() {
   }, []);
 
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-    const d =
-      scrollRef.current.scrollHeight -
-      scrollRef.current.scrollTop -
-      scrollRef.current.clientHeight;
-    setUserScrolledUp(d >= 64);
+    const el = scrollRef.current;
+    if (!el) return;
+    const d = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const overflows = el.scrollHeight > el.clientHeight + 10;
+    setContentOverflows(overflows);
+    setUserScrolledUp(overflows && d >= 64);
   }, []);
 
   // Auto-scroll: scroll to bottom when new messages arrive and user is at bottom
@@ -69,13 +70,13 @@ export function MessageList() {
         <MessageBubble key={msg.id} message={msg} />
       ))}
       <div ref={bottomRef} />
-      {userScrolledUp && (
+      {userScrolledUp && contentOverflows && (
         <button
           onClick={() => {
             scrollToBottom(true);
             setUserScrolledUp(false);
           }}
-          className="sticky bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors z-10"
+          className="fixed bottom-28 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors z-50"
         >
           ↓ 回到底部
         </button>
