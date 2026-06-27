@@ -164,6 +164,24 @@ async def stream_generate(request: GenerateRequest):
 
         event_ctx = EventMapContext(trace_ctx=trace_ctx, known_tools=_tool_names())
         try:
+            # Persist user message to database (both mock and real modes)
+            try:
+                pool_user = get_pool()
+                if pool_user:
+                    from db.chat_message_repository import save_message as _save_msg
+                    user_msg_id = str(uuid.uuid4())
+                    asyncio.create_task(_save_msg(pool_user, {
+                        "id": user_msg_id,
+                        "conversation_id": trace_ctx.conversation_id,
+                        "role": "user",
+                        "content": request.message,
+                        "toolCalls": [],
+                        "status": "done",
+                        "agentId": active_agent,
+                    }))
+            except (ImportError, Exception):
+                pass
+
             if not settings.api_key:
                 # Simulated tool call for UI demonstration
                 tc_id = uuid.uuid4().hex[:12]
@@ -274,25 +292,6 @@ async def stream_generate(request: GenerateRequest):
 
                 graph_task = asyncio.create_task(graph_runner())
                 bus_task = asyncio.create_task(bus_runner())
-
-                # Persist user message to database
-                try:
-                    pool_user = get_pool()
-                    if pool_user:
-                        from db.chat_message_repository import save_message as save_msg
-                        user_msg_id = str(uuid.uuid4())
-                        user_msg_dict = {
-                            "id": user_msg_id,
-                            "conversation_id": trace_ctx.conversation_id,
-                            "role": "user",
-                            "content": request.message,
-                            "toolCalls": [],
-                            "status": "done",
-                            "agentId": active_agent,
-                        }
-                        asyncio.create_task(save_msg(pool_user, user_msg_dict))
-                except (ImportError, Exception):
-                    pass
 
                 graph_done_flag = False
                 bus_done_flag = False

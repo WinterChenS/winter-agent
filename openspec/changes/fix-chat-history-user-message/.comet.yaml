@@ -13,8 +13,8 @@ base_ref: fbc7e5812bdca4e92a629803ab729f9d8d60b90a
 design_doc: null
 plan: null
 verify_result: pending
-verification_report: null
-branch_status: pending
+verification_report: docs/superpowers/reports/2026-06-28-fix-chat-history-user-message-verify.md
+branch_status: handled
 created_at: 2026-06-27
 verified_at: null
 archived: false
