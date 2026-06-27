@@ -7,6 +7,9 @@ import os
 from functools import lru_cache
 from typing import Any, Mapping
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from tavily import TavilyClient
 
 from tools.base import BaseTool, ToolResult
@@ -132,6 +135,8 @@ class SearchTool(BaseTool):
         try:
             logger.debug(f"Executing web search for query: {query}")
             client = TavilyClient(api_key=api_key)
+            # Disable SSL verification for internal networks
+            client._session.verify = False
 
             # TavilyClient.search is sync, run in a worker thread with timeout
             raw_result = await asyncio.wait_for(
