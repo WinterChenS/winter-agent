@@ -7,6 +7,21 @@ from typing import Any
 from psycopg_pool import AsyncConnectionPool
 
 
+def _parse_tool_calls(value: Any) -> list[dict[str, Any]] | None:
+    """Parse tool_calls from DB row. psycopg auto-deserializes JSONB to list,
+    but legacy rows may have plain JSON strings or NULL."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return None
+
+
 async def save_message(pool: AsyncConnectionPool, message: dict[str, Any]) -> None:
     """Async insert a completed message into chat_messages table."""
     sql = """
@@ -59,7 +74,7 @@ async def get_messages_by_conversation(
             "role": row[2],
             "content": row[3],
             "reasoning": row[4],
-            "toolCalls": json.loads(row[5]) if row[5] else None,
+            "toolCalls": _parse_tool_calls(row[5]),
             "status": row[6],
             "agentId": row[7],
             "createdAt": int(row[8]) if row[8] else None,
