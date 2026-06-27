@@ -76,20 +76,21 @@ async def collaboration_node(state: State, *, engine: CollaborationEngine) -> di
 
 
 async def merge_node(state: State) -> dict:
-    """Merge collaboration result into messages for the downstream pipeline."""
+    """Merge collaboration result into messages for the downstream pipeline.
+    Skip chart_planner when we have a result — go directly to answer for streaming."""
     collab_result = state.get("collab_result")
     if collab_result:
         return {
             "messages": [HumanMessage(content=collab_result)],
-            "route": "chart_planner",
+            "route": "answer",
         }
-    return {"route": "chart_planner"}
+    return {"route": "answer"}
 
 
 def _route_from_router(state: State) -> str:
     agents = state.get("selected_agents", [])
     if not agents:
-        return "chart_planner"  # Skip to existing pipeline
+        return "answer"  # No agents → answer directly
     return "factory"
 
 
@@ -103,7 +104,8 @@ def _route_from_collaboration(state: State) -> str:
 
 
 def _route_from_merge(state: State) -> str:
-    return state.get("route", "chart_planner")
+    route = state.get("route", "answer")
+    return route if route in ("chart_planner", "answer") else "answer"
 
 
 def create_multi_agent_graph(
@@ -131,6 +133,7 @@ def create_multi_agent_graph(
         _route_from_router,
         {
             "factory": "factory",
+            "answer": "answer",
             "chart_planner": "chart_planner",
         },
     )
@@ -158,10 +161,13 @@ def create_multi_agent_graph(
         _route_from_merge,
         {
             "chart_planner": "chart_planner",
+            "answer": "answer",
         },
     )
 
     workflow.add_edge("chart_planner", "answer")
+    workflow.add_edge("answer", END)
+    # Direct path: router → answer (skip chart_planner when no agents matched)
     workflow.add_edge("answer", END)
 
     return workflow.compile(checkpointer=checkpointer)
