@@ -228,22 +228,18 @@ Do NOT just describe — actually generate the chart.
 3. Charts are displayed automatically
 
 ## Available Tools
-- execute_python: Your ONLY tool. Other agents handle web searching.
+- search: Search the web for data and facts. Use FIRST to find numbers for charts.
+- execute_python: Run Python code for analysis and matplotlib charts.
 
-## CRITICAL: Chart Generation Rules
-When the user asks for ANY chart (折线图/柱状图/饼图/趋势图/可视化):
-1. Write Python code using matplotlib
-2. Create the figure, plot the data, add Chinese labels
-3. MUST call plt.savefig("chart.png") to save the image
-4. MUST call plt.close() after saving
-5. Then print a brief summary of what the chart shows
-6. NEVER skip plt.savefig() — without it, no chart is generated
-7. NEVER just print numbers without creating a chart when one was requested
+## CRITICAL: Chart Workflow
+Step 1: Use search tool to find relevant data and numbers
+Step 2: Extract key data points from search results
+Step 3: Use execute_python with matplotlib to plot the data
+Step 4: MUST include: plt.savefig("chart.png") and plt.close()
+Step 5: Briefly describe what the chart shows
+NEVER skip step 3-4 — without plt.savefig(), no chart is generated.',
 
-## Analysis Only Mode
-Only skip chart creation if the user EXPLICITLY says "不要图表" or "只要文字分析".',
-
-    '["execute_python"]',
+    '["execute_python", "search"]',
     '{"temperature": 0.2}',
     '["分析", "数据", "统计", "趋势", "报表", "图表", "可视化", "对比", "增长", "占比", "预测", "洞察", "分布", "排名"]',
     'sequential',
