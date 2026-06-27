@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -123,11 +124,18 @@ class CollaborationEngine:
                 for filename, url in images.items():
                     self._emit("image.uploaded", filename=filename, url=url)
                     final_output = final_output.replace(filename, url)
-                    import re
                     final_output = re.sub(
                         rf'https?://[^\s)]*{re.escape(filename)}', url,
                         final_output
                     )
+                # Strip any remaining localhost image URLs that weren't uploaded
+                final_output = re.sub(
+                    r'https?://localhost[^\s)]*\.(?:png|jpg|jpeg|gif|svg)', '',
+                    final_output
+                )
+                final_output = re.sub(
+                    r'!\[.*?\]\([^)]*localhost[^)]*\)', '', final_output
+                )
                 return {
                     "agent": agent_name,
                     "status": "ok",
