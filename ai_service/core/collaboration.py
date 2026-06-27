@@ -185,16 +185,16 @@ class CollaborationEngine:
                 })
                 messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
 
-        # Max rounds reached
-        elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
-        self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
-        last_response = response if 'response' in dir() else None
-        return {
-            "agent": agent_name,
-            "status": "ok",
-            "output": str(last_response.content).strip() if last_response else "",
-            "tool_calls": tool_call_history,
-        }
+            # Max rounds reached
+            elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+            self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+            last_response = response if 'response' in dir() else None
+            return {
+                "agent": agent_name,
+                "status": "ok",
+                "output": str(last_response.content).strip() if last_response else "",
+                "tool_calls": tool_call_history,
+            }
         except Exception as e:
             elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
             self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
