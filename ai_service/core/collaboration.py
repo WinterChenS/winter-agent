@@ -128,6 +128,12 @@ class CollaborationEngine:
                 images = self._scan_and_upload_images(final_output)
                 for filename, url in images.items():
                     self._emit("image.uploaded", filename=filename, url=url)
+                    final_output = final_output.replace(filename, url)
+                    import re
+                    final_output = re.sub(
+                        rf'https?://[^\s)]*{re.escape(filename)}', url,
+                        final_output
+                    )
                 return {
                     "agent": agent_name,
                     "status": "ok",
