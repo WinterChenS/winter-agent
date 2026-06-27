@@ -137,14 +137,18 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
         for match in re.finditer(pattern, output_text, re.IGNORECASE):
             found_files.add(match.group(1))
 
-    # Also scan both directories for recently created .png files
+    # Also scan for recently created .png files (regardless of output text)
     try:
+        import time as _time
+        now = _time.time()
         for root_dir in (WORKSPACE_ROOT, PROJECT_ROOT):
             for p in root_dir.glob("*.png"):
-                if p.name not in found_files:
+                fp = str(p)
+                if fp not in found_files:
                     mtime = p.stat().st_mtime
-                    if (__import__("time").time() - mtime) < 120:
-                        found_files.add(str(p))  # Full path
+                    if (now - mtime) < 300:  # 5 min window
+                        found_files.add(fp)
+                        logger.info("Found recent PNG: %s (age=%ds)", p.name, int(now - mtime))
     except Exception:
         pass
 
