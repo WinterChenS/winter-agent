@@ -52,11 +52,7 @@ from domain.event_envelope import (
     envelope_token,
     to_sse_data,
 )
-from graph.graph import create_agent_graph
-from graph.multi_agent_graph import create_multi_agent_graph
-from core.router_agent import RouterAgent
-from core.agent_factory import AgentFactory
-from core.collaboration import CollaborationEngine
+from graph.multi_agent_graph import create_plan_execute_graph
 from core.runtime import get_checkpointer, get_tool_registry, get_agent_repository, get_pool
 from observability.trace import ensure_trace_context
 
@@ -68,8 +64,8 @@ def _sanitize_delta(text: str) -> str:
     # Strip localhost image URLs (any extension)
     text = re.sub(r'https?://localhost[^\s)]*', '', text)
     text = re.sub(r'!\[.*?\]\([^)]*localhost[^)]*\)', '', text)
-    # Strip markdown image syntax with local paths
-    text = re.sub(r'!\[.*?\]\([^)]*\.(?:png|jpg|jpeg|gif|svg)\)', '', text)
+    # Strip markdown image syntax with local paths only (NOT http/https URLs)
+    text = re.sub(r'!\[.*?\]\((?!https?://)[^)]*\.(?:png|jpg|jpeg|gif|svg)\)', '', text)
     # Strip ```python code blocks (opening tag through closing tag)
     text = re.sub(r'```python\s*\n.*?\n```', '', text, flags=re.DOTALL)
     return text
@@ -194,20 +190,14 @@ async def stream_generate(request: GenerateRequest):
             else:
                 checkpointer = get_checkpointer()
 
-                # ── Multi-Agent Graph with Real-Time Streaming ────────────
+                # ── Plan-Execute-Compose Graph with Event Bus ────────────
                 from core.streaming_event_bus import StreamingEventBus
-
                 event_bus = StreamingEventBus()
-                agent_repo = get_agent_repository()
-                router = RouterAgent(repository=agent_repo)
-                factory = AgentFactory()
-                engine = CollaborationEngine(event_bus=event_bus)
-                graph = create_multi_agent_graph(
-                    router=router, factory=factory, engine=engine,
-                    checkpointer=checkpointer, event_bus=event_bus,
-                )
+                graph = create_plan_execute_graph(checkpointer=checkpointer, event_bus=event_bus)
 
-                logging.info("[CHAT] streaming multi-agent graph with event bus")
+                logging.info("[CHAT] streaming plan-execute-compose graph")
+                logging.info("[CHAT] request: message_id=%s agent_id=%s query='%s'",
+                             message_id, active_agent, request.message[:100])
 
                 inputs = {
                     "messages": [HumanMessage(content=request.message)],
@@ -216,6 +206,12 @@ async def stream_generate(request: GenerateRequest):
                     "chart_specs": [],
                     "blocks": [],
                     "route": "start",
+                    # Plan-Execute-Compose state defaults
+                    "execution_plan": None,
+                    "execution_results": [],
+                    "artifacts": [],
+                    "current_plan_step": 0,
+                    "plan_phase": "planning",
                 }
 
                 thread_id = trace_ctx.conversation_id
@@ -243,6 +239,10 @@ async def stream_generate(request: GenerateRequest):
                             if captured is not None:
                                 nonlocal final_state
                                 final_state = captured
+                                logging.info("[CHAT] final_state captured: plan_phase=%s, execution_results=%d, artifacts=%d",
+                                             captured.get("plan_phase", "?"),
+                                             len(captured.get("execution_results", [])),
+                                             len(captured.get("artifacts", [])))
                             for envelope in mapped:
                                 if envelope.get("type") == "message.delta":
                                     nonlocal assistant_text_emitted
@@ -285,7 +285,7 @@ async def stream_generate(request: GenerateRequest):
 
                     if source == "graph_done":
                         graph_done_flag = True
-                        event_bus.close()  # Signal bus_runner to stop
+                        event_bus.close()
                     elif source == "bus_done":
                         bus_done_flag = True
                     elif source == "error":
@@ -303,19 +303,10 @@ async def stream_generate(request: GenerateRequest):
                 # Cleanup
                 await asyncio.gather(graph_task, bus_task, return_exceptions=True)
 
-                # If collaboration produced a result, stream it directly (skip answer_node)
-                logging.info("[CHAT] final_state has_collab=%s",
-                             bool(final_state and final_state.get("collab_result")))
-                collab_text = ""
-                if final_state and final_state.get("collab_result"):
-                    collab_text = str(final_state["collab_result"])
-                    content_accumulated += collab_text
-                    logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
-                    for char in collab_text:
-                        yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
-                        await asyncio.sleep(0.01)
-                else:
-                    logging.warning("[CHAT] no collab_result in final_state — nothing to stream")
+                # Composer node handles output generation via graph streaming
+                logging.info("[CHAT] stream complete: content_length=%d, tool_calls=%d, plan_phase=%s",
+                             len(content_accumulated), len(tool_calls_accumulated),
+                             final_state.get("plan_phase", "?") if final_state else "?")
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))

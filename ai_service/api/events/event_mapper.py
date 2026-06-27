@@ -103,7 +103,7 @@ def map_langgraph_event_to_envelopes(
         # Router and collaboration LLM calls are internal — their output
         # goes through the pipeline, not directly to the user.
         node_name = (event.get("metadata") or {}).get("langgraph_node", "")
-        allowed_nodes = {"answer", "agent", "chart_planner"}
+        allowed_nodes = {"answer", "agent", "chart_planner", "composer", "planning", "execution"}
         if node_name and node_name not in allowed_nodes:
             return envelopes, active_tool_span_id, final_state
 
