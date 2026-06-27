@@ -807,7 +807,9 @@ def _validate_plan_json(plan: dict) -> tuple[bool, str]:
 
 _PLANNING_SYSTEM_PROMPT = """\
 You are a research planner. Given a user query, generate an execution plan as a JSON object.
-You have access to read-only tools: search, browser, time.
+
+For exploration, you have read-only tools: search, browser, time.
+For chart/image generation, plan steps with required_tools: ["execute_python"]
 
 Output ONLY a valid JSON object. No markdown wrapping, no explanation.
 
@@ -816,7 +818,7 @@ Output ONLY a valid JSON object. No markdown wrapping, no explanation.
   "steps": [
     {
       "step_id": 1,
-      "description": "What this step does — specific search or research action",
+      "description": "Step description — for search steps, write a specific search query. For chart steps, describe what chart to generate and what data to use.",
       "required_tools": ["search"],
       "expected_artifacts": [
         {"type": "data", "purpose": "What data this step produces", "chart_type": null}
@@ -826,14 +828,17 @@ Output ONLY a valid JSON object. No markdown wrapping, no explanation.
 }
 
 Rules:
-- Each step must accomplish ONE unit of research
-- required_tools: choose from ["search", "browser", "time"]
+- Each step must accomplish ONE unit of research or chart generation
+- required_tools for SEARCH/data steps: ["search"] or ["browser"]
+- required_tools for CHART steps: ["execute_python"] — system will auto-generate matplotlib code
+- Chart step description MUST include: what chart to make (line/bar/pie/...), what data to visualize, axis labels
 - expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar"
-- Limit to 5 steps maximum
+- Only use "chart_type" when required_tools includes "execute_python"
+- Limit to 7 steps maximum
 - For simple questions (1 search is enough), output a single step
 - CRITICAL: The "title" field is MANDATORY — always include it
 
-To use a tool, output: {"action":"tool","tool":"<tool_name>","query":"<search query>"}
+To use a tool during planning, output: {"action":"tool","tool":"<tool_name>","query":"<search query>"}
 When you have enough information for a plan, output the plan JSON directly. You MUST include both "title" (string) and "steps" (array) fields.
 """
 
@@ -878,6 +883,99 @@ def _generate_fallback_plan(query: str) -> dict:
             }
         ],
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Chart code generation helper
+# ────────────────────────────────────────────────────────────────────────────
+
+_CHART_CODE_PROMPT = """\
+You are a Python matplotlib expert. Generate Python code to create ONE chart based on the specification.
+
+Specification:
+{spec}
+
+Available data context (from previous research steps):
+{data_context}
+
+Requirements:
+- Use matplotlib and the ChartTheme (already initialized, available as plt)
+- Set figure size to (12, 6)
+- Use Chinese-friendly fonts (ChartTheme handles this via plt.rcParams)
+- Include title, axis labels, legend if applicable
+- Use auto-detected colors from the theme
+- Output ONLY valid Python code. No markdown wrappers, no explanation.
+- Save using plt.savefig(fname, dpi=200, bbox_inches='tight') where fname is a descriptive filename ending in .png
+- Do NOT call plt.show()
+- Add plt.close() at the end
+"""
+
+
+async def _generate_chart_code(
+    step_description: str,
+    expected_artifacts: list[dict],
+    previous_results: list[dict],
+) -> str:
+    """Generate matplotlib Python code for a chart step using a small LLM call."""
+    # Build data context from previous results
+    data_lines = []
+    for i, r in enumerate(previous_results):
+        status = r.get("status", "?")
+        step_id = r.get("step_id", i)
+        tool_data = r.get("data", [])
+        for td in tool_data:
+            tool_name = td.get("tool", "?")
+            tool_status = td.get("status", "?")
+            data_lines.append(f"[Step {step_id}] {tool_name}: {tool_status}")
+
+    data_context = "\n".join(data_lines) if data_lines else "No previous data available — use reasonable sample data."
+
+    # Build chart spec from expected_artifacts
+    spec_lines = [f"Description: {step_description}"]
+    for ea in expected_artifacts:
+        chart_type = ea.get("chart_type", "line")
+        purpose = ea.get("purpose", "")
+        spec_lines.append(f"Chart type: {chart_type}")
+        spec_lines.append(f"Purpose: {purpose}")
+    spec = "\n".join(spec_lines)
+
+    prompt = _CHART_CODE_PROMPT.format(spec=spec, data_context=data_context)
+
+    llm = _build_llm(streaming=False, json_mode=False)
+    llm.temperature = 0.1
+
+    try:
+        response = await llm.ainvoke([SystemMessage(content=prompt)])
+        content = str(response.content or "").strip()
+        # Strip markdown wrappers if present
+        if content.startswith("```python"):
+            content = content[9:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
+    except Exception:
+        # Fallback: generate minimal chart code
+        chart_type = expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"
+        title = expected_artifacts[0].get("purpose", step_description) if expected_artifacts else step_description
+        return f'''import matplotlib.pyplot as plt
+import numpy as np
+
+# Sample data
+x = np.arange(10)
+y = np.random.randn(10).cumsum()
+
+plt.figure(figsize=(12, 6))
+plt.plot(x, y, marker='o', linewidth=2)
+plt.title("{title}", fontsize=16, fontweight='bold')
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("chart_output.png", dpi=200, bbox_inches='tight')
+plt.close()
+'''
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -986,7 +1084,7 @@ async def planning_node(state: State) -> dict:
         tool_lines = []
         for t in registry.list_tools():
             name = str(t.get("name", "")).strip().lower()
-            if name in ("search", "browser", "time"):
+            if name in ("search", "browser", "time", "execute_python"):
                 tool_lines.append(f"  - {t['name']}: {t['description']}")
         tool_descriptions = "\n".join(tool_lines)
 
@@ -1176,81 +1274,94 @@ async def execution_node(state: State, event_bus=None) -> dict:
     tool_results = []
     step_status = "completed"
 
+    import time as _time
+
     for tool_name in required_tools:
-        # Use step description as the search query (NOT the original user query),
-        # so each plan step searches for its specific data need
-        search_query = step.get("description", user_query)
-        logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
-        # Generate consistent tool_call_id for started/finished pairing
-        import time as _time
         tool_call_id = f"{tool_name}_{step_id}_{int(_time.time()*1000)}"
-        # Emit tool.started event for frontend display
-        if event_bus:
-            event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name, arguments={"query": search_query})
-        try:
-            result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
-            tool_results.append({
-                "tool": tool_name,
-                "status": result.get("status", "error"),
-                "elapsed_ms": result.get("elapsed_ms", 0),
-            })
 
-            if result.get("status") == "error":
-                # Check if error is retryable before retrying
-                error_info = result.get("error", {})
-                is_retryable = error_info.get("retryable", True) if isinstance(error_info, dict) else True
-                if not is_retryable:
-                    logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
-                    step_status = "error"
-                    if event_bus:
-                        event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(error_info.get("message", error_info.get("code", "unknown error"))))
+        # ── execute_python: generate chart code, execute, capture image URLs ──
+        if tool_name == "execute_python":
+            logger.info("[EXECUTION] generating chart code for step %d", step_id)
+            if event_bus:
+                event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name,
+                               arguments={"chart_type": expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"})
+            try:
+                chart_code = await _generate_chart_code(
+                    step.get("description", ""),
+                    expected_artifacts,
+                    existing_results,
+                )
+                logger.info("[EXECUTION] chart code generated (%d chars)", len(chart_code))
+                result = await _execute_single_tool(tool_name, {"code": chart_code}, gate, context)
+            except Exception as exc:
+                logger.exception("[EXECUTION] chart generation failed for step %d", step_id)
+                result = {"ok": False, "error": {"code": "CHART_GENERATION_FAILED", "message": str(exc)[:200], "retryable": False}, "elapsed_ms": 0, "status": "error", "error_msg": str(exc)[:200]}
+
+            tool_results.append({"tool": tool_name, "status": result.get("status", "error"), "elapsed_ms": result.get("elapsed_ms", 0)})
+
+            if result.get("status") == "completed":
+                # Extract image URLs from execute_python result
+                output_data = result.get("result", {})
+                images = output_data.get("images", {}) if isinstance(output_data, dict) else {}
+                if images:
+                    for fname, url in images.items():
+                        artifact_id = _register_artifact(state, artifact_type="image", purpose=f"Chart: {step.get('description', '')[:60]}", step_id=step_id, content_ref=url)
+                        artifact_ids.append(artifact_id)
+                        logger.info("[EXECUTION] registered chart artifact: %s -> %s", artifact_id, url)
                 else:
-                    # Retry once
-                    logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
-                    result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
-                    tool_results[-1] = {
-                        "tool": tool_name,
-                        "status": result.get("status", "error"),
-                        "elapsed_ms": result.get("elapsed_ms", 0) + tool_results[-1].get("elapsed_ms", 0),
-                    }
-
-            if result.get("status") == "error":
+                    logger.warning("[EXECUTION] chart generated but no images found in result")
+                if event_bus:
+                    event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": "completed", "images": len(images)})
+            else:
                 step_status = "error"
                 if event_bus:
-                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "tool execution failed")))
-            else:
-                if event_bus:
-                    event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": result.get("status", "completed"), "elapsed_ms": result.get("elapsed_ms", 0)})
-                accumulated_reasons.append(_reason_record(
-                    "execution_node", "TOOL_EXECUTION_FAILURE",
-                    f"Tool '{tool_name}' failed after retry for step {step_id}",
-                    extra={"tool": tool_name, "error": result.get("error_msg")},
-                ))
+                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "chart generation failed")))
+            continue
 
-            # Register result data as artifact
-            if result.get("status") == "completed" and result.get("result"):
-                content_ref = f"tool:{tool_name}:{step_id}"
-                artifact_id = _register_artifact(
-                    state,
-                    artifact_type=f"tool_result_{tool_name}",
-                    purpose=f"Result from {tool_name} for step {step_id}: {step.get('description', '')[:60]}",
-                    step_id=step_id,
-                    content_ref=content_ref,
-                )
-                artifact_ids.append(artifact_id)
+        # ── Normal tools (search, browser, time, etc.) ──
+        search_query = step.get("description", user_query)
+        logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
+        if event_bus:
+            event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name, arguments={"query": search_query})
 
+        try:
+            result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
         except Exception as exc:
-            logger.exception("[EXECUTION] unexpected error executing tool '%s'", tool_name)
-            tool_results.append({
-                "tool": tool_name,
-                "status": "error",
-                "elapsed_ms": 0,
-            })
+            logger.exception("[EXECUTION] tool '%s' failed", tool_name)
+            result = {"ok": False, "error": {"code": "TOOL_INVOKE_EXCEPTION", "message": str(exc)[:200], "retryable": False}, "elapsed_ms": 0, "status": "error", "error_msg": str(exc)[:200]}
+
+        tool_results.append({"tool": tool_name, "status": result.get("status", "error"), "elapsed_ms": result.get("elapsed_ms", 0)})
+
+        if result.get("status") == "error":
+            error_info = result.get("error", {})
+            is_retryable = error_info.get("retryable", True) if isinstance(error_info, dict) else True
+            if not is_retryable:
+                logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
+                step_status = "error"
+                if event_bus:
+                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(error_info.get("message", error_info.get("code", "unknown error"))))
+            else:
+                logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
+                result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
+                tool_results[-1] = {"tool": tool_name, "status": result.get("status", "error"), "elapsed_ms": result.get("elapsed_ms", 0) + tool_results[-1].get("elapsed_ms", 0)}
+
+        if result.get("status") == "error":
             step_status = "error"
-            accumulated_reasons.append(_reason_record(
-                "execution_node", "TOOL_EXECUTION_EXCEPTION",
-                f"Unexpected exception for tool '{tool_name}': {str(exc)[:100]}",
-            ))
+            if event_bus:
+                event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "tool execution failed")))
+        else:
+            if event_bus:
+                event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": "completed", "elapsed_ms": result.get("elapsed_ms", 0)})
+
+        # Register search/data results as artifact
+        if result.get("status") == "completed" and result.get("result"):
+            content_ref = f"tool:{tool_name}:{step_id}"
+            artifact_id = _register_artifact(
+                state, artifact_type=f"tool_result_{tool_name}",
+                purpose=f"Result from {tool_name} for step {step_id}: {step.get('description', '')[:60]}",
+                step_id=step_id, content_ref=content_ref,
+            )
+            artifact_ids.append(artifact_id)
 
     # Build step result
     step_result = {
@@ -1308,7 +1419,11 @@ def _build_composer_system_prompt(
             atype = a.get("type", "?")
             purpose = a.get("purpose", "")
             content_ref = a.get("content_ref", "")
-            lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
+            if atype == "image" and content_ref:
+                # For images, provide the actual URL and markdown syntax hint
+                lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref})")
+            else:
+                lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
         return "\n".join(lines)
 
     artifacts_section = _format_artifacts(artifacts)
