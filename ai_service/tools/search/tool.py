@@ -136,7 +136,8 @@ class SearchTool(BaseTool):
             logger.debug(f"Executing web search for query: {query}")
             client = TavilyClient(api_key=api_key)
             # Disable SSL verification for internal networks
-            client._session.verify = False
+            if hasattr(client, 'session'):
+                client.session.verify = False
 
             # TavilyClient.search is sync, run in a worker thread with timeout
             raw_result = await asyncio.wait_for(
