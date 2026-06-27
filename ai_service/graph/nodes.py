@@ -732,14 +732,7 @@ _ANSWER_SYSTEM_PROMPT_TEMPLATE = """\
 You are a helpful AI assistant. Answer the user's question based on the research results.
 Use Markdown for formatting and structure.
 
-{chart_section}
-
 [Output Instructions]
-- When your analysis reaches a point where a chart helps, reference it with [CHART:n] on its own line
-- Each available chart MUST be referenced at least once
-- When you reference a chart, do NOT repeat all its data values as text — let the chart show them
-- Write naturally as if the chart is embedded in your response
-- NEVER say "I cannot generate charts" or "I am unable to create charts" — if no charts are listed above, simply answer without referring to charts
 - NEVER output localhost image URLs (http://localhost:3000/chat/xxx.png) — images are automatically uploaded
 - If you saved images using Python, just mention the filename and the system handles the rest
 - Keep answers concise and well-structured
@@ -749,37 +742,11 @@ Current time: {now_str}
 """
 
 
-def _build_chart_section(chart_specs: list) -> str:
-    """Build the chart description section for the answer prompt."""
-    if not chart_specs:
-        return "[Available Charts]\nNone. Answer without referencing any charts."
-
-    lines = ["[Available Charts]"]
-    for c in chart_specs:
-        if not isinstance(c, dict):
-            continue
-        cid = c.get("id", "?")
-        ctype = c.get("chartType", "bar")
-        title = c.get("title", "Untitled")
-        desc = c.get("description", "")
-        x_label = c.get("xAxisLabel", "")
-        y_label = c.get("yAxisLabel", "")
-        data_count = len(c.get("data", []))
-        lines.append(
-            f"  Chart {cid} ({ctype}): \"{title}\" — {desc} "
-            f"({data_count} data points, x={x_label}, y={y_label})"
-        )
-    return "\n".join(lines)
-
-
 async def answer_node(state: State) -> dict:
     """Phase 3: Generate streaming final answer with [CHART:n] markers."""
-    chart_specs = list(state.get("chart_specs", []) or [])
-    chart_section = _build_chart_section(chart_specs)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     system_content = _ANSWER_SYSTEM_PROMPT_TEMPLATE.format(
-        chart_section=chart_section,
         now_str=now_str,
     )
 

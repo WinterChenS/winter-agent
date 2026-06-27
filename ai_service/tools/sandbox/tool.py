@@ -71,34 +71,13 @@ class CodeSandboxTool(BaseTool):
 
     @staticmethod
     def _build_preamble() -> str:
-        """Return code that sets Chinese font for matplotlib and resource limits on Linux."""
+        """Return code that initializes chart theme and sets resource limits on Linux."""
         lines = []
 
-        # ── Matplotlib Chinese font setup ──
-        lines.append("import matplotlib.pyplot as _plt")
-        lines.append("import platform as _plat")
-        lines.append("_sys_name = _plat.system()")
+        # ── Chart theme (font, DPI, style) ──
+        lines.append("from chart.chart_theme import ChartTheme")
+        lines.append("ChartTheme.initialize()")
         lines.append("")
-        lines.append("# Auto-detect Chinese font")
-        lines.append("_cn_fonts = []")
-        lines.append("if _sys_name == 'Darwin':")
-        lines.append("    _cn_fonts = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Arial Unicode MS']")
-        lines.append("elif _sys_name == 'Linux':")
-        lines.append("    _cn_fonts = ['Noto Sans CJK SC', 'Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'SimHei']")
-        lines.append("else:")
-        lines.append("    _cn_fonts = ['Microsoft YaHei', 'SimHei', 'KaiTi']")
-        lines.append("")
-        lines.append("_chosen = None")
-        lines.append("import matplotlib.font_manager as _fm")
-        lines.append("for _f in _fm.fontManager.ttflist:")
-        lines.append("    if _chosen: break")
-        lines.append("    for _cn in _cn_fonts:")
-        lines.append("        if _cn.lower() in _f.name.lower():")
-        lines.append("            _chosen = _f.name")
-        lines.append("            break")
-        lines.append("if _chosen:")
-        lines.append("    _plt.rcParams['font.sans-serif'] = [_chosen, 'DejaVu Sans']")
-        lines.append("    _plt.rcParams['axes.unicode_minus'] = False")
 
         # ── Linux resource limits ──
         if platform.system() == "Linux":
