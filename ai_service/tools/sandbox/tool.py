@@ -138,8 +138,50 @@ class CodeSandboxTool(BaseTool):
             if stderr_str:
                 output += "\n[stderr]\n" + stderr_str
 
+            # Scan for generated image files and upload to MinIO
+            import re as _re
+            import os as _os_module
+            png_patterns = [
+                _r'已(?:生成[并且]?)?保存[为至]?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+                _r'savefig\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg))',
+                _r'(\S+\.png)',
+            ]
+            uploaded: dict[str, str] = {}
+            cwd = _os_module.getcwd()
+            for pat in png_patterns:
+                for m in _re.finditer(pat, output):
+                    fname = m.group(1)
+                    fpath = _os_module.path.join(cwd, fname)
+                    if _os_module.path.isfile(fpath) and fname not in uploaded:
+                        try:
+                            from services.minio_client import upload_image
+                            url = upload_image(fpath)
+                            if url:
+                                uploaded[fname] = url
+                        except Exception:
+                            pass
+
+            # Also scan CWD for any new PNGs created during execution
+            import time as _time
+            now = _time.time()
+            for f in _os_module.listdir(cwd):
+                if f.endswith('.png') and f not in uploaded:
+                    fpath = _os_module.path.join(cwd, f)
+                    try:
+                        if _os_module.path.getmtime(fpath) > now - 120:
+                            url = upload_image(fpath)
+                            if url:
+                                uploaded[f] = url
+                    except Exception:
+                        pass
+
+            if uploaded:
+                urls_text = "\n".join(f"{fn} → {url}" for fn, url in uploaded.items())
+                output = f"{output}\n\n[图片已上传]\n{urls_text}"
+
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
+                "images": uploaded,
             })
 
         except asyncio.TimeoutError:
