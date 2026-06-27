@@ -11,13 +11,19 @@ interface ChatRequest {
 
 interface SseEvent {
   type: string;
-  messageId?: string;
+  schemaVersion?: string;
+  conversationId?: string;
   agentId?: string;
+  timestamp?: number;
+  payload?: Record<string, unknown>;
+  // Flat fallback fields (legacy compatibility)
+  messageId?: string;
+  agent?: string;
+  display?: string;
   delta?: string;
   toolCall?: ToolCall;
   status?: string;
   error?: string;
-  payload?: Record<string, unknown>;
 }
 
 export async function sendChatMessage(req: ChatRequest): Promise<void> {
@@ -75,8 +81,12 @@ export async function sendChatMessage(req: ChatRequest): Promise<void> {
 }
 
 function handleEvent(event: SseEvent): void {
-  const { type, messageId, delta, toolCall, status } = event;
-  const payload = event.payload || {};
+  const p = (event.payload || event) as Record<string, unknown>;
+  const { type } = event;
+  const messageId = p.messageId as string | undefined;
+  const delta = p.delta as string | undefined;
+  const toolCall = p.toolCall as ToolCall | undefined;
+  const status = p.status as string | undefined;
   const store = useChatStore.getState();
 
   switch (type) {
@@ -86,7 +96,7 @@ function handleEvent(event: SseEvent): void {
 
     case 'agent.started':
       store.setAgentStatus('calling_tool');
-      store.setActiveAgent(payload.agent as string, payload.display as string);
+      store.setActiveAgent(p.agent as string, p.display as string);
       break;
 
     case 'agent.finished':
@@ -95,12 +105,12 @@ function handleEvent(event: SseEvent): void {
       break;
 
     case 'tool.started': {
-      const tcId = (payload.tool_call_id as string) || '';
+      const tcId = (p.tool_call_id as string) || '';
       if (messageId && tcId) {
         store.upsertToolCall(messageId, {
           id: tcId,
-          name: (payload.tool as string) || 'unknown',
-          arguments: (payload.arguments as Record<string, unknown>) || {},
+          name: (p.tool as string) || 'unknown',
+          arguments: (p.arguments as Record<string, unknown>) || {},
           status: 'running',
         });
       }
@@ -108,26 +118,26 @@ function handleEvent(event: SseEvent): void {
     }
 
     case 'tool.finished': {
-      const tcId2 = (payload.tool_call_id as string) || '';
+      const tcId2 = (p.tool_call_id as string) || '';
       if (messageId && tcId2) {
         store.upsertToolCall(messageId, {
           id: tcId2,
-          name: (payload.tool as string) || 'unknown',
+          name: (p.tool as string) || 'unknown',
           status: 'done',
-          result: payload.result,
+          result: p.result,
         });
       }
       break;
     }
 
     case 'tool.failed': {
-      const tcId3 = (payload.tool_call_id as string) || '';
+      const tcId3 = (p.tool_call_id as string) || '';
       if (messageId && tcId3) {
         store.upsertToolCall(messageId, {
           id: tcId3,
-          name: (payload.tool as string) || 'unknown',
+          name: (p.tool as string) || 'unknown',
           status: 'failed',
-          result: payload.error,
+          result: p.error,
         });
       }
       break;
@@ -135,8 +145,8 @@ function handleEvent(event: SseEvent): void {
 
     case 'image.uploaded':
       if (messageId) {
-        const url = payload.url as string;
-        const filename = payload.filename as string;
+        const url = p.url as string;
+        const filename = p.filename as string;
         if (url) store.addImage(messageId, filename, url);
       }
       break;
