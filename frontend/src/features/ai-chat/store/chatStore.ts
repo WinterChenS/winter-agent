@@ -119,7 +119,16 @@ export const useChatStore = create<ChatState>((set) => ({
     const messages: Record<string, Message> = {};
     const messageOrder: string[] = [];
     for (const m of msgs) {
-      messages[m.id] = m;
+      if (!m.id) continue; // skip null/empty id
+      if (messages[m.id]) continue; // deduplicate by id
+      // Normalize toolCalls (may come as JSON string from API)
+      const raw = m as Record<string, unknown>;
+      let toolCalls = raw.toolCalls;
+      if (typeof toolCalls === 'string') {
+        try { toolCalls = JSON.parse(toolCalls); } catch { toolCalls = []; }
+      }
+      if (!Array.isArray(toolCalls)) toolCalls = [];
+      messages[m.id] = { ...m, toolCalls: toolCalls as ToolCall[], status: 'done' }; // force status to done for history messages
       messageOrder.push(m.id);
     }
     set({ messages, messageOrder });
