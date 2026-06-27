@@ -831,7 +831,7 @@ Rules:
 - For simple questions (1 search is enough), output a single step
 
 To use a tool, output: {"action":"tool","tool":"<tool_name>","query":"<search query>"}
-When you have enough information for a plan, output: {"action":"plan_ready","plan":{...}}
+When you have enough information for a plan, output the plan JSON directly with "title" and "steps" fields.
 """
 
 
@@ -851,11 +851,11 @@ _GREETING_PATTERNS = re.compile(
 
 
 def _is_trivial_query(text: str) -> bool:
-    """Detect trivial queries that don't need planning: short text or greetings."""
+    """Detect trivial queries that don't need planning: short text or exact greetings."""
     stripped = text.strip()
     if len(stripped) < 8:
         return True
-    if _GREETING_PATTERNS.search(stripped):
+    if _GREETING_PATTERNS.fullmatch(stripped):
         return True
     return False
 
@@ -991,8 +991,10 @@ async def planning_node(state: State) -> dict:
     plan = None
     max_planning_rounds = 3
 
+    pending_messages: list = []
+
     for planning_round in range(max_planning_rounds):
-        msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"])
+        msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"]) + pending_messages
 
         # If we have tool observations from previous round, inject them
         if plan is None and planning_round > 0:
@@ -1019,8 +1021,8 @@ async def planning_node(state: State) -> dict:
                         agent_id="planning",
                     )
                     tool_result = await _execute_single_tool(tool_name, {"query": query}, gate, context)
-                    # Store observation in state messages for next round
-                    state["messages"].append(AIMessage(
+                    # Store observation in pending messages for next round
+                    pending_messages.append(AIMessage(
                         content=json.dumps({
                             "action": "tool_result",
                             "tool": tool_name,
@@ -1044,7 +1046,7 @@ async def planning_node(state: State) -> dict:
         except (json.JSONDecodeError, TypeError) as e:
             logger.warning("[PLANNING] JSON parse error (round %d): %s", planning_round, e)
             if planning_round < max_planning_rounds - 1:
-                state["messages"].append(AIMessage(
+                pending_messages.append(AIMessage(
                     content=f"JSON parse error. Output ONLY valid JSON with title and steps fields."
                 ))
                 continue
@@ -1057,10 +1059,10 @@ async def planning_node(state: State) -> dict:
             logger.warning("[PLANNING] plan validation failed: %s", error_msg)
             # Retry once with error feedback
             try:
-                state["messages"].append(SystemMessage(
+                pending_messages.append(SystemMessage(
                     content=f"Plan validation error: {error_msg}. Please fix and output a valid plan JSON."
                 ))
-                msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"])
+                msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"]) + pending_messages
                 response = await llm.ainvoke(msg_list)
                 content = (response.content or "").strip()
                 plan = json.loads(content)
@@ -1080,6 +1082,7 @@ async def planning_node(state: State) -> dict:
     return {
         "execution_plan": plan,
         "plan_phase": plan_phase,
+        "messages": pending_messages,
         "reasoning_steps": _append_reason(state, _reason_record(
             "planning_node", "PLAN_READY",
             f"Generated plan: '{plan.get('title', '')}' with {len(plan.get('steps', []))} step(s)",

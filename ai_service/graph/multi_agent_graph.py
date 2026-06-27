@@ -28,7 +28,9 @@ def _route_from_execution(state: State) -> str:
     phase = state.get("plan_phase", "")
     if phase == "composing":
         return "composer"
-    return "execution"
+    if phase == "executing":
+        return "execution"
+    return "composer"
 
 
 def create_plan_execute_graph(checkpointer=None):
