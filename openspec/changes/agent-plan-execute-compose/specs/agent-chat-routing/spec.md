@@ -19,14 +19,3 @@ The RouterAgent-based multi-agent routing SHALL be removed. User requests SHALL 
 - **WHEN** `POST /api/v1/generate/stream` request carries non-existent agentId
 - **THEN** system returns error event: `{ type: "message.done", status: "error", error: "Agent not found: xxx" }`
 
-## REMOVED Requirements
-
-### Requirement: RouterAgent Multi-Agent Selection
-**Reason**: RouterAgent is replaced by Planning LLM's built-in intent analysis. The Plan → Execute → Compose workflow uses a single agent with execution plan-driven tool calls, eliminating the need for multi-agent routing.
-
-**Migration**: All user queries now enter the Planning phase directly. The Planning LLM naturally handles intent analysis as part of plan generation. No user-facing change required.
-
-### Requirement: CollaborationEngine Strategy Execution
-**Reason**: CollaborationEngine (sequential/parallel/supervisor strategies) is replaced by plan-driven sequential execution. The execution plan provides explicit ordering, removing the need for runtime strategy selection.
-
-**Migration**: The execution phase follows plan steps sequentially. Parallel tool execution within a single step is preserved via the existing `_parallel_tool_execution` utility.
