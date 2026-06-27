@@ -80,30 +80,29 @@ async def collaboration_node(state: State, *, factory: AgentFactory, engine: Col
 
 
 async def merge_node(state: State) -> dict:
-    """Merge collaboration result into messages. Route directly to answer for streaming."""
+    """Merge collaboration result. Route to END — chat.py handles streaming."""
     collab_result = state.get("collab_result")
-    if collab_result:
-        return {
-            "messages": [HumanMessage(content=collab_result)],
-            "route": "answer",
-        }
-    return {"route": "answer"}
+    return {
+        "messages": [HumanMessage(content=collab_result)] if collab_result else [],
+        "collab_ready": bool(collab_result),
+        "route": "__end__",
+    }
 
 
 def _route_from_router(state: State) -> str:
     agents = state.get("selected_agents", [])
     if not agents:
-        return "answer"  # No agents → answer directly
+        return "__end__"
     return "collaboration"
 
 
 def _route_from_collaboration(state: State) -> str:
-    return state.get("route", "chart_planner")
+    route = state.get("route", "")
+    return "merge" if route == "merge" else "__end__"
 
 
 def _route_from_merge(state: State) -> str:
-    route = state.get("route", "answer")
-    return route if route in ("chart_planner", "answer") else "answer"
+    return state.get("route", "__end__")
 
 
 def create_multi_agent_graph(
@@ -132,33 +131,19 @@ def create_multi_agent_graph(
     workflow.add_conditional_edges(
         "router",
         _route_from_router,
-        {
-            "collaboration": "collaboration",
-            "answer": "answer",
-        },
+        {"collaboration": "collaboration", "__end__": END},
     )
 
     workflow.add_conditional_edges(
         "collaboration",
         _route_from_collaboration,
-        {
-            "merge": "merge",
-            "answer": "answer",
-        },
+        {"merge": "merge", "__end__": END},
     )
 
     workflow.add_conditional_edges(
         "merge",
         _route_from_merge,
-        {
-            "chart_planner": "chart_planner",
-            "answer": "answer",
-        },
+        {"__end__": END},
     )
-
-    workflow.add_edge("chart_planner", "answer")
-    workflow.add_edge("answer", END)
-    # Direct path: router → answer (skip chart_planner when no agents matched)
-    workflow.add_edge("answer", END)
 
     return workflow.compile(checkpointer=checkpointer)
