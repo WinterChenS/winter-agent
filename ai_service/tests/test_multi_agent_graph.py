@@ -110,3 +110,110 @@ async def test_planning_node_generates_plan():
     assert result["execution_plan"] is not None
     assert "steps" in result["execution_plan"]
     assert len(result["execution_plan"]["steps"]) > 0
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Artifact dedup helpers
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def test_tokenize_purpose():
+    """Verify _tokenize_purpose handles Chinese bigrams, English words, and empty input."""
+    from graph.nodes import _tokenize_purpose
+
+    # English words
+    tokens = _tokenize_purpose("Search for stock market data")
+    assert "search" in tokens
+    assert "stock" in tokens
+    assert "market" in tokens
+    assert "data" in tokens
+
+    # Chinese bigrams
+    tokens = _tokenize_purpose("股市数据分析报告")
+    assert "股市" in tokens
+    assert "市数" in tokens
+    assert "数据" in tokens
+    assert "据分" in tokens
+    assert "分析" in tokens
+    assert "析报" in tokens
+    assert "报告" in tokens
+    # Full segment should also be present
+    assert "股市数据分析报告" in tokens
+
+    # Mixed CJK + English
+    # re.findall(r'[一-鿿]+', 'A股market分析') -> ['股', '分析']
+    # "股" (len=1) has no bigrams but the full segment is added
+    # "分析" (len=2) generates bigram "分析" and full segment "分析"
+    tokens = _tokenize_purpose("A股 market 分析")
+    assert "a" in tokens
+    assert "股" in tokens  # single CJK char, added as full segment
+    assert "分析" in tokens  # CJK bigram
+    assert "market" in tokens
+
+    # Empty
+    assert _tokenize_purpose("") == []
+    assert _tokenize_purpose(None) == []
+
+
+def test_check_artifact_dedup():
+    """Verify Jaccard similarity dedup matching works correctly."""
+    from graph.nodes import _check_artifact_dedup
+
+    existing = [
+        {"type": "chart", "purpose": "Draw stock price trend line chart"},
+        {"type": "data", "purpose": "Fetch quarterly revenue data"},
+        {"type": "chart", "purpose": "Show market share pie chart"},
+    ]
+
+    # Same type + high similarity -> match
+    candidate = {"type": "chart", "purpose": "Draw stock price trend chart"}
+    match = _check_artifact_dedup(candidate, existing)
+    assert match is not None
+    assert match["purpose"] == "Draw stock price trend line chart"
+
+    # Different type -> no match even if purpose is similar
+    candidate = {"type": "data", "purpose": "Draw stock price trend chart"}
+    match = _check_artifact_dedup(candidate, existing)
+    assert match is None
+
+    # Low similarity -> no match
+    candidate = {"type": "chart", "purpose": "Build machine learning model"}
+    match = _check_artifact_dedup(candidate, existing)
+    assert match is None
+
+    # Empty existing list
+    match = _check_artifact_dedup(candidate, [])
+    assert match is None
+
+    # Empty purpose fields -> no match
+    candidate = {"type": "chart", "purpose": ""}
+    match = _check_artifact_dedup(candidate, existing)
+    assert match is None
+
+
+def test_register_artifact():
+    """Verify _register_artifact appends to state and returns correct ID."""
+    from graph.nodes import _register_artifact
+
+    state = {"artifacts": []}
+
+    # First registration
+    aid1 = _register_artifact(state, "chart", "Stock price trend", 1, "chart_001.png")
+    assert aid1 == "chart_0"
+    assert len(state["artifacts"]) == 1
+    assert state["artifacts"][0]["artifact_id"] == "chart_0"
+    assert state["artifacts"][0]["type"] == "chart"
+    assert state["artifacts"][0]["source_step_id"] == 1
+
+    # Second registration
+    aid2 = _register_artifact(state, "data", "Revenue table", 2, "data_001.json")
+    assert aid2 == "data_1"
+    assert len(state["artifacts"]) == 2
+    assert state["artifacts"][1]["artifact_id"] == "data_1"
+
+    # Registration with non-empty existing artifacts list
+    existing = [{"artifact_id": "data_0", "type": "data", "purpose": "Existing data", "source_step_id": 0, "content_ref": "data.json"}]
+    state3 = {"artifacts": existing}
+    aid3 = _register_artifact(state3, "chart", "New chart", 3, "new_chart.png")
+    assert aid3 == "chart_1"
+    assert len(state3["artifacts"]) == 2

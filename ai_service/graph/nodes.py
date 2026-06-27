@@ -877,6 +877,72 @@ def _generate_fallback_plan(query: str) -> dict:
     }
 
 
+# ────────────────────────────────────────────────────────────────────────────
+# Artifact dedup helpers
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _tokenize_purpose(text: str) -> list[str]:
+    """Extract keywords from purpose text: Chinese bigram + English lowercase words.
+
+    For CJK text: extracts all bigrams (sliding window of 2 chars) plus the full segment.
+    For English text: extracts lowercase words.
+    """
+    if not text:
+        return []
+    # Extract CJK character sequences
+    cjk = re.findall(r'[一-鿿]+', text)
+    tokens = []
+    for segment in cjk:
+        for i in range(len(segment) - 1):
+            tokens.append(segment[i:i + 2])
+        if segment:
+            tokens.append(segment)  # full segment too
+    # Extract English words
+    en_words = re.findall(r'[a-zA-Z]+', text.lower())
+    tokens.extend(en_words)
+    return tokens
+
+
+def _check_artifact_dedup(candidate: dict, existing: list[dict]) -> dict | None:
+    """Check if a candidate artifact already exists via Jaccard similarity on purpose keywords.
+
+    Returns the matching existing artifact dict if similarity > 0.5, else None.
+    Only compares artifacts of the same type.
+    """
+    c_type = candidate.get("type", "")
+    c_keywords = set(_tokenize_purpose(candidate.get("purpose", "")))
+
+    for artifact in existing:
+        if artifact.get("type") != c_type:
+            continue
+        a_keywords = set(_tokenize_purpose(artifact.get("purpose", "")))
+        if not c_keywords or not a_keywords:
+            continue
+        intersection = c_keywords & a_keywords
+        union = c_keywords | a_keywords
+        jaccard = len(intersection) / len(union)
+        if jaccard > 0.5:
+            return artifact  # match found
+
+    return None  # no match
+
+
+def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, content_ref: str) -> str:
+    """Register a new artifact in state and return its artifact_id."""
+    existing = state.get("artifacts", [])
+    artifact_id = f"{artifact_type}_{len(existing)}"
+    entry = {
+        "artifact_id": artifact_id,
+        "type": artifact_type,
+        "purpose": purpose,
+        "source_step_id": step_id,
+        "content_ref": content_ref,
+    }
+    existing.append(entry)
+    return artifact_id
+
+
 async def planning_node(state: State) -> dict:
     """Phase 1: Generate execution plan using JSON Mode LLM with read-only tools.
 
