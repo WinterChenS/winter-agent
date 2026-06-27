@@ -217,3 +217,312 @@ def test_register_artifact():
     aid3 = _register_artifact(state3, "chart", "New chart", 3, "new_chart.png")
     assert aid3 == "chart_1"
     assert len(state3["artifacts"]) == 2
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# execution_node Tests
+# ────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_execution_node_follows_plan_steps():
+    """Verify execution_node executes tools per step, stores results, and increments step."""
+    from graph.nodes import execution_node
+    from unittest.mock import patch, AsyncMock
+
+    state = State(
+        messages=[HumanMessage(content="Research AI trends in 2026")],
+        execution_plan={
+            "title": "AI Trends Research",
+            "steps": [
+                {
+                    "step_id": 1,
+                    "description": "Search for latest AI trends",
+                    "required_tools": ["search"],
+                    "expected_artifacts": [
+                        {"type": "data", "purpose": "Search results for AI trends"}
+                    ],
+                },
+            ],
+        },
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="executing",
+        # Other required State fields with default values
+        conversation_id="test-exec-1",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+
+    with patch("graph.nodes._execute_single_tool", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = {
+            "result": {"ok": True, "data": "AI trend data"},
+            "elapsed_ms": 150,
+            "status": "completed",
+            "error_msg": None,
+        }
+        result = await execution_node(state)
+
+    # Should transition to composing (only 1 step)
+    assert result["plan_phase"] == "composing"
+    assert result["current_plan_step"] == 1
+
+    # Should have 1 execution result
+    assert len(result["execution_results"]) == 1
+    step_result = result["execution_results"][0]
+    assert step_result["step_id"] == 1
+    assert step_result["status"] == "completed"
+    assert len(step_result["data"]) == 1
+    assert step_result["data"][0]["tool"] == "search"
+
+    # _execute_single_tool should have been called once (success, no retry)
+    mock_exec.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_execution_node_empty_plan_skips_to_composing():
+    """Verify execution_node routes to composing when plan is empty or None."""
+    from graph.nodes import execution_node
+
+    # No plan at all
+    state = State(
+        messages=[HumanMessage(content="hello")],
+        execution_plan=None,
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="executing",
+        conversation_id="test-exec-2",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+    result = await execution_node(state)
+    assert result["plan_phase"] == "composing"
+
+
+@pytest.mark.asyncio
+async def test_execution_node_step_beyond_range():
+    """Verify execution_node handles step_idx beyond plan length."""
+    from graph.nodes import execution_node
+
+    state = State(
+        messages=[HumanMessage(content="test")],
+        execution_plan={
+            "title": "Test",
+            "steps": [{"step_id": 1, "description": "Step 1", "required_tools": ["search"], "expected_artifacts": []}],
+        },
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=5,  # Beyond plan length (1 step)
+        plan_phase="executing",
+        conversation_id="test-exec-3",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+    result = await execution_node(state)
+    assert result["plan_phase"] == "composing"
+
+
+@pytest.mark.asyncio
+async def test_execution_node_retry_on_failure():
+    """Verify execution_node retries failed tool once and records error."""
+    from graph.nodes import execution_node
+    from unittest.mock import patch, AsyncMock
+
+    state = State(
+        messages=[HumanMessage(content="test")],
+        execution_plan={
+            "title": "Test",
+            "steps": [{"step_id": 1, "description": "Step with failure", "required_tools": ["search"], "expected_artifacts": []}],
+        },
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="executing",
+        conversation_id="test-exec-4",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+
+    with patch("graph.nodes._execute_single_tool", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = {
+            "result": {"ok": False, "error": {"code": "TOOL_ERROR", "message": "API unavailable", "retryable": True}},
+            "elapsed_ms": 100,
+            "status": "error",
+            "error_msg": "API unavailable",
+        }
+        result = await execution_node(state)
+
+    # Should be called twice (first attempt + retry)
+    assert mock_exec.call_count == 2
+
+    # Step should be marked as error
+    assert len(result["execution_results"]) == 1
+    assert result["execution_results"][0]["status"] == "error"
+
+    # Still should increment step and transition to composing
+    assert result["current_plan_step"] == 1
+    assert result["plan_phase"] == "composing"
+
+
+@pytest.mark.asyncio
+async def test_execution_node_multi_step():
+    """Verify execution_node processes first step and stays in executing phase for multi-step plans."""
+    from graph.nodes import execution_node
+    from unittest.mock import patch, AsyncMock
+
+    state = State(
+        messages=[HumanMessage(content="research")],
+        execution_plan={
+            "title": "Multi-step Plan",
+            "steps": [
+                {"step_id": 1, "description": "Step 1", "required_tools": ["search"], "expected_artifacts": []},
+                {"step_id": 2, "description": "Step 2", "required_tools": ["browser"], "expected_artifacts": []},
+            ],
+        },
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="executing",
+        conversation_id="test-exec-5",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+
+    with patch("graph.nodes._execute_single_tool", new_callable=AsyncMock) as mock_exec:
+        mock_exec.return_value = {
+            "result": {"ok": True, "data": "result"},
+            "elapsed_ms": 100,
+            "status": "completed",
+            "error_msg": None,
+        }
+        result = await execution_node(state)
+
+    # Should remain in executing (more steps remain)
+    assert result["plan_phase"] == "executing"
+    assert result["current_plan_step"] == 1
+    assert len(result["execution_results"]) == 1
+
+    # Only step 1 tools executed
+    mock_exec.assert_called_once()

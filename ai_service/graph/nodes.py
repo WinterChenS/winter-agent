@@ -1086,3 +1086,156 @@ async def planning_node(state: State) -> dict:
             extra={"step_count": len(plan.get("steps", []))},
         )),
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# execution_node: Phase 2 — Execute one step from the execution plan
+# ────────────────────────────────────────────────────────────────────────────
+
+
+async def execution_node(state: State) -> dict:
+    """Phase 2: Execute one step from the execution plan.
+
+    For each step:
+    1. Check artifact dedup for each expected_artifact
+    2. For each required_tool, call _execute_single_tool (or skip if dedup'd)
+    3. Register new artifacts
+    4. Store step result in execution_results
+    5. Increment current_plan_step
+    6. Set plan_phase to "composing" if all steps done
+
+    Self-loop is controlled by conditional edges in multi_agent_graph.py.
+    """
+    plan = state.get("execution_plan")
+    step_idx = state.get("current_plan_step", 0)
+    plan_phase = state.get("plan_phase", "executing")
+
+    if not plan or not plan.get("steps"):
+        return {"plan_phase": "composing"}
+
+    steps = plan["steps"]
+    if step_idx >= len(steps):
+        return {"plan_phase": "composing"}
+
+    step = steps[step_idx]
+    step_id = int(step.get("step_id", step_idx))
+    required_tools = step.get("required_tools", [])
+    expected_artifacts = step.get("expected_artifacts", [])
+
+    logger.info("[EXECUTION] executing step %d/%d: %s", step_idx + 1, len(steps), step.get("description", "")[:80])
+
+    user_query = ""
+    for msg in reversed(list(state.get("messages", []))):
+        if hasattr(msg, "type") and msg.type == "human":
+            user_query = (msg.content or "").strip()
+            break
+
+    existing_artifacts = list(state.get("artifacts", []))
+
+    # Artifact dedup: for each expected artifact, check if it already exists
+    artifact_ids = []
+    for ea in expected_artifacts:
+        match = _check_artifact_dedup(ea, existing_artifacts)
+        if match:
+            logger.info("[EXECUTION] artifact dedup match: type=%s purpose='%s' -> existing artifact %s",
+                        ea.get("type"), ea.get("purpose", "")[:40], match.get("artifact_id"))
+            artifact_ids.append(match.get("artifact_id"))
+            _append_reason(state, _reason_record(
+                "execution_node", "ARTIFACT_DEDUP_MATCH",
+                f"Artifact dedup match: type={ea.get('type')}, matched existing {match.get('artifact_id')}",
+                extra={"candidate_type": ea.get("type"), "matched_id": match.get("artifact_id")},
+            ))
+        else:
+            _append_reason(state, _reason_record(
+                "execution_node", "ARTIFACT_DEDUP_MISS",
+                f"No dedup match for artifact type={ea.get('type')}, purpose='{ea.get('purpose', '')[:40]}'",
+            ))
+
+    # Execute tools for this step
+    gate = _build_policy_gate()
+    context = PolicyContext(
+        conversation_id=str(state.get("conversation_id") or ""),
+        agent_id=str(state.get("active_agent", "execution")),
+    )
+
+    tool_results = []
+    step_status = "completed"
+
+    for tool_name in required_tools:
+        logger.info("[EXECUTION] invoking tool: %s", tool_name)
+        try:
+            result = await _execute_single_tool(tool_name, {"query": user_query}, gate, context)
+            tool_results.append({
+                "tool": tool_name,
+                "status": result.get("status", "error"),
+                "elapsed_ms": result.get("elapsed_ms", 0),
+            })
+
+            if result.get("status") == "error":
+                # Retry once
+                logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
+                result = await _execute_single_tool(tool_name, {"query": user_query}, gate, context)
+                tool_results[-1] = {
+                    "tool": tool_name,
+                    "status": result.get("status", "error"),
+                    "elapsed_ms": result.get("elapsed_ms", 0) + tool_results[-1].get("elapsed_ms", 0),
+                }
+
+            if result.get("status") == "error":
+                step_status = "error"
+                _append_reason(state, _reason_record(
+                    "execution_node", "TOOL_EXECUTION_FAILURE",
+                    f"Tool '{tool_name}' failed after retry for step {step_id}",
+                    extra={"tool": tool_name, "error": result.get("error_msg")},
+                ))
+
+            # Register result data as artifact
+            if result.get("status") == "completed" and result.get("result"):
+                content_ref = f"tool:{tool_name}:{step_id}"
+                artifact_id = _register_artifact(
+                    state,
+                    artifact_type=f"tool_result_{tool_name}",
+                    purpose=f"Result from {tool_name} for step {step_id}: {step.get('description', '')[:60]}",
+                    step_id=step_id,
+                    content_ref=content_ref,
+                )
+                artifact_ids.append(artifact_id)
+
+        except Exception as exc:
+            logger.exception("[EXECUTION] unexpected error executing tool '%s'", tool_name)
+            tool_results.append({
+                "tool": tool_name,
+                "status": "error",
+                "elapsed_ms": 0,
+            })
+            step_status = "error"
+            _append_reason(state, _reason_record(
+                "execution_node", "TOOL_EXECUTION_EXCEPTION",
+                f"Unexpected exception for tool '{tool_name}': {str(exc)[:100]}",
+            ))
+
+    # Build step result
+    step_result = {
+        "step_id": step_id,
+        "status": step_status,
+        "data": tool_results,
+        "artifacts": artifact_ids,
+    }
+
+    existing_results = list(state.get("execution_results", []))
+    existing_results.append(step_result)
+
+    next_step_idx = step_idx + 1
+    new_plan_phase = "composing" if next_step_idx >= len(steps) else "executing"
+
+    return {
+        "execution_results": existing_results,
+        "artifacts": state.get("artifacts", []),
+        "current_plan_step": next_step_idx,
+        "plan_phase": new_plan_phase,
+        "reasoning_steps": _append_reason(state, _reason_record(
+            "execution_node", "STEP_COMPLETED",
+            f"Step {step_id}/{len(steps)} completed with status={step_status}",
+            extra={"step_id": step_id, "status": step_status, "tool_count": len(required_tools)},
+        )),
+    }
