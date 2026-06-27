@@ -59,9 +59,28 @@ function chartSpecToOption(chart: any) {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
+  const charts = message.charts || [];
 
-  // Strip [CHART:n] markers from content — rendered separately
-  const cleanContent = message.content.replace(/\[CHART:\d+\]/g, '').trim();
+  // Split content at [CHART:n] markers and interleave with charts
+  const chartPattern = /\[CHART:(\d+)\]/g;
+  const contentParts: { type: 'text' | 'chart'; content?: string; chartIndex?: number }[] = [];
+  let lastIdx = 0;
+  let match;
+  while ((match = chartPattern.exec(message.content)) !== null) {
+    const textBefore = message.content.slice(lastIdx, match.index).trim();
+    if (textBefore) contentParts.push({ type: 'text', content: textBefore });
+    const chartIdx = parseInt(match[1], 10);
+    contentParts.push({ type: 'chart', chartIndex: chartIdx });
+    lastIdx = match.index + match[0].length;
+  }
+  const remaining = message.content.slice(lastIdx).trim();
+  if (remaining) contentParts.push({ type: 'text', content: remaining });
+
+  // Fallback: if no markers but charts exist, show charts at end
+  const hasMarkers = contentParts.some(p => p.type === 'chart');
+  if (!hasMarkers && charts.length > 0) {
+    contentParts.push({ type: 'text', content: message.content });
+  }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
@@ -86,20 +105,45 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <ToolCallPanel toolCalls={message.toolCalls} />
         )}
 
-        {/* Content */}
+        {/* Content with inline charts */}
         {isUser ? (
-          <div className="whitespace-pre-wrap">{cleanContent}</div>
+          <div className="whitespace-pre-wrap">{message.content}</div>
+        ) : hasMarkers ? (
+          <div>
+            {contentParts.map((part, i) => {
+              if (part.type === 'chart' && part.chartIndex !== undefined) {
+                const chart = charts[part.chartIndex];
+                if (chart) {
+                  return (
+                    <div key={i} className="my-3 border border-gray-200 rounded-lg p-2">
+                      <ReactECharts
+                        option={chartSpecToOption(chart)}
+                        style={{ height: 300, width: '100%' }}
+                        opts={{ renderer: 'canvas' }}
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              }
+              return (
+                <StreamingRenderer key={i} isStreaming={isStreaming && i === contentParts.length - 1}>
+                  <MarkdownRenderer content={part.content || ''} />
+                </StreamingRenderer>
+              );
+            })}
+          </div>
         ) : (
           <StreamingRenderer isStreaming={isStreaming}>
-            <MarkdownRenderer content={cleanContent} />
+            <MarkdownRenderer content={message.content} />
           </StreamingRenderer>
         )}
 
-        {/* Charts (from chart SSE events) */}
-        {!isUser && message.charts && message.charts.length > 0 && (
+        {/* Charts without markers — fallback at end */}
+        {!hasMarkers && charts.length > 0 && (
           <div className="mt-3 space-y-4">
-            {message.charts.map((chart: any, i: number) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-lg p-2">
+            {charts.map((chart: any, i: number) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-2">
                 <ReactECharts
                   option={chartSpecToOption(chart)}
                   style={{ height: 300, width: '100%' }}
