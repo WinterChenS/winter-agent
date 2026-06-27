@@ -172,103 +172,69 @@ async def stream_generate(request: GenerateRequest):
                     payload={"messageId": message_id, "agentId": active_agent},
                 ))
 
-                # Run graph stream + event bus reader concurrently
+                # Run graph stream + event bus reader concurrently via asyncio.Queue
+                merge_queue: asyncio.Queue = asyncio.Queue()
+
                 async def graph_runner():
-                    nonlocal final_state, assistant_text_emitted
-                    graph_events = graph.astream_events(inputs, config=config, version="v2")
-                    async for event in graph_events:
-                        mapped, _, captured = map_langgraph_event_to_envelopes(
-                            event, event_ctx, None, message_id=message_id,
-                        )
-                        if captured is not None:
-                            final_state = captured
-                        for envelope in mapped:
-                            if envelope.get("type") == "message.delta":
-                                assistant_text_emitted = True
-                            yield envelope
-
-                async def bus_reader():
-                    async for bus_event in event_bus.events():
-                        yield {
-                            "type": bus_event.type,
-                            "schemaVersion": "1.0",
-                            "conversationId": trace_ctx.conversation_id,
-                            "messageId": message_id,
-                            "agentId": active_agent,
-                            "timestamp": bus_event.timestamp,
-                            "payload": bus_event.data,
-                        }
-
-                # Merge both streams
-                graph_done = False
-                bus_done = False
-                graph_gen = graph_runner()
-                bus_gen = bus_reader()
-                pending_graph: list = []
-                pending_bus: list = []
-
-                while not graph_done or not bus_done or pending_graph or pending_bus:
-                    # Prioritize bus events (progress) over graph events (tokens)
-                    if pending_bus:
-                        for env in pending_bus:
-                            yield to_sse_data(env)
-                        pending_bus.clear()
-
-                    if pending_graph:
-                        env = pending_graph.pop(0)
-                        yield to_sse_data(env)
-                        continue
-
-                    if pending_bus:
-                        continue
-
-                    # Try both sources
-                    tasks = []
-                    if not graph_done:
-                        tasks.append(("graph", graph_gen.__anext__()))
-                    if not bus_done:
-                        tasks.append(("bus", bus_gen.__anext__()))
-
-                    if not tasks:
-                        break
-
-                    done_set, _ = await asyncio.wait(
-                        [t[1] for t in tasks],
-                        return_when=asyncio.FIRST_COMPLETED,
-                        timeout=0.1,
-                    )
-
-                    for task in done_set:
-                        for name, t in tasks:
-                            if t is task:
-                                try:
-                                    result = task.result()
-                                    if name == "graph":
-                                        pending_graph.append(result)
-                                    else:
-                                        pending_bus.append(result)
-                                except StopAsyncIteration:
-                                    if name == "graph":
-                                        graph_done = True
-                                    else:
-                                        bus_done = True
-                                break
-
-                event_bus.close()
-
-                # Yield remaining bus events
-                remaining = []
-                async for bus_event in bus_gen:
-                    remaining.append(bus_event)
-                for env in remaining:
-                    yield to_sse_data(env)
-                # Consume remaining graph
-                if not graph_done:
                     try:
-                        async for env in graph_gen:
-                            yield to_sse_data(env)
+                        async for event in graph.astream_events(inputs, config=config, version="v2"):
+                            mapped, _, captured = map_langgraph_event_to_envelopes(
+                                event, event_ctx, None, message_id=message_id,
+                            )
+                            if captured is not None:
+                                nonlocal final_state
+                                final_state = captured
+                            for envelope in mapped:
+                                if envelope.get("type") == "message.delta":
+                                    nonlocal assistant_text_emitted
+                                    assistant_text_emitted = True
+                                await merge_queue.put(("graph", envelope))
+                    except Exception as e:
+                        await merge_queue.put(("error", str(e)))
+                    finally:
+                        await merge_queue.put(("graph_done", None))
+
+                async def bus_runner():
+                    try:
+                        async for bus_event in event_bus.events():
+                            envelope = {
+                                "type": bus_event.type,
+                                "schemaVersion": "1.0",
+                                "conversationId": trace_ctx.conversation_id,
+                                "messageId": message_id,
+                                "agentId": active_agent,
+                                "timestamp": bus_event.timestamp,
+                                "payload": bus_event.data,
+                            }
+                            await merge_queue.put(("bus", envelope))
                     except Exception:
                         pass
+                    finally:
+                        await merge_queue.put(("bus_done", None))
+
+                graph_task = asyncio.create_task(graph_runner())
+                bus_task = asyncio.create_task(bus_runner())
+
+                graph_done_flag = False
+                bus_done_flag = False
+
+                while not (graph_done_flag and bus_done_flag):
+                    source, data = await merge_queue.get()
+
+                    if source == "graph_done":
+                        graph_done_flag = True
+                    elif source == "bus_done":
+                        bus_done_flag = True
+                    elif source == "error":
+                        yield to_sse_data(envelope_error(trace_ctx, str(data)))
+                        graph_done_flag = True
+                    else:
+                        # Bus events (progress) get priority — yield immediately
+                        yield to_sse_data(data)
+
+                # Cleanup
+                await asyncio.gather(graph_task, bus_task, return_exceptions=True)
+                event_bus.close()
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
