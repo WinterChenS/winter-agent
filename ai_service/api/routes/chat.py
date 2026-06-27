@@ -278,6 +278,7 @@ async def stream_generate(request: GenerateRequest):
                 graph_done_flag = False
                 bus_done_flag = False
                 tool_calls_accumulated: dict[str, dict] = {}
+                content_accumulated = ""
 
                 while not (graph_done_flag and bus_done_flag):
                     source, data = await merge_queue.get()
@@ -292,8 +293,11 @@ async def stream_generate(request: GenerateRequest):
                         graph_done_flag = True
                         event_bus.close()
                     else:
-                        # Accumulate tool calls for persistence
+                        # Accumulate tool calls and content for persistence
                         _accumulate_tool_call(data, tool_calls_accumulated)
+                        if data.get("type") == "message.delta":
+                            p = data.get("payload", data) or {}
+                            content_accumulated += str(p.get("delta", ""))
                         yield to_sse_data(data)
 
                 # Cleanup
@@ -305,6 +309,7 @@ async def stream_generate(request: GenerateRequest):
                 collab_text = ""
                 if final_state and final_state.get("collab_result"):
                     collab_text = str(final_state["collab_result"])
+                    content_accumulated += collab_text
                     logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
                     for char in collab_text:
                         yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
@@ -324,7 +329,7 @@ async def stream_generate(request: GenerateRequest):
                             "id": message_id,
                             "conversation_id": trace_ctx.conversation_id,
                             "role": "assistant",
-                            "content": collab_text or extract_last_assistant_text(final_state),
+                            "content": content_accumulated,
                             "toolCalls": list(tool_calls_accumulated.values()),
                             "status": "done",
                             "agentId": trace_ctx.agent_id,
