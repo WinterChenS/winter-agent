@@ -14,9 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class CollaborationResult:
-    def __init__(self, content: str, agent_results: list[dict]) -> None:
+    def __init__(self, content: str, agent_results: list[dict],
+                 chart_specs: list[dict] | None = None) -> None:
         self.content = content
         self.agent_results = agent_results
+        self.chart_specs = chart_specs or []
 
 
 def _build_lc_tool(tool_obj):
@@ -58,14 +60,27 @@ class CollaborationEngine:
         strategy: str,
     ) -> CollaborationResult:
         if strategy == "sequential":
-            return await self._sequential(runtimes, user_query)
+            result = await self._sequential(runtimes, user_query)
         elif strategy == "parallel":
-            return await self._parallel(runtimes, user_query)
+            result = await self._parallel(runtimes, user_query)
         elif strategy == "supervisor":
-            return await self._supervisor(runtimes, user_query)
+            result = await self._supervisor(runtimes, user_query)
         else:
             msg = f"Unknown strategy: {strategy}"
             raise ValueError(msg)
+
+        # Auto-extract charts if user asked for visualization
+        chart_keywords = ["图", "chart", "折线", "柱状", "饼图", "散点",
+                         "可视化", "曲线", "展示", "画", "plot", "graph",
+                         "面积图", "雷达图"]
+        if any(kw in user_query.lower() for kw in chart_keywords):
+            try:
+                chart_specs = await self._extract_charts(result.content, user_query)
+                result.chart_specs = chart_specs
+            except Exception:
+                pass
+
+        return result
 
     async def _run_agent_with_tools(
         self,
@@ -249,6 +264,60 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
             {"agent": supervisor.name, "status": "ok"},
             *worker_results,
         ])
+
+
+    async def _extract_charts(
+        self, content: str, user_query: str,
+    ) -> list[dict]:
+        """Extract chart specs from collaboration result using lightweight LLM call."""
+        from langchain_openai import ChatOpenAI
+        from config import settings
+
+        # Truncate content to first 3000 chars for chart extraction
+        snippet = content[:3000]
+
+        prompt = f"""Extract structured chart data from this analysis text.
+User asked: {user_query}
+
+Analysis result:
+{snippet}
+
+Output a JSON array of chart specs. Each chart spec has:
+- "title": chart title
+- "chartType": "line" | "bar" | "pie" | "scatter" | "area"
+- "description": one-line summary
+- "xAxisLabel": X axis label
+- "yAxisLabel": Y axis label
+- "data": [{{"name": "label", "value": number, "group": "optional group"}}]
+
+Rules:
+- Only create charts if the data is present in the text
+- Use numbers from the analysis, not made-up values
+- Max 3 charts
+- If no chartable data, return empty array []
+- Output ONLY the JSON array, no explanation"""
+
+        llm = ChatOpenAI(
+            model=settings.model,
+            temperature=0.1,
+            streaming=False,
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+        )
+
+        try:
+            resp = await llm.ainvoke([HumanMessage(content=prompt)])
+            charts = json.loads(str(resp.content).strip())
+            if isinstance(charts, list):
+                # Ensure each chart has an id
+                for i, c in enumerate(charts):
+                    if isinstance(c, dict) and "id" not in c:
+                        c["id"] = f"chart-{i}"
+                return charts
+        except Exception as e:
+            logging.warning("Chart extraction failed: %s", e)
+
+        return []
 
 
 def _find_tool(tools: list, name: str):

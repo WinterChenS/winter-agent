@@ -74,6 +74,7 @@ async def collaboration_node(state: State, *, factory: AgentFactory, engine: Col
     return {
         "collab_result": result.content,
         "agent_results": result.agent_results,
+        "chart_specs": result.chart_specs,
         "route": "merge",
     }
 
