@@ -15,11 +15,17 @@ class AgentRuntime:
     """A fully assembled agent ready to execute."""
 
     name: str
-    display_name: str
-    llm: ChatOpenAI
-    system_prompt: str
-    tools: list  # list of BaseTool instances
-    strategy: str
+    display_name: str = ""
+    llm: ChatOpenAI | None = None
+    system_prompt: str = ""
+    tools: list | None = None
+    strategy: str = "sequential"
+
+    def __post_init__(self):
+        if not self.display_name:
+            self.display_name = self.name
+        if self.tools is None:
+            self.tools = []
 
 
 class AgentFactory:

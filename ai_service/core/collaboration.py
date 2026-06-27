@@ -29,10 +29,14 @@ def _build_lc_tool(tool_obj):
 
     name = tool_obj.name
     desc = getattr(tool_obj, 'description', name) or name
-    input_schema = getattr(tool_obj, 'input_schema', None) or {}
+    input_schema = getattr(tool_obj, 'input_schema', None)
+
+    # Validate input_schema — must be a dict
+    if not isinstance(input_schema, dict) or not input_schema.get('properties'):
+        logger.warning("Tool %s has invalid input_schema, skipping", name)
+        return None
 
     async def _execute(**kwargs) -> str:
-        # Unwrap if LangChain double-wraps in 'kwargs' key
         if 'kwargs' in kwargs and len(kwargs) == 1:
             kwargs = kwargs['kwargs']
         result = await tool_obj.execute(kwargs)
@@ -102,7 +106,9 @@ class CollaborationEngine:
             for t in runtime.tools:
                 if hasattr(t, 'name') and hasattr(t, 'execute'):
                     from langchain_core.tools import tool
-                    lc_tools.append(_build_lc_tool(t))
+                    lc = _build_lc_tool(t)
+                    if lc:
+                        lc_tools.append(lc)
             if lc_tools:
                 llm = llm.bind_tools(lc_tools)
 
