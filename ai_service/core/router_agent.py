@@ -47,19 +47,24 @@ class RouterAgent:
 
     async def route(self, user_query: str) -> RouterResult:
         agents = await self._repo.list_enabled()
+        logger.info("[Router] %d enabled agents available", len(agents))
         if not agents:
+            logger.warning("[Router] No enabled agents found!")
             return RouterResult([], "sequential", "none")
 
         # 1. Keyword matching
         matched = self._keyword_match(user_query, agents)
         if matched:
+            names = [a.name for a in matched]
             if len(matched) == 1:
                 strategy = matched[0].collaboration_strategy
             else:
                 strategies = set(a.collaboration_strategy for a in matched)
                 strategy = matched[0].collaboration_strategy if len(strategies) == 1 else "parallel"
+            logger.info("[Router] ✅ keyword matched %d agent(s): %s (strategy=%s)", len(matched), names, strategy)
             return RouterResult(matched, strategy, "keyword")
 
+        logger.info("[Router] No keyword match, trying LLM fallback...")
         # 2. LLM fallback
         return await self._llm_route(user_query, agents)
 
@@ -73,12 +78,17 @@ class RouterAgent:
         for agent in agents:
             if not agent.trigger_keywords:
                 continue
-            hits = sum(1 for kw in agent.trigger_keywords if kw.lower() in query_lower)
+            matched_kws = [kw for kw in agent.trigger_keywords if kw.lower() in query_lower]
+            hits = len(matched_kws)
             if hits > 0:
                 scored.append((agent, hits))
+                logger.info("[Router] agent '%s' matched keywords: %s (score=%d)", agent.name, matched_kws[:5], hits)
         scored.sort(key=lambda x: (-x[1], -x[0].priority))
+        result = [a for a, _ in scored[:3]]
+        if not result:
+            logger.info("[Router] no keyword match for query: '%s'", query[:80])
         # Return top 3
-        return [a for a, _ in scored[:3]]
+        return result
 
     async def _llm_route(
         self,
