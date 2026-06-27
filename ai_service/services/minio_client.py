@@ -27,7 +27,7 @@ def _get_client() -> Minio | None:
     # Ensure .env is loaded (may not be loaded in subprocess contexts)
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except ImportError:
         pass
 
