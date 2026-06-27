@@ -1304,8 +1304,13 @@ async def execution_node(state: State, event_bus=None) -> dict:
 
             if result.get("status") == "completed":
                 # Extract image URLs from execute_python result
-                output_data = result.get("result", {})
-                images = output_data.get("images", {}) if isinstance(output_data, dict) else {}
+                # result structure: {"result": {"ok": True, "result": {"output": "...", "images": {...}}}}
+                outer_result = result.get("result", {})
+                if isinstance(outer_result, dict):
+                    inner_result = outer_result.get("result", {})
+                    images = inner_result.get("images", {}) if isinstance(inner_result, dict) else {}
+                else:
+                    images = {}
                 if images:
                     for fname, url in images.items():
                         artifact_id = _register_artifact(state, artifact_type="image", purpose=f"Chart: {step.get('description', '')[:60]}", step_id=step_id, content_ref=url)
