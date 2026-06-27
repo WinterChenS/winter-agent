@@ -79,15 +79,14 @@ async def collaboration_node(state: State, *, factory: AgentFactory, engine: Col
 
 
 async def merge_node(state: State) -> dict:
-    """Merge collaboration result into messages for the downstream pipeline.
-    Skip chart_planner when we have a result — go directly to answer for streaming."""
+    """Merge collaboration result into messages. Route to chart_planner for chart extraction."""
     collab_result = state.get("collab_result")
     if collab_result:
         return {
             "messages": [HumanMessage(content=collab_result)],
-            "route": "answer",
+            "route": "chart_planner",
         }
-    return {"route": "answer"}
+    return {"route": "chart_planner"}
 
 
 def _route_from_router(state: State) -> str:
