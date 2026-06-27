@@ -141,13 +141,6 @@ function handleEvent(event: SseEvent): void {
       }
       break;
 
-    case 'chart':
-      if (messageId) {
-        const cs = payload.chartSpec || (event as any).chartSpec;
-        if (cs) store.addChart(messageId, cs as Record<string, unknown>);
-      }
-      break;
-
     case 'message.tool_call':
       if (messageId && toolCall) store.upsertToolCall(messageId, toolCall);
       break;

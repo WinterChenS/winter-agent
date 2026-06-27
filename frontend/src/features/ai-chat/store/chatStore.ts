@@ -17,7 +17,6 @@ interface ChatState {
   appendReasoning: (id: string, delta: string) => void;
   upsertToolCall: (messageId: string, toolCall: ToolCall) => void;
   addImage: (messageId: string, filename: string, url: string) => void;
-  addChart: (messageId: string, chart: Record<string, unknown>) => void;
   completeMessage: (id: string, status: "done" | "error") => void;
   setAgentId: (id: string) => void;
   setConversationId: (id: string) => void;
@@ -103,12 +102,6 @@ export const useChatStore = create<ChatState>((set) => ({
     if (!msg) return state;
     const images = { ...(msg.images || {}), [filename]: url };
     return { messages: { ...state.messages, [messageId]: { ...msg, images } } };
-  }),
-  addChart: (messageId, chart) => set(state => {
-    const msg = state.messages[messageId];
-    if (!msg) return state;
-    const charts = [...(msg.charts || []), chart];
-    return { messages: { ...state.messages, [messageId]: { ...msg, charts } } };
   }),
   completeMessage: (id, status) => set(state => {
     const msg = state.messages[id];
