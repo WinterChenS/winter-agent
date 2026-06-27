@@ -61,19 +61,30 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isStreaming = message.status === 'streaming';
   const charts = message.charts || [];
 
-  // Split content at [CHART:n] markers and interleave with charts
-  const chartPattern = /\[CHART:(\d+)\]/g;
+  // Build a lookup: chart id → index
+  const chartIdToIndex: Record<string, number> = {};
+  charts.forEach((c: any, i: number) => { chartIdToIndex[c.id] = i; });
+
+  // Split content at [CHART:<id>] markers — supports both numeric and string IDs
+  const chartPattern = /\[CHART:([^\]]+)\]/g;
   const contentParts: { type: 'text' | 'chart'; content?: string; chartIndex?: number }[] = [];
   let lastIdx = 0;
   let match;
   while ((match = chartPattern.exec(message.content)) !== null) {
     const textBefore = message.content.slice(lastIdx, match.index).trim();
     if (textBefore) contentParts.push({ type: 'text', content: textBefore });
-    const chartIdx = parseInt(match[1], 10);
-    contentParts.push({ type: 'chart', chartIndex: chartIdx });
+    const chartId = match[1];
+    // Try numeric index first, then ID lookup
+    const numIdx = parseInt(chartId, 10);
+    const chartIdx = !isNaN(numIdx) ? numIdx : chartIdToIndex[chartId];
+    if (chartIdx !== undefined) {
+      contentParts.push({ type: 'chart', chartIndex: chartIdx });
+    }
     lastIdx = match.index + match[0].length;
   }
-  const remaining = message.content.slice(lastIdx).trim();
+  const remaining = message.content.slice(lastIdx)
+    .replace(/\[图\]/g, '')  // Strip legacy chart placeholders
+    .trim();
   if (remaining) contentParts.push({ type: 'text', content: remaining });
 
   // Fallback: if no markers but charts exist, show charts at end
