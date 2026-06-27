@@ -242,7 +242,7 @@ async def stream_generate(request: GenerateRequest):
                     if isinstance(chart_specs, list):
                         for cs in chart_specs:
                             if isinstance(cs, dict) and cs:
-                                yield to_sse_data(envelope_chart(trace_ctx, cs))
+                                yield to_sse_data(envelope_chart(trace_ctx, cs, message_id=message_id))
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
