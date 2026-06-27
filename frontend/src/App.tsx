@@ -12,19 +12,17 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={
-          <PrivateRoute><ChatInterface /></PrivateRoute>
+          <PrivateRoute><ChatContainer /></PrivateRoute>
         } />
         <Route path="/chat/:id" element={
-          <PrivateRoute><ChatInterface /></PrivateRoute>
+          <PrivateRoute><ChatContainer /></PrivateRoute>
         } />
         <Route path="/admin/agents" element={
           <PrivateRoute><AdminAgents /></PrivateRoute>
         } />
-        <Route path="/chat-v2/:id" element={
-          <PrivateRoute><ChatContainer /></PrivateRoute>
-        } />
-        <Route path="/chat-v2" element={
-          <PrivateRoute><ChatContainer /></PrivateRoute>
+        {/* @deprecated: legacy route kept for reference, old UI replaced by ChatContainer */}
+        <Route path="/chat-legacy/:id" element={
+          <PrivateRoute><ChatInterface /></PrivateRoute>
         } />
       </Routes>
     </AuthProvider>
