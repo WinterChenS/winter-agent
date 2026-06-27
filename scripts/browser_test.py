@@ -261,10 +261,11 @@ async def test_empty_state(page):
     empty = page.get_by_text("开始", exact=False).first
     if await empty.is_visible():
         print("  ✓ Empty state message shown")
+        await screenshot(page, "07-empty-state")
+        return True
     else:
         print("  ⚠ Empty state message not found")
-
-    await screenshot(page, "07-empty-state")
+        return False
 
 
 async def test_agent_selector(page):
@@ -285,10 +286,11 @@ async def test_agent_selector(page):
         if len(options) > 1:
             await select.select_option(index=1)
             print(f"  ✓ Switched to: {option_texts[1]}")
-    else:
-        print("  ⚠ No agent selector found")
+            await screenshot(page, "08-agent-selector")
+            return True
 
-    await screenshot(page, "08-agent-selector")
+    print("  ⚠ No agent selector found")
+    return False
 
 
 async def test_markdown_rendering(page):
@@ -323,6 +325,7 @@ async def test_markdown_rendering(page):
             break
 
     await screenshot(page, "09-markdown")
+    return has_table
 
 
 async def nav_to_chat(page):
