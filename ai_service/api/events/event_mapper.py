@@ -99,6 +99,14 @@ def map_langgraph_event_to_envelopes(
     event_name = event.get("name")
 
     if event_type == "on_chat_model_stream":
+        # Only forward stream tokens from answer_node or non-graph LLM calls.
+        # Router and collaboration LLM calls are internal — their output
+        # goes through the pipeline, not directly to the user.
+        node_name = (event.get("metadata") or {}).get("langgraph_node", "")
+        allowed_nodes = {"answer", "agent", "chart_planner"}
+        if node_name and node_name not in allowed_nodes:
+            return envelopes, active_tool_span_id, final_state
+
         chunk = event.get("data", {}).get("chunk")
         content = getattr(chunk, "content", "")
         if content:

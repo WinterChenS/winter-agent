@@ -34,33 +34,16 @@ async def router_node(state: State, *, router: RouterAgent) -> dict:
             "strategy": result.strategy,
             "source": result.source,
         },
-        "selected_agents": result.agents,
+        "selected_agents": agent_names,  # Store names only (msgpack-safe)
         "selected_strategy": result.strategy,
     }
 
 
-async def factory_node(state: State, *, factory: AgentFactory) -> dict:
-    """Build AgentRuntime instances from selected agent definitions."""
-    agents = state.get("selected_agents", [])
-    if not agents:
-        return {"runtimes": [], "route": "chart_planner"}
-
-    user_query = ""
-    for msg in reversed(list(state.get("messages", []))):
-        if hasattr(msg, "type") and msg.type == "human":
-            user_query = msg.content or ""
-            break
-
-    runtimes = [factory.build(a, context={"user_query": user_query}) for a in agents]
-
-    return {"runtimes": runtimes}
-
-
-async def collaboration_node(state: State, *, engine: CollaborationEngine) -> dict:
-    """Execute multi-agent collaboration."""
-    runtimes = state.get("runtimes", [])
+async def collaboration_node(state: State, *, factory: AgentFactory, engine: CollaborationEngine) -> dict:
+    """Build agent runtimes and execute collaboration.
+    Combined into one node to avoid msgpack serialization of AgentRuntime objects."""
+    agent_names = state.get("selected_agents", [])
     strategy = state.get("selected_strategy", "sequential")
-    logger.info("[COLLAB] executing with %d agent(s) strategy=%s", len(runtimes), strategy)
 
     user_query = ""
     for msg in reversed(list(state.get("messages", []))):
@@ -68,8 +51,23 @@ async def collaboration_node(state: State, *, engine: CollaborationEngine) -> di
             user_query = msg.content or ""
             break
 
-    if not runtimes:
-        return {"collab_result": None, "route": "chart_planner"}
+    if not agent_names:
+        return {"collab_result": None, "route": "answer"}
+
+    # Load agent definitions by name and build runtimes
+    from core.runtime import get_agent_repository
+    repo = get_agent_repository()
+    selected: list = []
+    for name in agent_names:
+        agents = await repo.list_enabled()
+        for a in agents:
+            if a.name == name or a.id == name:
+                selected.append(a)
+                break
+
+    runtimes = [factory.build(a, context={"user_query": user_query}) for a in selected]
+    logger.info("[COLLAB] executing with %d agent(s) strategy=%s: %s",
+                len(runtimes), strategy, [r.name for r in runtimes])
 
     result = await engine.execute(runtimes, user_query, strategy)
 
@@ -96,12 +94,7 @@ def _route_from_router(state: State) -> str:
     agents = state.get("selected_agents", [])
     if not agents:
         return "answer"  # No agents → answer directly
-    return "factory"
-
-
-def _route_from_factory(state: State) -> str:
-    runtimes = state.get("runtimes", [])
-    return "collaboration" if runtimes else "chart_planner"
+    return "collaboration"
 
 
 def _route_from_collaboration(state: State) -> str:
@@ -123,11 +116,9 @@ def create_multi_agent_graph(
 
     # Multi-agent nodes — wrap async functions for LangGraph
     async def _router(s): return await router_node(s, router=router)
-    async def _factory(s): return await factory_node(s, factory=factory)
-    async def _collaboration(s): return await collaboration_node(s, engine=engine)
+    async def _collaboration(s): return await collaboration_node(s, factory=factory, engine=engine)
 
     workflow.add_node("router", _router)
-    workflow.add_node("factory", _factory)
     workflow.add_node("collaboration", _collaboration)
     workflow.add_node("merge", merge_node)
 
@@ -141,18 +132,8 @@ def create_multi_agent_graph(
         "router",
         _route_from_router,
         {
-            "factory": "factory",
-            "answer": "answer",
-            "chart_planner": "chart_planner",
-        },
-    )
-
-    workflow.add_conditional_edges(
-        "factory",
-        _route_from_factory,
-        {
             "collaboration": "collaboration",
-            "chart_planner": "chart_planner",
+            "answer": "answer",
         },
     )
 
@@ -161,7 +142,7 @@ def create_multi_agent_graph(
         _route_from_collaboration,
         {
             "merge": "merge",
-            "chart_planner": "chart_planner",
+            "answer": "answer",
         },
     )
 
