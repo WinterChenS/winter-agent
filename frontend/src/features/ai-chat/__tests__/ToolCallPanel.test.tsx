@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ToolCallPanel } from '../components/ToolCallPanel';
 
 function makeToolCall(id: string, status: 'pending' | 'running' | 'done' | 'failed', name = 'search') {
@@ -35,12 +35,16 @@ describe('ToolCallPanel', () => {
     expect(checkmarks.length).toBeGreaterThan(0);
   });
 
-  it('shows tool name for each tool', () => {
+  it('shows tool name for each tool after expanding', async () => {
     render(<ToolCallPanel toolCalls={[
       makeToolCall('tc-1', 'done', 'search'),
       makeToolCall('tc-2', 'done', 'browser'),
     ]} />);
-    expect(screen.getByText('search')).toBeTruthy();
+    // Two done tools start auto-collapsed — click header button to expand
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => {
+      expect(screen.getByText('search')).toBeTruthy();
+    });
     expect(screen.getByText('browser')).toBeTruthy();
   });
 });

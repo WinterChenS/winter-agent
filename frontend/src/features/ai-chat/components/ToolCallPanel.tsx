@@ -70,7 +70,7 @@ const ToolCallItem = React.memo(function ToolCallItem({ toolCall }: { toolCall: 
         </button>
       )}
       {expanded && toolCall.result !== undefined && (
-        <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-60 overflow-y-auto col-span-full">
+        <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-60 overflow-y-auto w-full">
           {typeof toolCall.result === 'string'
             ? toolCall.result
             : JSON.stringify(toolCall.result, null, 2)}
@@ -82,20 +82,27 @@ const ToolCallItem = React.memo(function ToolCallItem({ toolCall }: { toolCall: 
 
 export function ToolCallPanel({ toolCalls }: ToolCallPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [userToggled, setUserToggled] = useState(false);
   const tools = toolCalls ?? [];
 
   if (tools.length === 0) return null;
 
   const status = useMemo(() => aggregateStatus(tools), [tools]);
   const defaultCollapsed = tools.length > 1 && status === 'done';
-
-  const effectiveCollapsed = collapsed || defaultCollapsed;
+  const effectiveCollapsed = userToggled ? collapsed : defaultCollapsed;
 
   return (
     <div className="border border-gray-200 rounded-lg mb-3 text-sm overflow-hidden">
       {/* Header */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={() => {
+          if (!userToggled) {
+            setUserToggled(true);
+            setCollapsed(!defaultCollapsed);
+          } else {
+            setCollapsed(!collapsed);
+          }
+        }}
         className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
       >
         <AggregateIcon status={status} />
@@ -109,7 +116,7 @@ export function ToolCallPanel({ toolCalls }: ToolCallPanelProps) {
         )}
       </button>
       {/* Body */}
-      {!collapsed && (
+      {!effectiveCollapsed && (
         <div className="px-3 py-1.5 divide-y divide-gray-100">
           {tools.map((tc) => (
             <ToolCallItem key={tc.id} toolCall={tc} />
