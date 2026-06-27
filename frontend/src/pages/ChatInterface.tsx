@@ -8,6 +8,7 @@ import { useChatStore } from '../features/ai-chat/store/chatStore';
 import { useChatStream } from '../features/ai-chat/hooks/useChatStream';
 import { useConversation } from '../features/ai-chat/hooks/useConversation';
 import { MessageList } from '../features/ai-chat/components/MessageList';
+import type { AgentInfo } from '../features/ai-chat/types/agent';
 import { InputBox } from '../features/ai-chat/components/InputBox';
 
 export function ChatInterface() {
@@ -18,6 +19,19 @@ export function ChatInterface() {
 
   const { sessions, createSession, removeSession, updateSessionTitle } = useSessions();
   const { username, logout } = useAuth();
+  const agentId = useChatStore(s => s.agentId);
+  const setAgentId = useChatStore(s => s.setAgentId);
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    fetch('/api/agents', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(data => setAgents(Array.isArray(data) ? data : []))
+      .catch(() => setAgents([]));
+  }, []);
   const { send, isSending } = useChatStream();
   const { loadHistory } = useConversation();
   const messageOrder = useChatStore(s => s.messageOrder);
@@ -97,6 +111,18 @@ export function ChatInterface() {
           <h1 className="text-xl font-semibold text-gray-800">
             {routeSessionId ? sessions.find(s => s.id === routeSessionId)?.title || 'AI Chat' : '新对话'}
           </h1>
+          <select
+            value={agentId || ''}
+            onChange={e => setAgentId(e.target.value)}
+            className="ml-4 border border-gray-300 rounded px-2 py-1 text-sm text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">Default Agent</option>
+            {agents.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.display_name || a.name}
+              </option>
+            ))}
+          </select>
           <div className="ml-auto flex items-center gap-4">
             {messages.length > 0 && (
               <button
