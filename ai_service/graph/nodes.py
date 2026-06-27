@@ -141,7 +141,9 @@ async def agent_node(state: State) -> dict:
     # When active_agent is explicitly set (not null, not "default"),
     # skip the ReAct loop entirely and route directly to chart_planner.
     active = state.get("active_agent", "default")
+    logging.info("[AGENT_NODE] active_agent=%s iteration=%s", active, state.get("iteration_count", 0))
     if active and active != "default":
+        logging.warning("[AGENT_NODE] ⚠️ agent '%s' selected — ReAct bypassed, routing to chart_planner (no tools will be called)", active)
         return {"route": "chart_planner", "active_agent": active}
 
     registry = get_tool_registry()
@@ -251,6 +253,7 @@ async def agent_node(state: State) -> dict:
     if action == "tool":
         tool_name = str(parsed.get("tool", "")).strip().lower()
         query = str(parsed.get("query", "")).strip()
+        logging.info("[AGENT_NODE] 🛠️ tool call decision: tool=%s query=%s", tool_name, query[:80])
 
         if not tool_name:
             return _force_final_answer(state, tool_result)
@@ -298,7 +301,9 @@ async def agent_node(state: State) -> dict:
 
     # 5. Handle final_answer — reject on first iteration
     if action == "final_answer":
+        logging.info("[AGENT_NODE] LLM returned final_answer (iter=%s, has_tool_result=%s)", current_iteration, bool(tool_result_sanitized))
         if not tool_result_sanitized:
+            logging.warning("[AGENT_NODE] ⚠️ final_answer on first turn — auto-injecting forced search")
             # First iteration with no tools → force search with user's question
             user_query = ""
             raw_messages = list(state.get("messages") or [])
@@ -527,6 +532,8 @@ async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
 # ────────────────────────────────────────────────────────────────────────────
 async def tool_node(state: State) -> dict:
     tool_input = state.get("tool_input") or {}
+    tool_name = state.get("current_tool") or ""
+    logging.info("[TOOL_NODE] 🛠️ executing tool=%s input_keys=%s", tool_name, list(tool_input.keys())[:5])
 
     # ── Parallel execution path ──
     if "actions" in tool_input:
@@ -618,6 +625,10 @@ async def tool_node(state: State) -> dict:
     )
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
+
+    logging.info("[TOOL_NODE] %s tool=%s elapsed=%dms status=%s",
+                 "✅" if status == "completed" else "❌",
+                 tool_name, int(elapsed_time * 1000), status)
 
     return {
         "tool_result": result_str,

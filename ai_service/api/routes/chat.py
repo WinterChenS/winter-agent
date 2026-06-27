@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 import random
 
@@ -85,6 +86,8 @@ async def stream_generate(request: GenerateRequest):
 
         # Load agent if specified
         agent_id = request.agent_id
+        logging.info("[CHAT] stream start: message_id=%s agent_id=%s conversation_id=%s message=%s",
+                     message_id, agent_id, request.conversation_id, request.message[:80])
         if agent_id:
             from core.runtime import get_agent_repository
             agent_repo = get_agent_repository()
