@@ -1275,6 +1275,7 @@ async def execution_node(state: State, event_bus=None) -> dict:
     step_status = "completed"
 
     import time as _time
+    previous_results = list(state.get("execution_results", []))
 
     for tool_name in required_tools:
         tool_call_id = f"{tool_name}_{step_id}_{int(_time.time()*1000)}"
@@ -1289,7 +1290,7 @@ async def execution_node(state: State, event_bus=None) -> dict:
                 chart_code = await _generate_chart_code(
                     step.get("description", ""),
                     expected_artifacts,
-                    existing_results,
+                    previous_results,
                 )
                 logger.info("[EXECUTION] chart code generated (%d chars)", len(chart_code))
                 result = await _execute_single_tool(tool_name, {"code": chart_code}, gate, context)
