@@ -223,18 +223,18 @@ async def stream_generate(request: GenerateRequest):
 
                     if source == "graph_done":
                         graph_done_flag = True
+                        event_bus.close()  # Signal bus_runner to stop
                     elif source == "bus_done":
                         bus_done_flag = True
                     elif source == "error":
                         yield to_sse_data(envelope_error(trace_ctx, str(data)))
                         graph_done_flag = True
+                        event_bus.close()
                     else:
-                        # Bus events (progress) get priority — yield immediately
                         yield to_sse_data(data)
 
                 # Cleanup
                 await asyncio.gather(graph_task, bus_task, return_exceptions=True)
-                event_bus.close()
 
                 # Emit chart specs from chart_planner_node output
                 if final_state:
