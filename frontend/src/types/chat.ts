@@ -22,7 +22,13 @@ export interface Message {
   createdAt?: number;
 }
 
-// Keep old types for AdminAgents backward compat
+// Keep old types for backward compat with Sidebar/system components
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+}
+
 export interface AgentDefinition {
   id: string;
   name: string;
