@@ -78,14 +78,22 @@ function handleEvent(event: SseEvent): void {
   const { type, messageId, delta, toolCall, status } = event;
   const store = useChatStore.getState();
 
+  console.log('[SSE]', type, event);
+
   switch (type) {
     case 'message.delta':
       if (messageId && delta) store.appendDelta(messageId, delta);
       break;
     case 'message.tool_call':
-      if (messageId && toolCall) store.upsertToolCall(messageId, toolCall);
+      console.log('[TOOL_CALL] messageId:', messageId, 'toolCall:', toolCall);
+      if (messageId && toolCall) {
+        store.upsertToolCall(messageId, toolCall);
+        const msg = store.messages[messageId];
+        console.log('[TOOL_CALL] after upsert, msg.toolCalls:', msg?.toolCalls);
+      }
       break;
     case 'message.reasoning':
+      console.log('[REASONING] messageId:', messageId, 'delta:', delta?.slice(0, 50));
       if (messageId && delta) store.appendReasoning(messageId, delta);
       break;
     case 'message.done':
@@ -98,5 +106,7 @@ function handleEvent(event: SseEvent): void {
       if (messageId) store.completeMessage(messageId, 'error');
       store.setIsSending(false);
       break;
+    default:
+      console.log('[SSE] unhandled event type:', type);
   }
 }
