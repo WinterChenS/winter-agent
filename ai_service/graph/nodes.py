@@ -762,12 +762,10 @@ async def answer_node(state: State) -> dict:
         fallback = "Sorry, an error occurred while generating the answer. Please try again."
         return {
             "messages": [AIMessage(content=fallback)],
-            "chart_specs": chart_specs,
             "route": "end",
         }
 
     return {
         "messages": [response],
-        "chart_specs": chart_specs,
         "route": "end",
     }
