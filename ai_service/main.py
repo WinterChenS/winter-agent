@@ -35,19 +35,22 @@ async def lifespan(app: FastAPI):
     checkpointer: AsyncPostgresSaver | None = None
 
     # ── 启动时初始化 ──────────────────────────────────────────────────────────
+    # 始终初始化 PostgreSQL pool（chat_messages 历史表依赖它）
+    print("Initializing PostgreSQL pool...")
+    pg_pool = AsyncConnectionPool(
+        conninfo=settings.postgres_uri,
+        max_size=10,
+        kwargs={
+            "autocommit": True,
+            "prepare_threshold": 0,
+        },
+    )
     if settings.api_key:
-        print("Initializing PostgreSQL pool for LangGraph...")
-        pg_pool = AsyncConnectionPool(
-            conninfo=settings.postgres_uri,
-            max_size=10,
-            kwargs={
-                "autocommit": True,
-                "prepare_threshold": 0,
-            },
-        )
         checkpointer = AsyncPostgresSaver(pg_pool)
         await checkpointer.setup()
         print("PostgreSQL checkpointer is ready.")
+    else:
+        print("No API key configured — running in mock mode (chat history via DB)")
 
     # 初始化 ToolRegistry（全局单例，整个应用生命周期共用）
     tool_registry = ToolRegistry()
