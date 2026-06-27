@@ -1,0 +1,13 @@
+{
+  "change": "unify-chart-pipeline",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "317b773afcc23150c11094d48557e3b0c09a07b4fa6e4496298ce1405c8aab00",
+  "files": [
+    { "path": "openspec/changes/unify-chart-pipeline/proposal.md", "sha256": "176b8da22cf4a3181124f3fbca98e24cbff137f0d904bc4f639a3d145f16a79f" },
+    { "path": "openspec/changes/unify-chart-pipeline/design.md", "sha256": "480be0bf52edc0da97f090b554fac6a0014faa0d37df664b03ca23c665cd4d63" },
+    { "path": "openspec/changes/unify-chart-pipeline/tasks.md", "sha256": "25500463cb7c4ba60d27ba0f2adf7ecc06d1b6a9435b09cbcd98e84d9d90a132" }
+  ]
+}

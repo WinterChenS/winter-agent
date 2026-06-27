@@ -2,6 +2,7 @@
 change: ai-chat-layer-rewrite
 design-doc: docs/superpowers/specs/2026-06-26-ai-chat-layer-rewrite-design.md
 base-ref: 2fd5b1f19578274810b2c23e2e81735de4896e00
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 # AI Chat UI Layer Rewrite 实施计划
@@ -26,6 +27,7 @@ base-ref: 2fd5b1f19578274810b2c23e2e81735de4896e00
 - 旧 Chat 文件保留不删，标注 @deprecated
 - 新 Chat UI 路由：/chat-v2/:id，旧 /chat/:id 保持不变直到迁移完成
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## File Structure Map
@@ -65,6 +67,7 @@ Modified files:
   scripts/test_chat_scenarios.py
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 1: Python — 重构 event_envelope.py
@@ -228,6 +231,7 @@ git add ai_service/domain/event_envelope.py ai_service/tests/test_event_envelope
 git commit -m "feat: add new SSE protocol envelope functions (message.delta/tool_call/reasoning/done)"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 2: Python — 更新 event_mapper.py
@@ -288,6 +292,7 @@ git add ai_service/api/events/event_mapper.py
 git commit -m "feat: update event mapper to emit new SSE protocol events"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 3: Python — 更新 schemas.py
@@ -332,6 +337,7 @@ git add ai_service/api/schemas.py
 git commit -m "feat: add agentId and messageId fields to GenerateRequest"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 4: Python — 更新 chat.py stream_generate
@@ -403,6 +409,7 @@ git add ai_service/api/routes/chat.py
 git commit -m "feat: add agentId routing, messageId passthrough, message.done emission to stream_generate"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 5: Python — 新增 chat_message_repository.py
@@ -500,6 +507,7 @@ git add ai_service/db/chat_message_repository.py
 git commit -m "feat: add chat_message_repository for message persistence"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 6: Python — 新增 PostgreSQL 迁移脚本
@@ -552,6 +560,7 @@ git add ai_service/db/migrations/001_create_chat_messages.sql
 git commit -m "feat: add chat_messages table migration"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 7: Python — 更新 get_chat_history
@@ -593,6 +602,7 @@ git add ai_service/api/routes/chat.py
 git commit -m "feat: update get_chat_history to use new chat_messages table"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 8: Python — 更新 graph.py Agent 路由
@@ -635,6 +645,7 @@ git add ai_service/graph/graph.py ai_service/graph/nodes.py
 git commit -m "feat: support agentId-based direct routing in graph"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 9: Spring Boot — 新增 AgentController
@@ -719,6 +730,7 @@ git add backend/src/main/java/com/example/aichat/controller/AgentController.java
 git commit -m "feat: add AgentController for CRUD proxy to Python AI service"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 10: Spring Boot — 更新 ChatRequest + AIClient
@@ -776,6 +788,7 @@ git add backend/src/main/java/com/example/aichat/model/ChatRequest.java \
 git commit -m "feat: add agentId and messageId passthrough in Spring Boot gateway"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 11-12: 前端 — 类型定义 + 依赖安装
@@ -868,6 +881,7 @@ git add frontend/src/types/chat.ts \
 git commit -m "feat: add new Message/ToolCall types and install zustand, virtual, shiki"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 13: 前端 — Zustand chatStore
@@ -1004,6 +1018,7 @@ git add frontend/src/features/ai-chat/store/chatStore.ts
 git commit -m "feat: add Zustand chatStore with Map-based state and rAF batching"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 14: 前端 — chatApi SSE 服务
@@ -1131,6 +1146,7 @@ git add frontend/src/features/ai-chat/services/chatApi.ts
 git commit -m "feat: add chatApi with new SSE protocol parser"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Tasks 15-22: 前端 — 核心组件（8 个组件）
@@ -1208,6 +1224,7 @@ git add frontend/src/features/ai-chat/components/<Component>.tsx
 git commit -m "feat: add <Component> for AI Chat UI"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Tasks 23-24: 前端 — Hooks + 集成
@@ -1333,6 +1350,7 @@ git add frontend/src/features/ai-chat/hooks/useConversation.ts \
 git commit -m "feat: add useConversation hook and /chat-v2 route"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 25: 前端 — 废弃旧文件
@@ -1362,6 +1380,7 @@ git add frontend/src/components/ChatMessage.tsx \
 git commit -m "chore: mark old Chat components as @deprecated"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 26: 测试 — 更新 test_chat_scenarios.py
@@ -1399,6 +1418,7 @@ git add scripts/test_chat_scenarios.py
 git commit -m "test: update test_chat_scenarios for new SSE protocol"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 27: 前端 — chatStore 单元测试
@@ -1486,6 +1506,7 @@ git add frontend/src/features/ai-chat/__tests__/chatStore.test.ts
 git commit -m "test: add chatStore unit tests"
 ```
 
+archived-with: 2026-06-27-ai-chat-layer-rewrite
 ---
 
 ## Task 28: 验收检查
