@@ -1,75 +1,40 @@
-export interface GuardReason {
-  node?: string;
-  code?: string;
-  message?: string;
-  timestamp?: number;
-  extra?: Record<string, unknown>;
-}
+// frontend/src/types/chat.ts
+// @deprecated — Old message types kept for AdminAgents compatibility.
+// New AI Chat UI uses features/ai-chat/types/message.ts
 
-export interface ChartDataPoint {
-  name: string;
-  value: number;
-  group?: string;
-}
-
-export interface ChartSpecData {
+export interface ToolCall {
   id: string;
-  title: string;
-  chartType: 'line' | 'bar' | 'pie' | 'scatter' | 'area' | 'radar';
-  description: string;
-  xAxisLabel?: string;
-  yAxisLabel?: string;
-  data: ChartDataPoint[];
-}
-
-export interface AgentProcessStep {
-  id?: string;
-  kind?: 'reasoning' | 'tool' | 'guard';
-  tool?: string;
-  title?: string;
-  summary?: string;
-  input?: string;
-  detail?: string;
-  status: 'completed' | 'error' | 'running';
-  elapsed_ms?: number;
-  error?: string;
-  startTime?: number;
-}
-
-export interface ContentBlock {
-  type: 'text' | 'chart';
-  content?: string;
-  chartId?: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  status: "pending" | "running" | "done" | "failed";
+  result?: unknown;
 }
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'tool_summary' | 'agent_step' | 'chart' | 'thinking';
+  role: "user" | "assistant" | "system";
   content: string;
-  timestamp: number;
-  toolSteps?: AgentProcessStep[];
-  guardReason?: GuardReason;
-  chartDatas?: ChartSpecData[];
-  contentBlocks?: ContentBlock[];
-}
-
-export interface ChatRequest {
-  message: string;
+  reasoning?: string;
+  toolCalls?: ToolCall[];
+  status: "streaming" | "done" | "error";
+  agentId?: string;
   conversationId?: string;
+  createdAt?: number;
+  images?: Record<string, string>;  // filename → url
+  charts?: Record<string, unknown>[];  // ChartSpec array
 }
 
-export interface ChatResponse {
-  content: string;
-  conversationId?: string;
-}
-
-export interface StreamEvent {
-  type: 'token' | 'done' | 'error';
-  data: string;
-}
-
+// Keep old types for backward compat with Sidebar/system components
 export interface Conversation {
   id: string;
   title: string;
   createdAt: number;
+}
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  enabled: boolean;
 }

@@ -2,6 +2,8 @@
 comet_change: refactor-tool-system
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-25-refactor-tool-system
+status: final
 ---
 
 # Tool System Refactor — Design Doc

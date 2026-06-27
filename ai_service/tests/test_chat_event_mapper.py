@@ -23,8 +23,8 @@ def test_map_chat_model_stream_to_token():
     assert span is None
     assert final_state is None
     assert len(mapped) == 1
-    assert mapped[0]["type"] == "token"
-    assert mapped[0]["content"] == "hello"
+    assert mapped[0]["type"] == "message.delta"
+    assert mapped[0]["payload"]["delta"] == "hello"
 
 
 def test_map_tool_start_event():
@@ -34,8 +34,11 @@ def test_map_tool_start_event():
     assert final_state is None
     assert span is not None
     assert len(mapped) == 1
-    assert mapped[0]["type"] == "tool_start"
-    assert mapped[0]["toolName"] == "search"
+    assert mapped[0]["type"] == "message.tool_call"
+    tc = mapped[0]["payload"]["toolCall"]
+    assert tc["name"] == "search"
+    assert tc["status"] == "running"
+    assert tc["id"] != ""
 
 
 def test_map_tool_end_event():
@@ -55,13 +58,15 @@ def test_map_tool_end_event():
     assert final_state is None
     assert span is None
     assert len(mapped) == 1
-    assert mapped[0]["type"] == "tool_result"
-    assert mapped[0]["toolName"] == "search"
+    assert mapped[0]["type"] == "message.tool_call"
+    tc = mapped[0]["payload"]["toolCall"]
+    assert tc["name"] == "search"
+    assert tc["status"] == "done"
 
 
 def test_emit_tool_summary_from_final_state():
     ctx = _ctx()
-    final_state = {"tool_steps": [{"tool": "search", "status": "completed"}]}
+    final_state = {"tool_steps": [{"tool": "search", "status": "done"}]}
     envelope = emit_final_summary_envelope(final_state, ctx)
 
     assert envelope is not None

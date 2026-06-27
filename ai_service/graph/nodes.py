@@ -137,6 +137,9 @@ def _force_final_answer(state: State, tool_result: str | None,
 # agent_node：LLM 决策节点（JSON Mode）
 # ────────────────────────────────────────────────────────────────────────────
 async def agent_node(state: State) -> dict:
+    active = state.get("active_agent", "default")
+    logging.info("[AGENT_NODE] active_agent=%s iteration=%s", active, state.get("iteration_count", 0))
+
     registry = get_tool_registry()
 
     # 1. Build tool list description
@@ -244,6 +247,7 @@ async def agent_node(state: State) -> dict:
     if action == "tool":
         tool_name = str(parsed.get("tool", "")).strip().lower()
         query = str(parsed.get("query", "")).strip()
+        logging.info("[AGENT_NODE] 🛠️ tool call decision: tool=%s query=%s", tool_name, query[:80])
 
         if not tool_name:
             return _force_final_answer(state, tool_result)
@@ -291,7 +295,9 @@ async def agent_node(state: State) -> dict:
 
     # 5. Handle final_answer — reject on first iteration
     if action == "final_answer":
+        logging.info("[AGENT_NODE] LLM returned final_answer (iter=%s, has_tool_result=%s)", current_iteration, bool(tool_result_sanitized))
         if not tool_result_sanitized:
+            logging.warning("[AGENT_NODE] ⚠️ final_answer on first turn — auto-injecting forced search")
             # First iteration with no tools → force search with user's question
             user_query = ""
             raw_messages = list(state.get("messages") or [])
@@ -344,6 +350,18 @@ async def _execute_single_tool(
     context: PolicyContext,
 ) -> dict:
     """Execute a single tool, return dict with 'result', 'elapsed_ms', 'status', 'error_msg'."""
+    # Normalize tool_input: map "query" to the tool's first required param if different
+    registry = get_tool_registry()
+    if registry and "query" in tool_input:
+        try:
+            tool = registry.get(tool_name)
+            schema_params = getattr(tool, "schema", None)
+            if schema_params and isinstance(schema_params.parameters, dict):
+                required = schema_params.parameters.get("required", [])
+                if required and required[0] != "query" and required[0] not in tool_input:
+                    tool_input = {required[0]: tool_input["query"]}
+        except Exception:
+            pass
     call = CapabilityCall(capability_name=tool_name, input_payload=tool_input)
     step_start = time.time()
 
@@ -508,6 +526,8 @@ async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
 # ────────────────────────────────────────────────────────────────────────────
 async def tool_node(state: State) -> dict:
     tool_input = state.get("tool_input") or {}
+    tool_name = state.get("current_tool") or ""
+    logging.info("[TOOL_NODE] 🛠️ executing tool=%s input_keys=%s", tool_name, list(tool_input.keys())[:5])
 
     # ── Parallel execution path ──
     if "actions" in tool_input:
@@ -599,6 +619,10 @@ async def tool_node(state: State) -> dict:
     )
 
     new_tool_steps = state.get("tool_steps", []) + [tool_step_record]
+
+    logging.info("[TOOL_NODE] %s tool=%s elapsed=%dms status=%s",
+                 "✅" if status == "completed" else "❌",
+                 tool_name, int(elapsed_time * 1000), status)
 
     return {
         "tool_result": result_str,
@@ -716,6 +740,8 @@ Use Markdown for formatting and structure.
 - When you reference a chart, do NOT repeat all its data values as text — let the chart show them
 - Write naturally as if the chart is embedded in your response
 - NEVER say "I cannot generate charts" or "I am unable to create charts" — if no charts are listed above, simply answer without referring to charts
+- NEVER output localhost image URLs (http://localhost:3000/chat/xxx.png) — images are automatically uploaded
+- If you saved images using Python, just mention the filename and the system handles the rest
 - Keep answers concise and well-structured
 - Reply in the same language as the user's question
 

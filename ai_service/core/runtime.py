@@ -3,12 +3,14 @@ from typing import Optional
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
+from repositories.agent_repository import AgentRepository
 from tools import ToolRegistry
 
 # 运行时全局资源：由 main.py 的 lifespan 初始化，在各路由中按需读取
 _pg_pool: Optional[AsyncConnectionPool] = None
 _checkpointer: Optional[AsyncPostgresSaver] = None
 _tool_registry: ToolRegistry | None = None
+_agent_repo: AgentRepository | None = None
 
 
 def set_runtime(pool: Optional[AsyncConnectionPool], checkpointer: Optional[AsyncPostgresSaver]) -> None:
@@ -30,3 +32,14 @@ def set_tool_registry(registry: ToolRegistry | None) -> None:
 
 def get_tool_registry() -> ToolRegistry | None:
     return _tool_registry
+
+
+def set_agent_repository(repo: AgentRepository | None) -> None:
+    global _agent_repo
+    _agent_repo = repo
+
+
+def get_agent_repository() -> AgentRepository:
+    if _agent_repo is None:
+        raise RuntimeError("Agent repository not initialized")
+    return _agent_repo

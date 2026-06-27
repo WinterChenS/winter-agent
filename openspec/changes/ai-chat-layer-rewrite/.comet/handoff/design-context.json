@@ -1,0 +1,18 @@
+{
+  "change": "ai-chat-layer-rewrite",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "b9abe250d24193e86562bc79b7146a88018b907f29850389abe7419afbef91a9",
+  "files": [
+    { "path": "openspec/changes/ai-chat-layer-rewrite/proposal.md", "sha256": "f4156ea07fd7100abc385d6ab9a56fd61217a149997b7ad457dcdf0e8c90fb1c" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/design.md", "sha256": "22ea75f54b11778278e4cab12fa322aa54aaaee1c6e93af02c85230db2b72b00" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/tasks.md", "sha256": "38c59db6f161da8288f1ea606a798006a0b3ca79813664abcfb987ee02511d60" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/specs/agent-chat-routing/spec.md", "sha256": "a139b31d51a419b6ea08fd06c9d66f4e0b0c51fd4ca78b2e69184bb4cf67dce6" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/specs/agent-gateway/spec.md", "sha256": "aa3b7a7dc9fd881639bc4e9e290379dc28746fae646c91f35b74709cf505d730" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/specs/ai-chat-ui/spec.md", "sha256": "c563b2d6bfaa279ace48cc6c1306f681e654152824435b2d9f6e70c01b033f41" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/specs/chat-message-protocol/spec.md", "sha256": "150a74d0ff85f484c6c076c1dccf25fe68ce49f61c465be8e9f82220f799ac4e" },
+    { "path": "openspec/changes/ai-chat-layer-rewrite/specs/sse-event-protocol/spec.md", "sha256": "fff614e81d3d647ff067acae99459964b35adbda8f989d32e4d8b4758d79a9c6" }
+  ]
+}

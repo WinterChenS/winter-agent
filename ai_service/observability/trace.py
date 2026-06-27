@@ -18,7 +18,7 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex}"
 
 
-def ensure_trace_context(conversation_id: str | None, agent_id: str = "agent.main") -> TraceContext:
+def ensure_trace_context(conversation_id: str | None, agent_id: str = "default") -> TraceContext:
     conv_id = conversation_id or _new_id("conv")
     return TraceContext(
         conversation_id=conv_id,

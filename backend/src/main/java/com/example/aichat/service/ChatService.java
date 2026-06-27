@@ -13,8 +13,9 @@ public class ChatService {
         this.aiClient = aiClient;
     }
 
-    public Flux<String> streamChat(String message, String conversationId) {
-        return aiClient.streamGenerate(message, conversationId);
+    public Flux<String> streamChat(String message, String agentId,
+                                    String conversationId, String messageId) {
+        return aiClient.streamGenerate(message, agentId, conversationId, messageId);
     }
 
     public reactor.core.publisher.Mono<String> getChatHistory(String conversationId) {

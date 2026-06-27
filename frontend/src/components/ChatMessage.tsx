@@ -1,3 +1,8 @@
+/**
+ * @deprecated since v2.0
+ * Replaced by features/ai-chat/ components.
+ * Kept for reference. Remove after v2.0 stabilization.
+ */
 import React, { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

@@ -1,14 +1,24 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
+from api.routes.agents import router as agents_router
 from api.routes.chat import router as chat_router
 from api.routes.system import router as system_router
 from config import settings
-from core.runtime import set_runtime, set_tool_registry
+from core.runtime import set_runtime, set_tool_registry, set_agent_repository
+from repositories.agent_repository import PostgresAgentRepository
 from tools import ToolRegistry
 
 # Auto-discovery: import tool modules so @tool classes register via BaseTool.__subclasses__()
@@ -46,6 +56,7 @@ async def lifespan(app: FastAPI):
 
     set_runtime(pg_pool, checkpointer)
     set_tool_registry(tool_registry)
+    set_agent_repository(PostgresAgentRepository(pg_pool))
 
     yield  # ← 应用正常运行中
 
@@ -69,6 +80,7 @@ app.add_middleware(
     allow_headers=["*"],           # 允许所有的 HTTP 请求头字段
 )
 
-# 包含系统与聊天相关的路由
+# 包含系统、聊天与代理管理的路由
 app.include_router(system_router)
 app.include_router(chat_router)
+app.include_router(agents_router)

@@ -1,0 +1,13 @@
+{
+  "change": "agent-expert-pool",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "e04d7b9c665dddaf3f6fec5538f4441656c44b406da895772dfdc0fc1d5d7b59",
+  "files": [
+    { "path": "openspec/changes/agent-expert-pool/proposal.md", "sha256": "6beef70558f5c35f5badbc377953fec8bd03a292967dd32e6d11282a6a6be4fc" },
+    { "path": "openspec/changes/agent-expert-pool/design.md", "sha256": "3c596f8aee739e47b5f63c6a86e1fb9e551070f08f308c3055d9f019e766c879" },
+    { "path": "openspec/changes/agent-expert-pool/tasks.md", "sha256": "4a856359c974f85e81a53ebffc7bfe710373875ca7aa835a7731c121b169bbbf" }
+  ]
+}

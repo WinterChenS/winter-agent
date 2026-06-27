@@ -1,3 +1,8 @@
+/**
+ * @deprecated since v2.0
+ * Replaced by features/ai-chat/ hooks.
+ * Kept for reference. Remove after v2.0 stabilization.
+ */
 import { useState, useRef, useCallback } from 'react';
 import { AgentProcessStep, ChartSpecData, GuardReason, Message } from '../types/chat';
 import { getChatHistory } from '../services/api';

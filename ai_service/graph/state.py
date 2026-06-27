@@ -60,3 +60,11 @@ class State(TypedDict):
     # ── V0.4 three-phase routing ─────────────────────────────────────────
     route: str  # "tool" | "chart_planner" | "answer" | "end"
 
+    # ── Multi-agent graph topology ───────────────────────────────────────
+    router_result: dict | None
+    selected_agents: list | None
+    selected_strategy: str | None
+    runtimes: list | None
+    collab_result: str | None
+    agent_results: list | None
+
