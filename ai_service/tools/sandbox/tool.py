@@ -143,7 +143,9 @@ class CodeSandboxTool(BaseTool):
             import os as _os_module
             try:
                 from services.minio_client import upload_image as _upload
-            except ImportError:
+                logger.info("MinIO upload available for sandbox tool")
+            except ImportError as e:
+                logger.warning("MinIO upload not available: %s", e)
                 _upload = None
             png_patterns = [
                 r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\]+)',
@@ -180,6 +182,9 @@ class CodeSandboxTool(BaseTool):
             if uploaded:
                 urls_text = "\n".join(f"{fn} → {url}" for fn, url in uploaded.items())
                 output = f"{output}\n\n[图片已上传]\n{urls_text}"
+                logger.info("Sandbox uploaded %d images: %s", len(uploaded), list(uploaded.keys()))
+            else:
+                logger.info("Sandbox: no images to upload (output=%s, cwd=%s)", output[:100], cwd)
 
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
