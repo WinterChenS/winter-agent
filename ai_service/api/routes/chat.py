@@ -64,8 +64,8 @@ def _sanitize_delta(text: str) -> str:
     # Strip localhost image URLs (any extension)
     text = re.sub(r'https?://localhost[^\s)]*', '', text)
     text = re.sub(r'!\[.*?\]\([^)]*localhost[^)]*\)', '', text)
-    # Strip markdown image syntax with local paths
-    text = re.sub(r'!\[.*?\]\([^)]*\.(?:png|jpg|jpeg|gif|svg)\)', '', text)
+    # Strip markdown image syntax with local paths only (NOT http/https URLs)
+    text = re.sub(r'!\[.*?\]\((?!https?://)[^)]*\.(?:png|jpg|jpeg|gif|svg)\)', '', text)
     # Strip ```python code blocks (opening tag through closing tag)
     text = re.sub(r'```python\s*\n.*?\n```', '', text, flags=re.DOTALL)
     return text
