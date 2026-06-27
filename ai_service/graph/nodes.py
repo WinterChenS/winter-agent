@@ -1304,17 +1304,13 @@ async def execution_node(state: State, event_bus=None) -> dict:
 
             if result.get("status") == "completed":
                 # Extract image URLs from execute_python result
-                # result structure: {"result": {"ok": True, "result": {"output": "...", "images": {...}}}}
+                # result structure: {"result": {"ok": True, "data": {"output": "...", "images": {...}}}}
                 outer_result = result.get("result", {})
                 if isinstance(outer_result, dict):
-                    inner_result = outer_result.get("result", {})
-                    images = inner_result.get("images", {}) if isinstance(inner_result, dict) else {}
+                    data = outer_result.get("data", {})
+                    images = data.get("images", {}) if isinstance(data, dict) else {}
                 else:
                     images = {}
-                logger.info("[EXECUTION] result keys: %s, outer_result keys: %s, images count: %d",
-                            list(result.keys()) if isinstance(result, dict) else type(result),
-                            list(outer_result.keys()) if isinstance(outer_result, dict) else type(outer_result),
-                            len(images))
                 if images:
                     for fname, url in images.items():
                         artifact_id = _register_artifact(state, artifact_type="image", purpose=f"Chart: {step.get('description', '')[:60]}", step_id=step_id, content_ref=url)
