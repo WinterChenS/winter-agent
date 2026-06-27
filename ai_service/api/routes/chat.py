@@ -323,7 +323,7 @@ async def stream_generate(request: GenerateRequest):
                 # Async persist message to database
                 try:
                     pool = get_pool()
-                    if pool and final_state:
+                    if pool:
                         from db.chat_message_repository import save_message
                         message_dict = {
                             "id": message_id,
