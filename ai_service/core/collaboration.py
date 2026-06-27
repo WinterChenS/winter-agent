@@ -64,8 +64,8 @@ class CollaborationEngine:
                     _name = t.name
                     _desc = getattr(t, 'description', t.name) or t.name
                     @tool(_name, description=_desc)
-                    async def _wrapped(query: str = "", _tool=t) -> str:
-                        result = await _tool.execute({"query": query})
+                    async def _wrapped(_tool=t, **kwargs) -> str:
+                        result = await _tool.execute(kwargs)
                         return str(result)
                     lc_tools.append(_wrapped)
             if lc_tools:
@@ -105,12 +105,11 @@ class CollaborationEngine:
                 self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
                           agent=agent_name, arguments=tc_args)
 
-                # Execute tool via BaseTool.execute()
+                # Execute tool via BaseTool.execute() — pass args directly
                 tool_obj = _find_tool(runtime.tools, tc_name)
                 if tool_obj and hasattr(tool_obj, 'execute'):
                     try:
-                        query_arg = tc_args.get("query", json.dumps(tc_args))
-                        result = await tool_obj.execute({"query": str(query_arg)})
+                        result = await tool_obj.execute(dict(tc_args))
                         result_str = str(result)
                         self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
                                   agent=agent_name, result=result_str[:500],
