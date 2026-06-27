@@ -1103,7 +1103,7 @@ async def planning_node(state: State) -> dict:
 # ────────────────────────────────────────────────────────────────────────────
 
 
-async def execution_node(state: State) -> dict:
+async def execution_node(state: State, event_bus=None) -> dict:
     """Phase 2: Execute one step from the execution plan.
 
     For each step:
@@ -1181,6 +1181,16 @@ async def execution_node(state: State) -> dict:
         # so each plan step searches for its specific data need
         search_query = step.get("description", user_query)
         logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
+        # Generate consistent tool_call_id for started/finished pairing
+        import time as _time
+        tool_call_id = f"{tool_name}_{step_id}_{int(_time.time()*1000)}"
+        # Emit tool.started event for frontend display
+        if event_bus:
+            await event_bus.emit("tool.started", {
+                "tool_call_id": tool_call_id,
+                "tool": tool_name,
+                "arguments": {"query": search_query},
+            })
         try:
             result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
             tool_results.append({
@@ -1191,12 +1201,17 @@ async def execution_node(state: State) -> dict:
 
             if result.get("status") == "error":
                 # Check if error is retryable before retrying
-                first_result = result
-                error_info = first_result.get("error", {})
+                error_info = result.get("error", {})
                 is_retryable = error_info.get("retryable", True) if isinstance(error_info, dict) else True
                 if not is_retryable:
                     logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
                     step_status = "error"
+                    if event_bus:
+                        await event_bus.emit("tool.failed", {
+                            "tool_call_id": tool_call_id,
+                            "tool": tool_name,
+                            "error": str(error_info.get("message", error_info.get("code", "unknown error"))),
+                        })
                 else:
                     # Retry once
                     logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
@@ -1209,6 +1224,22 @@ async def execution_node(state: State) -> dict:
 
             if result.get("status") == "error":
                 step_status = "error"
+                if event_bus:
+                    await event_bus.emit("tool.failed", {
+                        "tool_call_id": tool_call_id,
+                        "tool": tool_name,
+                        "error": str(result.get("error_msg", "tool execution failed")),
+                    })
+            else:
+                if event_bus:
+                    await event_bus.emit("tool.finished", {
+                        "tool_call_id": tool_call_id,
+                        "tool": tool_name,
+                        "result": {
+                            "status": result.get("status", "completed"),
+                            "elapsed_ms": result.get("elapsed_ms", 0),
+                        },
+                    })
                 accumulated_reasons.append(_reason_record(
                     "execution_node", "TOOL_EXECUTION_FAILURE",
                     f"Tool '{tool_name}' failed after retry for step {step_id}",
@@ -1315,8 +1346,12 @@ You are a professional data analyst. Generate a structured report based on the r
 
 [Instructions]
 - Write a professional analysis report
-- Interleave text with images naturally: introduction -> [IMAGE] -> analysis -> [IMAGE] -> conclusion
-- Use Markdown image syntax: ![description](image_url)
+- Only reference visual assets from the [Available Visual Assets] list above
+- Use Markdown image syntax ONLY for artifacts listed above: ![description](artifact_ref)
+- CRITICAL: Do NOT reference or embed images from external websites (no unsplash.com, no wikimedia, no third-party URLs)
+- CRITICAL: Do NOT use any image URL that contains "http://" or "https://" unless it is an artifact ref from the list above
+- If there are no applicable visual assets, do NOT invent or reference any images — write text-only
+- Interleave text with available images naturally: introduction -> [IMAGE] -> analysis -> [IMAGE] -> conclusion
 - Do NOT output code blocks, localhost URLs, or raw tool output
 - Reply in the same language as the user's question
 - Structure: title, executive summary, sections per plan step, conclusion

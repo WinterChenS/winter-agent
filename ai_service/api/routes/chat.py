@@ -190,8 +190,10 @@ async def stream_generate(request: GenerateRequest):
             else:
                 checkpointer = get_checkpointer()
 
-                # ── Multi-Agent Graph with Real-Time Streaming ────────────
-                graph = create_plan_execute_graph(checkpointer=checkpointer)
+                # ── Plan-Execute-Compose Graph with Event Bus ────────────
+                from core.streaming_event_bus import StreamingEventBus
+                event_bus = StreamingEventBus()
+                graph = create_plan_execute_graph(checkpointer=checkpointer, event_bus=event_bus)
 
                 logging.info("[CHAT] streaming plan-execute-compose graph")
                 logging.info("[CHAT] request: message_id=%s agent_id=%s query='%s'",
@@ -252,20 +254,44 @@ async def stream_generate(request: GenerateRequest):
                     finally:
                         await merge_queue.put(("graph_done", None))
 
+                async def bus_runner():
+                    try:
+                        async for bus_event in event_bus.events():
+                            envelope = {
+                                "type": bus_event.type,
+                                "schemaVersion": "1.0",
+                                "conversationId": trace_ctx.conversation_id,
+                                "messageId": message_id,
+                                "agentId": active_agent,
+                                "timestamp": bus_event.timestamp,
+                                "payload": bus_event.data,
+                            }
+                            await merge_queue.put(("bus", envelope))
+                    except Exception:
+                        pass
+                    finally:
+                        await merge_queue.put(("bus_done", None))
+
                 graph_task = asyncio.create_task(graph_runner())
+                bus_task = asyncio.create_task(bus_runner())
 
                 graph_done_flag = False
+                bus_done_flag = False
                 tool_calls_accumulated: dict[str, dict] = {}
                 content_accumulated = ""
 
-                while not graph_done_flag:
+                while not (graph_done_flag and bus_done_flag):
                     source, data = await merge_queue.get()
 
                     if source == "graph_done":
                         graph_done_flag = True
+                        event_bus.close()
+                    elif source == "bus_done":
+                        bus_done_flag = True
                     elif source == "error":
                         yield to_sse_data(envelope_error(trace_ctx, str(data)))
                         graph_done_flag = True
+                        event_bus.close()
                     else:
                         # Accumulate tool calls and content for persistence
                         _accumulate_tool_call(data, tool_calls_accumulated)
@@ -275,7 +301,7 @@ async def stream_generate(request: GenerateRequest):
                         yield to_sse_data(data)
 
                 # Cleanup
-                await asyncio.gather(graph_task, return_exceptions=True)
+                await asyncio.gather(graph_task, bus_task, return_exceptions=True)
 
                 # Composer node handles output generation via graph streaming
                 logging.info("[CHAT] stream complete: content_length=%d, tool_calls=%d, plan_phase=%s",

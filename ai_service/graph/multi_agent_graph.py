@@ -41,7 +41,7 @@ def _route_from_execution(state: State) -> str:
     return "composer"
 
 
-def create_plan_execute_graph(checkpointer=None):
+def create_plan_execute_graph(checkpointer=None, event_bus=None):
     """
     V0.5 Plan -> Execute -> Compose three-phase pipeline:
 
@@ -51,9 +51,12 @@ def create_plan_execute_graph(checkpointer=None):
     """
     workflow = StateGraph(State)
 
+    # Wrap execution_node with event_bus for tool call events
+    async def _execution(s): return await execution_node(s, event_bus=event_bus)
+
     # Add nodes
     workflow.add_node("planning", planning_node)
-    workflow.add_node("execution", execution_node)
+    workflow.add_node("execution", _execution)
     workflow.add_node("composer", composer_node)
 
     # Entry point
