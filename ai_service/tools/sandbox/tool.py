@@ -141,10 +141,14 @@ class CodeSandboxTool(BaseTool):
             # Scan for generated image files and upload to MinIO
             import re as _re
             import os as _os_module
+            try:
+                from services.minio_client import upload_image as _upload
+            except ImportError:
+                _upload = None
             png_patterns = [
-                _r'已(?:生成[并且]?)?保存[为至]?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-                _r'savefig\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg))',
-                _r'(\S+\.png)',
+                r'已(?:生成[并且]?)?保存[为至]?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+                r'savefig\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg))',
+                r'(\S+\.png)',
             ]
             uploaded: dict[str, str] = {}
             cwd = _os_module.getcwd()
@@ -152,10 +156,9 @@ class CodeSandboxTool(BaseTool):
                 for m in _re.finditer(pat, output):
                     fname = m.group(1)
                     fpath = _os_module.path.join(cwd, fname)
-                    if _os_module.path.isfile(fpath) and fname not in uploaded:
+                    if _os_module.path.isfile(fpath) and fname not in uploaded and _upload:
                         try:
-                            from services.minio_client import upload_image
-                            url = upload_image(fpath)
+                            url = _upload(fpath)
                             if url:
                                 uploaded[fname] = url
                         except Exception:
@@ -165,11 +168,11 @@ class CodeSandboxTool(BaseTool):
             import time as _time
             now = _time.time()
             for f in _os_module.listdir(cwd):
-                if f.endswith('.png') and f not in uploaded:
+                if f.endswith('.png') and f not in uploaded and _upload:
                     fpath = _os_module.path.join(cwd, f)
                     try:
                         if _os_module.path.getmtime(fpath) > now - 120:
-                            url = upload_image(fpath)
+                            url = _upload(fpath)
                             if url:
                                 uploaded[f] = url
                     except Exception:
