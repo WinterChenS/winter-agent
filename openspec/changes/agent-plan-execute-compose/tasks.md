@@ -49,8 +49,8 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Manual test: stock analysis query → verify planning generates plan → execution follows steps → composer produces interleaved report
-- [ ] 8.2 Manual test: simple greeting query → verify fast path skips planning → direct compose
-- [ ] 8.3 Manual test: verify artifact dedup by requesting overlapping chart types in plan
-- [ ] 8.4 Manual test: verify plan JSON failure → retry → fallback path works
-- [ ] 8.5 Verify no regressions: existing SSE event format, message persistence, tool execution
+- [x] 8.1 Manual test: stock analysis query → verify planning generates plan → execution follows steps → composer produces interleaved report
+- [x] 8.2 Manual test: simple greeting query → verify fast path skips planning → direct compose
+- [x] 8.3 Manual test: verify artifact dedup by requesting overlapping chart types in plan
+- [x] 8.4 Manual test: verify plan JSON failure → retry → fallback path works
+- [x] 8.5 Verify no regressions: existing SSE event format, message persistence, tool execution
