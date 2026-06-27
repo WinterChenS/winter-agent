@@ -40,8 +40,7 @@ async def test_graph_builds_and_routes():
     # Verify nodes exist
     nodes = list(graph.nodes.keys())
     assert "router" in nodes
-    assert "factory" in nodes
-    assert "collaboration" in nodes
+    assert "collaboration" in nodes  # factory merged into collaboration
     assert "merge" in nodes
 
 

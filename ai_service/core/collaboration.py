@@ -120,8 +120,9 @@ class CollaborationEngine:
         # Tool call loop (max 5 rounds)
         tool_call_history: list[dict] = []
         max_rounds = 5
-        for round_idx in range(max_rounds):
-            response = await llm.ainvoke(messages)
+        try:
+            for round_idx in range(max_rounds):
+                response = await llm.ainvoke(messages)
 
             # Check for tool calls
             tool_calls = getattr(response, 'tool_calls', None)
@@ -194,6 +195,16 @@ class CollaborationEngine:
             "output": str(last_response.content).strip() if last_response else "",
             "tool_calls": tool_call_history,
         }
+        except Exception as e:
+            elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+            self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+            return {
+                "agent": agent_name,
+                "status": "error",
+                "output": "",
+                "error": str(e),
+                "tool_calls": tool_call_history,
+            }
 
     async def _sequential(
         self, runtimes: list[AgentRuntime], user_query: str,
