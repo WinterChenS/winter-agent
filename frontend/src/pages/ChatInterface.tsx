@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Sidebar } from '../components/Sidebar';
@@ -20,7 +20,12 @@ export function ChatInterface() {
   const { username, logout } = useAuth();
   const { send, isSending } = useChatStream();
   const { loadHistory } = useConversation();
-  const messages = useChatStore(s => s.messageOrder.map(id => s.messages[id]));
+  const messageOrder = useChatStore(s => s.messageOrder);
+  const messagesMap = useChatStore(s => s.messages);
+  const messages = useMemo(
+    () => messageOrder.map(id => messagesMap[id]),
+    [messageOrder, messagesMap],
+  );
   const setConversationId = useChatStore(s => s.setConversationId);
   const clearMessages = useChatStore(s => s.clearMessages);
 
