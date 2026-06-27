@@ -71,34 +71,50 @@ class CodeSandboxTool(BaseTool):
 
     @staticmethod
     def _build_preamble() -> str:
-        """Return code that sets Chinese font for matplotlib and resource limits on Linux."""
+        """Return code that initializes chart theme and sets resource limits on Linux."""
+        import os as _os
         lines = []
 
-        # ── Matplotlib Chinese font setup ──
-        lines.append("import matplotlib.pyplot as _plt")
-        lines.append("import platform as _plat")
-        lines.append("_sys_name = _plat.system()")
+        # ── Ensure ai_service is on path for chart module imports ──
+        ai_service_dir = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+        lines.append(f"import sys; sys.path.insert(0, {ai_service_dir!r})")
         lines.append("")
-        lines.append("# Auto-detect Chinese font")
-        lines.append("_cn_fonts = []")
-        lines.append("if _sys_name == 'Darwin':")
-        lines.append("    _cn_fonts = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Arial Unicode MS']")
-        lines.append("elif _sys_name == 'Linux':")
-        lines.append("    _cn_fonts = ['Noto Sans CJK SC', 'Noto Sans SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'SimHei']")
-        lines.append("else:")
-        lines.append("    _cn_fonts = ['Microsoft YaHei', 'SimHei', 'KaiTi']")
+
+        # ── Disable SSL verification for external API calls ──
+        lines.append("import ssl; ssl._create_default_https_context = ssl._create_unverified_context")
+        lines.append("try:")
+        lines.append("    import urllib3; urllib3.disable_warnings()")
+        lines.append("except: pass")
         lines.append("")
-        lines.append("_chosen = None")
-        lines.append("import matplotlib.font_manager as _fm")
-        lines.append("for _f in _fm.fontManager.ttflist:")
-        lines.append("    if _chosen: break")
-        lines.append("    for _cn in _cn_fonts:")
-        lines.append("        if _cn.lower() in _f.name.lower():")
-        lines.append("            _chosen = _f.name")
-        lines.append("            break")
-        lines.append("if _chosen:")
-        lines.append("    _plt.rcParams['font.sans-serif'] = [_chosen, 'DejaVu Sans']")
-        lines.append("    _plt.rcParams['axes.unicode_minus'] = False")
+
+        # ── Chart theme (font, DPI, style) ──
+        lines.append("from chart.chart_theme import ChartTheme")
+        lines.append("ChartTheme.initialize()")
+        lines.append("")
+        lines.append("# ── Auto-save matplotlib figures on exit (safety net) ──")
+        lines.append("import atexit as _atexit, os as _os_hook, matplotlib.pyplot as _plt_hook")
+        lines.append("_hook_saved = set()")
+        lines.append("_orig_savefig = _plt_hook.savefig")
+        lines.append("def _patched_savefig(*args, **kwargs):")
+        lines.append("    fname = args[0] if args else kwargs.get('fname', '')")
+        lines.append("    if fname: _hook_saved.add(str(fname))")
+        lines.append("    return _orig_savefig(*args, **kwargs)")
+        lines.append("_plt_hook.savefig = _patched_savefig")
+        lines.append("def _auto_save_figures():")
+        lines.append("    for i, fn in enumerate(_plt_hook.get_fignums()):")
+        lines.append("        if not _plt_hook.fignum_exists(fn): continue")
+        lines.append("        fig = _plt_hook.figure(fn)")
+        lines.append("        if fig.get_axes() and fn not in _hook_saved:")
+        lines.append("            fname = f'chart_{i}.png'")
+        lines.append("            for ax in fig.get_axes():")
+        lines.append("                if not ax.has_data(): continue")
+        lines.append("                _orig_savefig(fname, dpi=200, bbox_inches='tight')")
+        lines.append("                print(f'Auto-saved: {fname}', flush=True)")
+        lines.append("                _hook_saved.add(fn)")
+        lines.append("                break")
+        lines.append("    _plt_hook.close('all')")
+        lines.append("_atexit.register(_auto_save_figures)")
+        lines.append("")
 
         # ── Linux resource limits ──
         if platform.system() == "Linux":
@@ -153,8 +169,57 @@ class CodeSandboxTool(BaseTool):
             if stderr_str:
                 output += "\n[stderr]\n" + stderr_str
 
+            # Scan for generated image files and upload to MinIO
+            import re as _re
+            import os as _os_module
+            try:
+                from services.minio_client import upload_image as _upload
+                logger.info("MinIO upload available for sandbox tool")
+            except ImportError as e:
+                logger.warning("MinIO upload not available: %s", e)
+                _upload = None
+            png_patterns = [
+                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\\'\"\}\,\)]+)',
+                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))',
+            ]
+            uploaded: dict[str, str] = {}
+            cwd = _os_module.getcwd()
+            for pat in png_patterns:
+                for m in _re.finditer(pat, output):
+                    fname = m.group(1)
+                    fpath = _os_module.path.join(cwd, fname)
+                    if _os_module.path.isfile(fpath) and fname not in uploaded and _upload:
+                        try:
+                            url = _upload(fpath)
+                            if url:
+                                uploaded[fname] = url
+                        except Exception:
+                            pass
+
+            # Also scan CWD for any new PNGs created during execution
+            import time as _time
+            now = _time.time()
+            for f in _os_module.listdir(cwd):
+                if f.endswith('.png') and f not in uploaded and _upload:
+                    fpath = _os_module.path.join(cwd, f)
+                    try:
+                        if _os_module.path.getmtime(fpath) > now - 120:
+                            url = _upload(fpath)
+                            if url:
+                                uploaded[f] = url
+                    except Exception:
+                        pass
+
+            if uploaded:
+                urls_text = "\n".join(f"{fn} → {url}" for fn, url in uploaded.items())
+                output = f"{output}\n\n[图片已上传]\n{urls_text}"
+                logger.info("Sandbox uploaded %d images: %s", len(uploaded), list(uploaded.keys()))
+            else:
+                logger.info("Sandbox: no images to upload (output=%s, cwd=%s)", output[:100], cwd)
+
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
+                "images": uploaded,
             })
 
         except asyncio.TimeoutError:

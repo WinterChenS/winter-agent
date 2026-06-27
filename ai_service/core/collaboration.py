@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -15,11 +16,9 @@ logger = logging.getLogger(__name__)
 
 class CollaborationResult:
     def __init__(self, content: str, agent_results: list[dict],
-                 chart_specs: list[dict] | None = None,
                  images: dict[str, str] | None = None) -> None:
         self.content = content
         self.agent_results = agent_results
-        self.chart_specs = chart_specs or []
         self.images = images or {}
 
 
@@ -75,17 +74,6 @@ class CollaborationEngine:
             msg = f"Unknown strategy: {strategy}"
             raise ValueError(msg)
 
-        # Auto-extract charts if user asked for visualization
-        chart_keywords = ["图", "chart", "折线", "柱状", "饼图", "散点",
-                         "可视化", "曲线", "展示", "画", "plot", "graph",
-                         "面积图", "雷达图"]
-        if any(kw in user_query.lower() for kw in chart_keywords):
-            try:
-                chart_specs = await self._extract_charts(result.content, user_query)
-                result.chart_specs = chart_specs
-            except Exception:
-                pass
-
         return result
 
     async def _run_agent_with_tools(
@@ -124,75 +112,83 @@ class CollaborationEngine:
             for round_idx in range(max_rounds):
                 response = await llm.ainvoke(messages)
 
-            # Check for tool calls
-            tool_calls = getattr(response, 'tool_calls', None)
-            if not tool_calls:
-                # No more tools — final answer
-                elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
-                self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
-                # Scan for generated images and upload to MinIO
-                final_output = str(response.content).strip()
-                images = self._scan_and_upload_images(final_output)
-                for filename, url in images.items():
-                    self._emit("image.uploaded", filename=filename, url=url)
-                    final_output = final_output.replace(filename, url)
-                    import re
+                # Check for tool calls
+                tool_calls = getattr(response, 'tool_calls', None)
+                if not tool_calls:
+                    # No more tools — final answer
+                    elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+                    self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+                    # Scan for generated images and upload to MinIO
+                    final_output = str(response.content).strip()
+                    images = self._scan_and_upload_images(final_output)
+                    for filename, url in images.items():
+                        self._emit("image.uploaded", filename=filename, url=url)
+                        final_output = final_output.replace(filename, url)
+                        final_output = re.sub(
+                            rf'https?://[^\s)]*{re.escape(filename)}', url,
+                            final_output
+                        )
+                    # Strip any remaining localhost image URLs that weren't uploaded
                     final_output = re.sub(
-                        rf'https?://[^\s)]*{re.escape(filename)}', url,
+                        r'https?://localhost[^\s)]*\.(?:png|jpg|jpeg|gif|svg)', '',
                         final_output
                     )
-                return {
-                    "agent": agent_name,
-                    "status": "ok",
-                    "output": final_output,
-                    "tool_calls": tool_call_history,
-                    "images": images,
-                }
+                    final_output = re.sub(
+                        r'!\[.*?\]\([^)]*localhost[^)]*\)', '', final_output
+                    )
+                    return {
+                        "agent": agent_name,
+                        "status": "ok",
+                        "output": final_output,
+                        "tool_calls": tool_call_history,
+                        "images": images,
+                    }
 
-            # Process tool calls
-            messages.append(response)
-            for tc in tool_calls:
-                tc_id = tc.get("id", f"tc-{round_idx}")
-                tc_name = tc.get("name", "unknown")
-                tc_args = tc.get("args", {})
+                # Process tool calls
+                messages.append(response)
+                for tc in tool_calls:
+                    tc_id = tc.get("id", f"tc-{round_idx}")
+                    tc_name = tc.get("name", "unknown")
+                    tc_args = tc.get("args", {})
 
-                self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
-                          agent=agent_name, arguments=tc_args)
+                    self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
+                              agent=agent_name, arguments=tc_args)
 
-                # Execute tool via BaseTool.execute() — pass args directly
-                tool_obj = _find_tool(runtime.tools, tc_name)
-                if tool_obj and hasattr(tool_obj, 'execute'):
-                    try:
-                        result = await tool_obj.execute(dict(tc_args))
-                        result_str = str(result)
-                        self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
-                                  agent=agent_name, result=result_str[:500],
-                                  status="done")
-                    except Exception as e:
-                        result_str = f"Tool error: {e}"
+                    # Execute tool via BaseTool.execute() — pass args directly
+                    tool_obj = _find_tool(runtime.tools, tc_name)
+                    if tool_obj and hasattr(tool_obj, 'execute'):
+                        try:
+                            result = await tool_obj.execute(dict(tc_args))
+                            result_str = str(result)
+                            self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
+                                      agent=agent_name, result=result_str[:500],
+                                      status="done")
+                            # Parse [图片已上传] section from tool result for image.uploaded events
+                            _parse_and_emit_images(self, result_str)
+                        except Exception as e:
+                            result_str = f"Tool error: {e}"
+                            self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
+                                      agent=agent_name, error=str(e), status="failed")
+                    else:
+                        result_str = f"Tool '{tc_name}' not found in runtime tools."
                         self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
-                                  agent=agent_name, error=str(e), status="failed")
-                else:
-                    result_str = f"Tool '{tc_name}' not found in runtime tools."
-                    self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
-                              agent=agent_name, error=f"Tool not found: {tc_name}",
-                              status="failed")
+                                  agent=agent_name, error=f"Tool not found: {tc_name}",
+                                  status="failed")
 
-                tool_call_history.append({
-                    "id": tc_id, "name": tc_name,
-                    "arguments": tc_args, "status": "done",
-                    "result": result_str[:500],
-                })
-                messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
+                    tool_call_history.append({
+                        "id": tc_id, "name": tc_name,
+                        "arguments": tc_args, "status": "done",
+                        "result": result_str[:500],
+                    })
+                    messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
 
             # Max rounds reached
             elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
             self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
-            last_response = response if 'response' in dir() else None
             return {
                 "agent": agent_name,
                 "status": "ok",
-                "output": str(last_response.content).strip() if last_response else "",
+                "output": str(response.content).strip() if response else "",
                 "tool_calls": tool_call_history,
             }
         except Exception as e:
@@ -222,7 +218,13 @@ class CollaborationEngine:
                 f"Original request: {user_query}"
             )
 
-        final = agent_results[-1].get("output", "") if agent_results else ""
+        # Merge outputs from all agents, not just the last one
+        parts = []
+        for r in agent_results:
+            out = r.get("output", "")
+            if out:
+                parts.append(f"## {r.get('agent', 'agent')}\n\n{out}")
+        final = "\n\n".join(parts) if parts else ""
         all_images = {}
         for r in agent_results:
             if isinstance(r.get("images"), dict):
@@ -309,58 +311,12 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
         except Exception:
             return {}
 
-    async def _extract_charts(
-        self, content: str, user_query: str,
-    ) -> list[dict]:
-        """Extract chart specs from collaboration result using lightweight LLM call."""
-        from langchain_openai import ChatOpenAI
-        from config import settings
-
-        # Truncate content to first 3000 chars for chart extraction
-        snippet = content[:3000]
-
-        prompt = f"""Extract structured chart data from this analysis text.
-User asked: {user_query}
-
-Analysis result:
-{snippet}
-
-Output a JSON array of chart specs. Each chart spec has:
-- "title": chart title
-- "chartType": "line" | "bar" | "pie" | "scatter" | "area"
-- "description": one-line summary
-- "xAxisLabel": X axis label
-- "yAxisLabel": Y axis label
-- "data": [{{"name": "label", "value": number, "group": "optional group"}}]
-
-Rules:
-- Only create charts if the data is present in the text
-- Use numbers from the analysis, not made-up values
-- Max 3 charts
-- If no chartable data, return empty array []
-- Output ONLY the JSON array, no explanation"""
-
-        llm = ChatOpenAI(
-            model=settings.model,
-            temperature=0.1,
-            streaming=False,
-            api_key=settings.api_key,
-            base_url=settings.base_url,
-        )
-
-        try:
-            resp = await llm.ainvoke([HumanMessage(content=prompt)])
-            charts = json.loads(str(resp.content).strip())
-            if isinstance(charts, list):
-                # Ensure each chart has an id
-                for i, c in enumerate(charts):
-                    if isinstance(c, dict) and "id" not in c:
-                        c["id"] = f"chart-{i}"
-                return charts
-        except Exception as e:
-            logging.warning("Chart extraction failed: %s", e)
-
-        return []
+def _parse_and_emit_images(engine, result_text: str) -> None:
+    """Parse tool result for MinIO URLs and emit image.uploaded events."""
+    import re
+    for m in re.finditer(r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\\'\"\}\,\)]+)', result_text):
+        fname, url = m.group(1), m.group(2)
+        engine._emit("image.uploaded", filename=fname, url=url)
 
 
 def _find_tool(tools: list, name: str):

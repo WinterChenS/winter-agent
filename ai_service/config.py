@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 
 # 主动加载 .env 到操作系统环境变量，让 LangChain 核心代码能检测到全局环境变量配置
-load_dotenv()
+load_dotenv(override=True)
 
 
 # 配置类，使用了 Pydantic 框架，方便项目直接从系统环境变量或 `.env` 配置文件读取信息

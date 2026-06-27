@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import uuid
-from datetime import timedelta
 from pathlib import Path
 
 import urllib3
@@ -16,8 +16,10 @@ from minio.error import S3Error
 
 logger = logging.getLogger(__name__)
 
-# Workspace root where execute_python saves images
-WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
+# AI service root where execute_python saves images (ai_service/)
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+# Also check parent project root for images saved from different CWDs
+PROJECT_ROOT = WORKSPACE_ROOT.parent
 
 
 def _get_client() -> Minio | None:
@@ -25,7 +27,7 @@ def _get_client() -> Minio | None:
     # Ensure .env is loaded (may not be loaded in subprocess contexts)
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except ImportError:
         pass
 
@@ -51,15 +53,28 @@ def _get_client() -> Minio | None:
 
 
 def _ensure_bucket(client: Minio, bucket: str = "agent-images") -> bool:
-    """Create bucket if it doesn't exist."""
+    """Create bucket if it doesn't exist, set public-read policy."""
     try:
         if not client.bucket_exists(bucket):
             client.make_bucket(bucket)
             logger.info("Created MinIO bucket: %s", bucket)
+
+        # Set bucket policy to allow public read access
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": [f"arn:aws:s3:::{bucket}/*"],
+            }],
+        }
+        client.set_bucket_policy(bucket, json.dumps(policy))
+        logger.info("Set public-read policy on bucket: %s", bucket)
         return True
     except S3Error as e:
-        logger.error("Failed to ensure bucket %s: %s", bucket, e)
-        return False
+        logger.warning("Failed to set bucket policy (non-fatal): %s", e)
+        return True
 
 
 def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
@@ -92,15 +107,16 @@ def upload_image(filepath: str, bucket: str = "agent-images") -> str | None:
             content_type=f"image/{ext.lstrip('.')}",
         )
 
-        # Generate a presigned URL valid for 7 days
-        url = client.presigned_get_object(
-            bucket_name=bucket,
-            object_name=object_name,
-            expires=timedelta(days=7),
-        )
+        # Generate direct URL (no signature needed — bucket is public-read)
+        pub = os.getenv("MINIO_PUBLIC_ENDPOINT", os.getenv("MINIO_ENDPOINT", ""))
+        if pub:
+            pub = pub.rstrip("/")
+        else:
+            pub = f"http://{client._base_url.host}:{client._base_url.port}"
+        direct_url = f"{pub}/{bucket}/{object_name}"
 
-        logger.info("Uploaded %s → MinIO %s/%s", path.name, bucket, object_name)
-        return url
+        logger.info("Uploaded %s → %s", path.name, direct_url)
+        return direct_url
 
     except S3Error as e:
         logger.error("MinIO upload failed for %s: %s", path, e)
@@ -120,11 +136,14 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
     import re
     # Match common image file references in output
     patterns = [
-        r'已保存[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-        r'saved[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-        r'保存[到至][：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'已(?:生成[并且]?)?保存[为至]?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'saved?\s*(?:as|to)?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'图表已.*?(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'→\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'=>\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r"savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
+        r"\.savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
+        r'(\S+\.png)',  # Any .png filename as fallback
     ]
 
     found_files = set()
@@ -132,20 +151,24 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
         for match in re.finditer(pattern, output_text, re.IGNORECASE):
             found_files.add(match.group(1))
 
-    # Also scan workspace root for recently created .png files
+    # Also scan for recently created .png files (regardless of output text)
     try:
-        for p in WORKSPACE_ROOT.glob("*.png"):
-            if p.name not in found_files:
-                # Check if this file was created in the last 60 seconds
-                mtime = p.stat().st_mtime
-                if (__import__("time").time() - mtime) < 60:
-                    found_files.add(p.name)
+        import time as _time
+        now = _time.time()
+        for root_dir in (WORKSPACE_ROOT, PROJECT_ROOT):
+            for p in root_dir.glob("*.png"):
+                fp = str(p)
+                if fp not in found_files:
+                    mtime = p.stat().st_mtime
+                    if (now - mtime) < 300:  # 5 min window
+                        found_files.add(fp)
+                        logger.info("Found recent PNG: %s (age=%ds)", p.name, int(now - mtime))
     except Exception:
         pass
 
-    for filename in found_files:
-        url = upload_image(str(WORKSPACE_ROOT / filename))
+    for filepath in found_files:
+        url = upload_image(filepath)
         if url:
-            uploaded[filename] = url
+            uploaded[Path(filepath).name] = url
 
     return uploaded

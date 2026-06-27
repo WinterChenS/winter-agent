@@ -126,14 +126,15 @@ def envelope_agent_step(trace_ctx: TraceContext, reason: dict[str, Any]) -> dict
     )
 
 
-def envelope_chart(trace_ctx: TraceContext, chart_spec: dict[str, Any],
-                  message_id: str = "") -> EventEnvelope:
-    """Build a 'chart' event envelope carrying ChartSpec to the frontend."""
+def envelope_chart(trace_ctx: TraceContext, chart_spec: dict[str, Any]) -> EventEnvelope:
+    """Build a 'chart' event envelope carrying ChartSpec to the frontend.
+    @deprecated — charts now use image.uploaded events via Matplotlib→MinIO path.
+    Kept for backward compatibility with legacy chart renderer only."""
     return build_envelope(
         event_type="chart",
         trace_ctx=trace_ctx,
-        payload={"chartSpec": chart_spec, "messageId": message_id},
-        compat_fields={"chartSpec": chart_spec, "messageId": message_id},
+        payload={"chartSpec": chart_spec},
+        compat_fields={"chartSpec": chart_spec},
     )
 
 

@@ -2,6 +2,8 @@
 comet_change: ai-chat-layer-rewrite
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-27-ai-chat-layer-rewrite
+status: final
 ---
 
 # AI Chat UI Layer Rewrite — Technical Design

@@ -62,6 +62,18 @@ from observability.trace import ensure_trace_context
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
+def _sanitize_delta(text: str) -> str:
+    """Strip localhost URLs and Python code blocks from streaming text."""
+    import re
+    # Strip localhost image URLs (any extension)
+    text = re.sub(r'https?://localhost[^\s)]*', '', text)
+    text = re.sub(r'!\[.*?\]\([^)]*localhost[^)]*\)', '', text)
+    # Strip markdown image syntax with local paths
+    text = re.sub(r'!\[.*?\]\([^)]*\.(?:png|jpg|jpeg|gif|svg)\)', '', text)
+    # Strip ```python code blocks (opening tag through closing tag)
+    text = re.sub(r'```python\s*\n.*?\n```', '', text, flags=re.DOTALL)
+    return text
+
 MOCK_RESPONSES = [
     "Hello! I am AI Assistant V0.2. How can I help you today?",
     "This is a mock response. The AI service is running in mock mode without a real LLM API key.",
@@ -188,6 +200,7 @@ async def stream_generate(request: GenerateRequest):
                                 if envelope.get("type") == "message.delta":
                                     nonlocal assistant_text_emitted
                                     assistant_text_emitted = True
+                                    envelope["delta"] = _sanitize_delta(str(envelope.get("delta", "")))
                                 await merge_queue.put(("graph", envelope))
                     except Exception as e:
                         await merge_queue.put(("error", str(e)))
@@ -236,13 +249,17 @@ async def stream_generate(request: GenerateRequest):
                 # Cleanup
                 await asyncio.gather(graph_task, bus_task, return_exceptions=True)
 
-                # Emit chart specs from chart_planner_node output
-                if final_state:
-                    chart_specs = final_state.get("chart_specs")
-                    if isinstance(chart_specs, list):
-                        for cs in chart_specs:
-                            if isinstance(cs, dict) and cs:
-                                yield to_sse_data(envelope_chart(trace_ctx, cs, message_id=message_id))
+                # If collaboration produced a result, stream it directly (skip answer_node)
+                logging.info("[CHAT] final_state has_collab=%s",
+                             bool(final_state and final_state.get("collab_result")))
+                if final_state and final_state.get("collab_result"):
+                    collab_text = str(final_state["collab_result"])
+                    logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
+                    for char in collab_text:
+                        yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
+                        await asyncio.sleep(0.01)
+                else:
+                    logging.warning("[CHAT] no collab_result in final_state — nothing to stream")
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
