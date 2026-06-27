@@ -3,10 +3,14 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
 
+from langchain_core.messages import HumanMessage
+
 from graph.multi_agent_graph import create_multi_agent_graph
-from core.router_agent import RouterAgent, RouterResult
+from graph.nodes import planning_node
+from graph.state import State
 from core.agent_factory import AgentFactory, AgentRuntime
 from core.collaboration import CollaborationEngine, CollaborationResult
+from core.router_agent import RouterAgent, RouterResult
 from models.agent import AgentDefinition
 
 
@@ -57,3 +61,52 @@ async def test_graph_no_agents_falls_through():
 
     graph = create_multi_agent_graph(router, factory, engine)
     assert graph is not None
+
+
+@pytest.mark.asyncio
+async def test_planning_node_generates_plan():
+    """Verify planning_node produces a valid execution_plan for a non-trivial query."""
+    from graph.state import State
+    from graph.nodes import planning_node
+
+    state = State(
+        messages=[HumanMessage(content="What were Apple's Q1 2026 earnings?")],
+        execution_plan=None,
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="planning",
+        iteration_count=0,
+        tool_steps=[],
+        reasoning_steps=[],
+        # other required fields with defaults
+        conversation_id="test-1",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+    result = await planning_node(state)
+    assert result["plan_phase"] == "executing"
+    assert result["execution_plan"] is not None
+    assert "steps" in result["execution_plan"]
+    assert len(result["execution_plan"]["steps"]) > 0

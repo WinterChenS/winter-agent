@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -768,4 +769,253 @@ async def answer_node(state: State) -> dict:
     return {
         "messages": [response],
         "route": "end",
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Plan-Execute-Compose: planning_node (Phase 1 — JSON Mode)
+# ────────────────────────────────────────────────────────────────────────────
+
+def _validate_plan_json(plan: dict) -> tuple[bool, str]:
+    """Validate execution plan JSON schema.
+
+    Required top-level keys: title (str), steps (list)
+    Each step requires: step_id (int), description (str), required_tools (list)
+    Optional per step: expected_artifacts (list of {type, purpose, chart_type})
+    """
+    if not isinstance(plan, dict):
+        return False, "Plan must be a JSON object"
+    if "title" not in plan or not isinstance(plan["title"], str):
+        return False, "Plan must have a 'title' string field"
+    if "steps" not in plan or not isinstance(plan["steps"], list):
+        return False, "Plan must have a 'steps' array field"
+    if len(plan["steps"]) == 0:
+        return False, "Plan must have at least one step"
+    for i, step in enumerate(plan["steps"]):
+        if not isinstance(step, dict):
+            return False, f"Step {i} must be a JSON object"
+        if "step_id" not in step:
+            return False, f"Step {i} missing 'step_id'"
+        if "description" not in step or not isinstance(step["description"], str):
+            return False, f"Step {i} missing 'description' string"
+        if "required_tools" not in step or not isinstance(step["required_tools"], list):
+            return False, f"Step {i} missing 'required_tools' list"
+    return True, ""
+
+
+_PLANNING_SYSTEM_PROMPT = """\
+You are a research planner. Given a user query, generate an execution plan as a JSON object.
+You have access to read-only tools: search, browser, time.
+
+Output ONLY a valid JSON object. No markdown wrapping, no explanation.
+
+{
+  "title": "Brief plan title",
+  "steps": [
+    {
+      "step_id": 1,
+      "description": "What this step does — specific search or research action",
+      "required_tools": ["search"],
+      "expected_artifacts": [
+        {"type": "data", "purpose": "What data this step produces", "chart_type": null}
+      ]
+    }
+  ]
+}
+
+Rules:
+- Each step must accomplish ONE unit of research
+- required_tools: choose from ["search", "browser", "time"]
+- expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar"
+- Limit to 5 steps maximum
+- For simple questions (1 search is enough), output a single step
+"""
+
+
+def _build_planning_system_prompt(now_str: str, tool_descriptions: str) -> str:
+    lines = [_PLANNING_SYSTEM_PROMPT]
+    if now_str:
+        lines.append(f"\nCurrent time: {now_str}")
+    if tool_descriptions:
+        lines.append(f"\nAvailable tools:\n{tool_descriptions}")
+    return "\n".join(lines)
+
+
+_GREETING_PATTERNS = re.compile(
+    r"^(hello|hi|hey|good morning|good afternoon|good evening|how are you|nice to meet you|thanks|thank you|bye|goodbye)$",
+    re.IGNORECASE,
+)
+
+
+def _is_trivial_query(text: str) -> bool:
+    """Detect trivial queries that don't need planning: short text or greetings."""
+    stripped = text.strip()
+    if len(stripped) < 20:
+        return True
+    if _GREETING_PATTERNS.match(stripped):
+        return True
+    return False
+
+
+def _generate_fallback_plan(query: str) -> dict:
+    """Generate a minimal single-step fallback plan."""
+    return {
+        "title": "Research: " + query[:60],
+        "steps": [
+            {
+                "step_id": 1,
+                "description": f"Search for information about: {query}",
+                "required_tools": ["search"],
+                "expected_artifacts": [
+                    {"type": "data", "purpose": "Research results for the query", "chart_type": None}
+                ],
+            }
+        ],
+    }
+
+
+async def planning_node(state: State) -> dict:
+    """Phase 1: Generate execution plan using JSON Mode LLM with read-only tools.
+
+    Flow:
+    1. Check fast path: trivial/greeting query -> empty plan -> route to composer
+    2. Mini ReAct loop (max 3 rounds) with read-only tools
+    3. Validate plan JSON schema
+    4. On failure: retry once with error feedback -> fallback plan
+    5. Set plan_phase to "executing" (or "composing" if empty)
+    """
+    from langchain_core.messages import AIMessage, SystemMessage
+
+    # Extract user query
+    user_query = ""
+    for msg in reversed(list(state.get("messages", []))):
+        if hasattr(msg, "type") and msg.type == "human":
+            user_query = (msg.content or "").strip()
+            break
+
+    # Fast path: trivial query
+    if _is_trivial_query(user_query):
+        logger.info("[PLANNING] trivial query detected — skipping planning")
+        return {
+            "execution_plan": None,
+            "plan_phase": "composing",
+            "reasoning_steps": _append_reason(state, _reason_record(
+                "planning_node", "FAST_PATH",
+                "Trivial query detected; skipping planning phase.",
+            )),
+        }
+
+    # Build system prompt with read-only tools
+    registry = get_tool_registry()
+    tool_descriptions = ""
+    if registry:
+        tool_lines = []
+        for t in registry.list_tools():
+            name = str(t.get("name", "")).strip().lower()
+            if name in ("search", "browser", "time"):
+                tool_lines.append(f"  - {t['name']}: {t['description']}")
+        tool_descriptions = "\n".join(tool_lines)
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    system_prompt = _build_planning_system_prompt(now_str, tool_descriptions)
+
+    # Mini ReAct loop (max 3 rounds)
+    llm = _build_llm(streaming=False, json_mode=True)
+    plan = None
+    max_planning_rounds = 3
+
+    for planning_round in range(max_planning_rounds):
+        msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"])
+
+        # If we have tool observations from previous round, inject them
+        if plan is None and planning_round > 0:
+            # Add instruction to read state and produce plan
+            msg_list.append(SystemMessage(content=(
+                "Based on the information gathered, now produce the execution plan JSON. "
+                "Make sure to include all steps with required_tools and expected_artifacts."
+            )))
+
+        try:
+            response = await llm.ainvoke(msg_list)
+            content = (response.content or "").strip()
+            parsed = json.loads(content)
+
+            # Check if LLM wants to call a tool (planning_round < max-1)
+            action = str(parsed.get("action", "")).strip().lower()
+            if action == "tool" and planning_round < max_planning_rounds - 1:
+                tool_name = str(parsed.get("tool", "")).strip().lower()
+                if tool_name in ("search", "browser", "time"):
+                    query = str(parsed.get("query", "")).strip()
+                    gate = _build_policy_gate()
+                    context = PolicyContext(
+                        conversation_id=str(state.get("conversation_id") or ""),
+                        agent_id="planning",
+                    )
+                    tool_result = await _execute_single_tool(tool_name, {"query": query}, gate, context)
+                    # Store observation in state messages for next round
+                    state["messages"].append(AIMessage(
+                        content=json.dumps({
+                            "action": "tool_result",
+                            "tool": tool_name,
+                            "result": tool_result.get("result", {}),
+                        }, ensure_ascii=False)
+                    ))
+                    continue
+
+            # Check if the response IS a plan (has title and steps)
+            if "title" in parsed and "steps" in parsed:
+                plan = parsed
+                break
+            else:
+                # Response is something else — treat as plan_ready
+                if "execution_plan" in parsed:
+                    plan = parsed["execution_plan"]
+                    break
+                plan = parsed
+                break
+
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning("[PLANNING] JSON parse error (round %d): %s", planning_round, e)
+            if planning_round < max_planning_rounds - 1:
+                state["messages"].append(AIMessage(
+                    content=f"JSON parse error. Output ONLY valid JSON with title and steps fields."
+                ))
+                continue
+            plan = None
+
+    # Validate plan
+    if plan:
+        is_valid, error_msg = _validate_plan_json(plan)
+        if not is_valid:
+            logger.warning("[PLANNING] plan validation failed: %s", error_msg)
+            # Retry once with error feedback
+            try:
+                state["messages"].append(SystemMessage(
+                    content=f"Plan validation error: {error_msg}. Please fix and output a valid plan JSON."
+                ))
+                msg_list = [SystemMessage(content=system_prompt)] + list(state["messages"])
+                response = await llm.ainvoke(msg_list)
+                content = (response.content or "").strip()
+                plan = json.loads(content)
+                is_valid, error_msg = _validate_plan_json(plan)
+                if not is_valid:
+                    plan = None
+            except (json.JSONDecodeError, TypeError):
+                plan = None
+
+    # Fallback: if still no valid plan, generate minimal plan
+    if not plan:
+        logger.info("[PLANNING] generating fallback plan for query: %s", user_query[:60])
+        plan = _generate_fallback_plan(user_query)
+
+    plan_phase = "composing" if not plan.get("steps") else "executing"
+
+    return {
+        "execution_plan": plan,
+        "plan_phase": plan_phase,
+        "reasoning_steps": _append_reason(state, _reason_record(
+            "planning_node", "PLAN_READY",
+            f"Generated plan: '{plan.get('title', '')}' with {len(plan.get('steps', []))} step(s)",
+            extra={"step_count": len(plan.get("steps", []))},
+        )),
     }
