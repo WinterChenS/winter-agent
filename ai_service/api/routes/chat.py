@@ -52,6 +52,11 @@ from domain.event_envelope import (
     to_sse_data,
 )
 from graph.graph import create_agent_graph
+from graph.multi_agent_graph import create_multi_agent_graph
+from core.router_agent import RouterAgent
+from core.agent_factory import AgentFactory
+from core.collaboration import CollaborationEngine
+from core.runtime import get_checkpointer, get_tool_registry, get_agent_repository, get_pool
 from observability.trace import ensure_trace_context
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
@@ -89,7 +94,6 @@ async def stream_generate(request: GenerateRequest):
         logging.info("[CHAT] stream start: message_id=%s agent_id=%s conversation_id=%s message=%s",
                      message_id, agent_id, request.conversation_id, request.message[:80])
         if agent_id:
-            from core.runtime import get_agent_repository
             agent_repo = get_agent_repository()
             agent_def = await agent_repo.get_by_id(agent_id)
             if not agent_def:
@@ -131,11 +135,6 @@ async def stream_generate(request: GenerateRequest):
                 checkpointer = get_checkpointer()
 
                 # ── Multi-Agent Graph ──────────────────────────────────────
-                from core.router_agent import RouterAgent
-                from core.agent_factory import AgentFactory
-                from core.collaboration import CollaborationEngine
-                from graph.multi_agent_graph import create_multi_agent_graph
-
                 agent_repo = get_agent_repository()
                 router = RouterAgent(repository=agent_repo)
                 factory = AgentFactory()

@@ -121,10 +121,14 @@ def create_multi_agent_graph(
 ):
     workflow = StateGraph(State)
 
-    # Multi-agent nodes
-    workflow.add_node("router", lambda s: router_node(s, router=router))
-    workflow.add_node("factory", lambda s: factory_node(s, factory=factory))
-    workflow.add_node("collaboration", lambda s: collaboration_node(s, engine=engine))
+    # Multi-agent nodes — wrap async functions for LangGraph
+    async def _router(s): return await router_node(s, router=router)
+    async def _factory(s): return await factory_node(s, factory=factory)
+    async def _collaboration(s): return await collaboration_node(s, engine=engine)
+
+    workflow.add_node("router", _router)
+    workflow.add_node("factory", _factory)
+    workflow.add_node("collaboration", _collaboration)
     workflow.add_node("merge", merge_node)
 
     # Existing pipeline nodes (from graph/nodes.py)
