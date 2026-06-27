@@ -3,9 +3,57 @@ import { ReasoningPanel } from './ReasoningPanel';
 import { ToolCallPanel } from './ToolCallPanel';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { StreamingRenderer } from './StreamingRenderer';
+import ReactECharts from 'echarts-for-react';
 
 interface MessageBubbleProps {
   message: Message;
+}
+
+function chartSpecToOption(chart: any) {
+  const { title, chartType, description, xAxisLabel, yAxisLabel, data = [] } = chart;
+  const names = data.map((d: any) => d.name);
+  const values = data.map((d: any) => d.value);
+  const groups = [...new Set(data.map((d: any) => d.group).filter(Boolean))];
+
+  const baseOption: any = {
+    title: { text: title, subtext: description, left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    legend: groups.length > 0 ? { data: groups, bottom: 0 } : undefined,
+    grid: { left: '3%', right: '4%', bottom: groups.length > 0 ? '12%' : '8%', containLabel: true },
+    xAxis: { type: 'category', data: names, name: xAxisLabel },
+    yAxis: { type: 'value', name: yAxisLabel },
+    series: [],
+  };
+
+  if (chartType === 'pie') {
+    return {
+      title: baseOption.title,
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        data: data.map((d: any) => ({ name: d.name, value: d.value })),
+        label: { formatter: '{b}: {c}' },
+      }],
+    };
+  }
+
+  if (groups.length > 0) {
+    baseOption.series = groups.map((g: string) => ({
+      type: chartType === 'bar' ? 'bar' : 'line',
+      name: g,
+      data: data.filter((d: any) => d.group === g).map((d: any) => d.value),
+    }));
+  } else {
+    baseOption.series = [{
+      type: chartType === 'bar' ? 'bar' : 'line',
+      data: values,
+      itemStyle: chartType === 'bar' ? undefined : { color: '#5470c6' },
+    }];
+  }
+
+  return baseOption;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
@@ -49,25 +97,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         {/* Charts (from chart SSE events) */}
         {!isUser && message.charts && message.charts.length > 0 && (
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-4">
             {message.charts.map((chart: any, i: number) => (
-              <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <div className="text-sm font-semibold text-gray-700 mb-2">
-                  📊 {chart.title || `图表 ${i + 1}`}
-                </div>
-                <div className="text-xs text-gray-500 mb-1">
-                  {chart.description} ({chart.chartType})
-                </div>
-                {chart.data && chart.data.length > 0 && (
-                  <div className="text-xs text-gray-600 max-h-32 overflow-y-auto">
-                    {chart.data.slice(0, 20).map((pt: any, j: number) => (
-                      <span key={j} className="inline-block mr-2 mb-1 px-1.5 py-0.5 bg-white rounded border">
-                        {pt.name}: {pt.value}
-                      </span>
-                    ))}
-                    {chart.data.length > 20 && <span className="text-gray-400">+{chart.data.length - 20} more</span>}
-                  </div>
-                )}
+              <div key={i} className="bg-white border border-gray-200 rounded-lg p-2">
+                <ReactECharts
+                  option={chartSpecToOption(chart)}
+                  style={{ height: 300, width: '100%' }}
+                  opts={{ renderer: 'canvas' }}
+                />
               </div>
             ))}
           </div>
