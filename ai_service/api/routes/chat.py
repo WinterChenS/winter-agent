@@ -164,13 +164,13 @@ async def stream_generate(request: GenerateRequest):
 
         event_ctx = EventMapContext(trace_ctx=trace_ctx, known_tools=_tool_names())
         try:
-            # Persist user message to database (both mock and real modes)
+            # Persist user message to database (before streaming, both modes)
             try:
                 pool_user = get_pool()
                 if pool_user:
                     from db.chat_message_repository import save_message as _save_msg
                     user_msg_id = str(uuid.uuid4())
-                    asyncio.create_task(_save_msg(pool_user, {
+                    await _save_msg(pool_user, {
                         "id": user_msg_id,
                         "conversation_id": trace_ctx.conversation_id,
                         "role": "user",
@@ -178,9 +178,11 @@ async def stream_generate(request: GenerateRequest):
                         "toolCalls": [],
                         "status": "done",
                         "agentId": active_agent,
-                    }))
-            except (ImportError, Exception):
-                pass
+                    })
+                    logging.info("[CHAT] user message persisted: id=%s conv=%s",
+                                user_msg_id, trace_ctx.conversation_id)
+            except Exception as e:
+                logging.warning("[CHAT] failed to persist user message: %s", e)
 
             if not settings.api_key:
                 # Simulated tool call for UI demonstration
@@ -329,7 +331,7 @@ async def stream_generate(request: GenerateRequest):
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
 
-                # Async persist message to database
+                # Persist assistant message to database
                 try:
                     pool = get_pool()
                     if pool:
@@ -343,9 +345,11 @@ async def stream_generate(request: GenerateRequest):
                             "status": "done",
                             "agentId": trace_ctx.agent_id,
                         }
-                        asyncio.create_task(save_message(pool, message_dict))
-                except (ImportError, Exception):
-                    pass
+                        await save_message(pool, message_dict)
+                        logging.info("[CHAT] assistant message persisted: id=%s conv=%s",
+                                    message_id, trace_ctx.conversation_id)
+                except Exception as e:
+                    logging.warning("[CHAT] failed to persist assistant message: %s", e)
 
         except Exception as e:
             yield to_sse_data(envelope_error(trace_ctx, str(e)))
