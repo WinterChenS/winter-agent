@@ -1098,7 +1098,7 @@ async def execution_node(state: State) -> dict:
 
     For each step:
     1. Check artifact dedup for each expected_artifact
-    2. For each required_tool, call _execute_single_tool (or skip if dedup'd)
+    2. For each required_tool, call _execute_single_tool (matched artifacts are referenced, not regenerated)
     3. Register new artifacts
     4. Store step result in execution_results
     5. Increment current_plan_step
@@ -1108,7 +1108,6 @@ async def execution_node(state: State) -> dict:
     """
     plan = state.get("execution_plan")
     step_idx = state.get("current_plan_step", 0)
-    plan_phase = state.get("plan_phase", "executing")
 
     if not plan or not plan.get("steps"):
         return {"plan_phase": "composing"}
@@ -1130,6 +1129,7 @@ async def execution_node(state: State) -> dict:
             user_query = (msg.content or "").strip()
             break
 
+    accumulated_reasons = []
     existing_artifacts = list(state.get("artifacts", []))
 
     # Artifact dedup: for each expected artifact, check if it already exists
@@ -1140,13 +1140,13 @@ async def execution_node(state: State) -> dict:
             logger.info("[EXECUTION] artifact dedup match: type=%s purpose='%s' -> existing artifact %s",
                         ea.get("type"), ea.get("purpose", "")[:40], match.get("artifact_id"))
             artifact_ids.append(match.get("artifact_id"))
-            _append_reason(state, _reason_record(
+            accumulated_reasons.append(_reason_record(
                 "execution_node", "ARTIFACT_DEDUP_MATCH",
                 f"Artifact dedup match: type={ea.get('type')}, matched existing {match.get('artifact_id')}",
                 extra={"candidate_type": ea.get("type"), "matched_id": match.get("artifact_id")},
             ))
         else:
-            _append_reason(state, _reason_record(
+            accumulated_reasons.append(_reason_record(
                 "execution_node", "ARTIFACT_DEDUP_MISS",
                 f"No dedup match for artifact type={ea.get('type')}, purpose='{ea.get('purpose', '')[:40]}'",
             ))
@@ -1172,18 +1172,26 @@ async def execution_node(state: State) -> dict:
             })
 
             if result.get("status") == "error":
-                # Retry once
-                logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
-                result = await _execute_single_tool(tool_name, {"query": user_query}, gate, context)
-                tool_results[-1] = {
-                    "tool": tool_name,
-                    "status": result.get("status", "error"),
-                    "elapsed_ms": result.get("elapsed_ms", 0) + tool_results[-1].get("elapsed_ms", 0),
-                }
+                # Check if error is retryable before retrying
+                first_result = result
+                error_info = first_result.get("error", {})
+                is_retryable = error_info.get("retryable", True) if isinstance(error_info, dict) else True
+                if not is_retryable:
+                    logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
+                    step_status = "error"
+                else:
+                    # Retry once
+                    logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
+                    result = await _execute_single_tool(tool_name, {"query": user_query}, gate, context)
+                    tool_results[-1] = {
+                        "tool": tool_name,
+                        "status": result.get("status", "error"),
+                        "elapsed_ms": result.get("elapsed_ms", 0) + tool_results[-1].get("elapsed_ms", 0),
+                    }
 
             if result.get("status") == "error":
                 step_status = "error"
-                _append_reason(state, _reason_record(
+                accumulated_reasons.append(_reason_record(
                     "execution_node", "TOOL_EXECUTION_FAILURE",
                     f"Tool '{tool_name}' failed after retry for step {step_id}",
                     extra={"tool": tool_name, "error": result.get("error_msg")},
@@ -1209,7 +1217,7 @@ async def execution_node(state: State) -> dict:
                 "elapsed_ms": 0,
             })
             step_status = "error"
-            _append_reason(state, _reason_record(
+            accumulated_reasons.append(_reason_record(
                 "execution_node", "TOOL_EXECUTION_EXCEPTION",
                 f"Unexpected exception for tool '{tool_name}': {str(exc)[:100]}",
             ))
@@ -1233,9 +1241,9 @@ async def execution_node(state: State) -> dict:
         "artifacts": state.get("artifacts", []),
         "current_plan_step": next_step_idx,
         "plan_phase": new_plan_phase,
-        "reasoning_steps": _append_reason(state, _reason_record(
+        "reasoning_steps": state.get("reasoning_steps", []) + accumulated_reasons + [_reason_record(
             "execution_node", "STEP_COMPLETED",
             f"Step {step_id}/{len(steps)} completed with status={step_status}",
             extra={"step_id": step_id, "status": step_status, "tool_count": len(required_tools)},
-        )),
+        )],
     }
