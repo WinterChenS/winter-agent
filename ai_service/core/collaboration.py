@@ -307,9 +307,9 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
             return {}
 
 def _parse_and_emit_images(engine, result_text: str) -> None:
-    """Parse [图片已上传] section and emit image.uploaded events."""
+    """Parse tool result for MinIO URLs and emit image.uploaded events."""
     import re
-    for m in re.finditer(r'(\S+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://\S+)', result_text):
+    for m in re.finditer(r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\]+)', result_text):
         fname, url = m.group(1), m.group(2)
         engine._emit("image.uploaded", filename=fname, url=url)
 

@@ -146,9 +146,8 @@ class CodeSandboxTool(BaseTool):
             except ImportError:
                 _upload = None
             png_patterns = [
-                r'已(?:生成[并且]?)?保存[为至]?\s*[：:]?\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-                r'savefig\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg))',
-                r'(\S+\.png)',
+                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\]+)',
+                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))',
             ]
             uploaded: dict[str, str] = {}
             cwd = _os_module.getcwd()
