@@ -68,3 +68,10 @@ class State(TypedDict):
     collab_result: str | None
     agent_results: list | None
 
+    # ── V0.5 plan-execute-compose ──────────────────────────────────────────
+    execution_plan: dict | None           # JSON execution plan from planning_node
+    execution_results: list[dict]         # Per-step results [{step_id, status, data, artifacts}]
+    artifacts: list[dict]                 # All artifact metadata [{artifact_id, type, purpose, source_step_id, content_ref}]
+    current_plan_step: int                # 0-based index into execution_plan.steps
+    plan_phase: str                       # "planning" | "executing" | "composing" | "done"
+
