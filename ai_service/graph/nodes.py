@@ -1177,10 +1177,10 @@ async def execution_node(state: State) -> dict:
     step_status = "completed"
 
     for tool_name in required_tools:
-        logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
         # Use step description as the search query (NOT the original user query),
         # so each plan step searches for its specific data need
         search_query = step.get("description", user_query)
+        logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
         try:
             result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
             tool_results.append({
