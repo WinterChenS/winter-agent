@@ -228,10 +228,11 @@ Do NOT just describe — actually generate the chart.
 3. Charts are displayed automatically
 
 ## Available Tools
-- execute_python: Run Python code for analysis, statistics, and matplotlib charts
-- search: Search web for external data when needed',
+- execute_python: Your ONLY tool. Use it for ALL data analysis, statistics, and matplotlib chart generation.
+  Other agents (general, search) handle web searching — you receive their results as context.
+  Your job: take the data and produce analysis + charts via execute_python.',
 
-    '["execute_python", "search"]',
+    '["execute_python"]',
     '{"temperature": 0.2}',
     '["分析", "数据", "统计", "趋势", "报表", "图表", "可视化", "对比", "增长", "占比", "预测", "洞察", "分布", "排名"]',
     'sequential',
