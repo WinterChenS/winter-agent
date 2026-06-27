@@ -275,6 +275,25 @@ async def stream_generate(request: GenerateRequest):
                 graph_task = asyncio.create_task(graph_runner())
                 bus_task = asyncio.create_task(bus_runner())
 
+                # Persist user message to database
+                try:
+                    pool_user = get_pool()
+                    if pool_user:
+                        from db.chat_message_repository import save_message as save_msg
+                        user_msg_id = str(uuid.uuid4())
+                        user_msg_dict = {
+                            "id": user_msg_id,
+                            "conversation_id": trace_ctx.conversation_id,
+                            "role": "user",
+                            "content": request.message,
+                            "toolCalls": [],
+                            "status": "done",
+                            "agentId": active_agent,
+                        }
+                        asyncio.create_task(save_msg(pool_user, user_msg_dict))
+                except (ImportError, Exception):
+                    pass
+
                 graph_done_flag = False
                 bus_done_flag = False
                 tool_calls_accumulated: dict[str, dict] = {}
