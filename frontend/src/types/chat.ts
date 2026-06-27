@@ -20,6 +20,7 @@ export interface Message {
   agentId?: string;
   conversationId?: string;
   createdAt?: number;
+  images?: Record<string, string>;  // filename → url
 }
 
 // Keep old types for backward compat with Sidebar/system components

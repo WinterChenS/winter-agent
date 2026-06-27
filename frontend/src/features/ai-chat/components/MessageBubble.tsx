@@ -44,6 +44,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </StreamingRenderer>
         )}
 
+        {/* Generated images (from MinIO) */}
+        {message.images && Object.keys(message.images).length > 0 && (
+          <div className="mt-2 space-y-2">
+            {Object.entries(message.images).map(([filename, url]) => (
+              <div key={filename}>
+                <img
+                  src={url}
+                  alt={filename}
+                  className="max-w-full rounded border border-gray-200"
+                  loading="lazy"
+                />
+                <span className="block text-xs text-gray-400 mt-1">{filename}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Error indicator */}
         {message.status === 'error' && (
           <span className="block mt-1 text-xs text-red-500">

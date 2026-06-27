@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 class CollaborationResult:
     def __init__(self, content: str, agent_results: list[dict],
-                 chart_specs: list[dict] | None = None) -> None:
+                 chart_specs: list[dict] | None = None,
+                 images: dict[str, str] | None = None) -> None:
         self.content = content
         self.agent_results = agent_results
         self.chart_specs = chart_specs or []
+        self.images = images or {}
 
 
 def _build_lc_tool(tool_obj):
@@ -121,11 +123,17 @@ class CollaborationEngine:
                 # No more tools — final answer
                 elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
                 self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+                # Scan for generated images and upload to MinIO
+                final_output = str(response.content).strip()
+                images = self._scan_and_upload_images(final_output)
+                for filename, url in images.items():
+                    self._emit("image.uploaded", filename=filename, url=url)
                 return {
                     "agent": agent_name,
                     "status": "ok",
-                    "output": str(response.content).strip(),
+                    "output": final_output,
                     "tool_calls": tool_call_history,
+                    "images": images,
                 }
 
             # Process tool calls
@@ -192,7 +200,11 @@ class CollaborationEngine:
             )
 
         final = agent_results[-1].get("output", "") if agent_results else ""
-        return CollaborationResult(content=final, agent_results=agent_results)
+        all_images = {}
+        for r in agent_results:
+            if isinstance(r.get("images"), dict):
+                all_images.update(r["images"])
+        return CollaborationResult(content=final, agent_results=agent_results, images=all_images)
 
     async def _parallel(
         self, runtimes: list[AgentRuntime], user_query: str,
@@ -265,6 +277,14 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
             *worker_results,
         ])
 
+
+    def _scan_and_upload_images(self, output_text: str) -> dict[str, str]:
+        """Scan tool output for generated images and upload to MinIO."""
+        try:
+            from services.minio_client import scan_and_upload_images
+            return scan_and_upload_images(output_text)
+        except Exception:
+            return {}
 
     async def _extract_charts(
         self, content: str, user_query: str,

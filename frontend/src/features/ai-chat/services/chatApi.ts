@@ -133,6 +133,14 @@ function handleEvent(event: SseEvent): void {
       break;
     }
 
+    case 'image.uploaded':
+      if (messageId) {
+        const url = payload.url as string;
+        const filename = payload.filename as string;
+        if (url) store.addImage(messageId, filename, url);
+      }
+      break;
+
     case 'message.tool_call':
       if (messageId && toolCall) store.upsertToolCall(messageId, toolCall);
       break;
