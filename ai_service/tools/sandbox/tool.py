@@ -140,8 +140,15 @@ class CodeSandboxTool(BaseTool):
         full_code = f"{preamble}\n{code}" if preamble else code
 
         try:
+            # Prefer venv python (has matplotlib, numpy, pandas installed);
+            # fall back to sys.executable if venv not available
+            import os as _os
+            _venv_python = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), ".venv", "bin", "python")
+            _python_exe = _venv_python if _os.path.isfile(_venv_python) else sys.executable
+            logger.info("Sandbox using Python: %s", _python_exe)
+
             proc = await asyncio.create_subprocess_exec(
-                sys.executable,
+                _python_exe,
                 "-c",
                 full_code,
                 stdout=asyncio.subprocess.PIPE,
