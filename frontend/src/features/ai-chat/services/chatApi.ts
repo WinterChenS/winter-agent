@@ -81,12 +81,14 @@ export async function sendChatMessage(req: ChatRequest): Promise<void> {
 }
 
 function handleEvent(event: SseEvent): void {
-  const p = (event.payload || event) as Record<string, unknown>;
+  // Merge top-level AND payload fields: bus_runner puts messageId at top level,
+  // LangGraph events put it in payload. Payload takes priority when both exist.
+  const p = { ...event, ...(event.payload || {}) } as Record<string, unknown>;
   const { type } = event;
-  const messageId = p.messageId as string | undefined;
-  const delta = p.delta as string | undefined;
+  const messageId = (p.messageId as string) || undefined;
+  const delta = (p.delta as string) || undefined;
   const toolCall = p.toolCall as ToolCall | undefined;
-  const status = p.status as string | undefined;
+  const status = (p.status as string) || undefined;
   const store = useChatStore.getState();
 
   switch (type) {
