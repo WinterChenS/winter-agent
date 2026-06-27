@@ -740,6 +740,8 @@ Use Markdown for formatting and structure.
 - When you reference a chart, do NOT repeat all its data values as text — let the chart show them
 - Write naturally as if the chart is embedded in your response
 - NEVER say "I cannot generate charts" or "I am unable to create charts" — if no charts are listed above, simply answer without referring to charts
+- NEVER output localhost image URLs (http://localhost:3000/chat/xxx.png) — images are automatically uploaded
+- If you saved images using Python, just mention the filename and the system handles the rest
 - Keep answers concise and well-structured
 - Reply in the same language as the user's question
 
