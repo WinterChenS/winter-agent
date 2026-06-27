@@ -122,14 +122,14 @@ def scan_and_upload_images(output_text: str) -> dict[str, str]:
     import re
     # Match common image file references in output
     patterns = [
-        r'已保存[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-        r'saved[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
-        r'保存[到至][：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'已(?:生成[并且]?)?保存[为至]?[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'saved?\s*(?:as|to)?[：:]\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
+        r'图表已.*?(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'→\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r'=>\s*(\S+\.(?:png|jpg|jpeg|gif|svg))',
         r"savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
         r"\.savefig\(['\"]([^'\"]+\.(?:png|jpg|jpeg|gif|svg))",
-        r'(\S+\.png)',  # Any .png filename in output
+        r'(\S+\.png)',  # Any .png filename as fallback
     ]
 
     found_files = set()

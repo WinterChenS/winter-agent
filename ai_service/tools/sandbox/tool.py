@@ -72,7 +72,13 @@ class CodeSandboxTool(BaseTool):
     @staticmethod
     def _build_preamble() -> str:
         """Return code that initializes chart theme and sets resource limits on Linux."""
+        import os as _os
         lines = []
+
+        # ── Ensure ai_service is on path for chart module imports ──
+        ai_service_dir = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+        lines.append(f"import sys; sys.path.insert(0, {ai_service_dir!r})")
+        lines.append("")
 
         # ── Chart theme (font, DPI, style) ──
         lines.append("from chart.chart_theme import ChartTheme")
