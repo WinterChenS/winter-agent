@@ -56,16 +56,17 @@ class CollaborationEngine:
 
         # Build LLM with tools bound
         llm = runtime.llm
+        lc_tools = []
         if runtime.tools:
-            # Convert tool registry tools to LangChain tools (they have .name, .description, .invoke)
-            lc_tools = []
             for t in runtime.tools:
-                # Each tool from registry has: name, description, fn (callable)
-                if hasattr(t, 'name') and hasattr(t, 'fn'):
+                if hasattr(t, 'name') and hasattr(t, 'execute'):
                     from langchain_core.tools import tool
-                    @tool(t.name, description=t.description or t.name)
+                    _name = t.name
+                    _desc = getattr(t, 'description', t.name) or t.name
+                    @tool(_name, description=_desc)
                     async def _wrapped(query: str = "", _tool=t) -> str:
-                        return str(await _tool.fn(query))
+                        result = await _tool.execute({"query": query})
+                        return str(result)
                     lc_tools.append(_wrapped)
             if lc_tools:
                 llm = llm.bind_tools(lc_tools)
@@ -104,12 +105,12 @@ class CollaborationEngine:
                 self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
                           agent=agent_name, arguments=tc_args)
 
-                # Execute tool
+                # Execute tool via BaseTool.execute()
                 tool_obj = _find_tool(runtime.tools, tc_name)
-                if tool_obj and hasattr(tool_obj, 'fn'):
+                if tool_obj and hasattr(tool_obj, 'execute'):
                     try:
-                        query_arg = str(tc_args.get("query", json.dumps(tc_args)))
-                        result = await tool_obj.fn(query_arg)
+                        query_arg = tc_args.get("query", json.dumps(tc_args))
+                        result = await tool_obj.execute({"query": str(query_arg)})
                         result_str = str(result)
                         self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
                                   agent=agent_name, result=result_str[:500],
@@ -235,6 +236,6 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
 
 def _find_tool(tools: list, name: str):
     for t in tools:
-        if hasattr(t, 'name') and t.name == name:
+        if hasattr(t, 'name') and getattr(t, 'name', '') == name:
             return t
     return None
