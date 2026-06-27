@@ -785,8 +785,9 @@ def _validate_plan_json(plan: dict) -> tuple[bool, str]:
     """
     if not isinstance(plan, dict):
         return False, "Plan must be a JSON object"
+    # Auto-fix missing title
     if "title" not in plan or not isinstance(plan["title"], str):
-        return False, "Plan must have a 'title' string field"
+        plan["title"] = "Research Report"
     if "steps" not in plan or not isinstance(plan["steps"], list):
         return False, "Plan must have a 'steps' array field"
     if len(plan["steps"]) == 0:
@@ -794,8 +795,9 @@ def _validate_plan_json(plan: dict) -> tuple[bool, str]:
     for i, step in enumerate(plan["steps"]):
         if not isinstance(step, dict):
             return False, f"Step {i} must be a JSON object"
+        # Auto-fix missing step_id
         if "step_id" not in step:
-            return False, f"Step {i} missing 'step_id'"
+            step["step_id"] = i + 1
         if "description" not in step or not isinstance(step["description"], str):
             return False, f"Step {i} missing 'description' string"
         if "required_tools" not in step or not isinstance(step["required_tools"], list):
@@ -829,9 +831,10 @@ Rules:
 - expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar"
 - Limit to 5 steps maximum
 - For simple questions (1 search is enough), output a single step
+- CRITICAL: The "title" field is MANDATORY — always include it
 
 To use a tool, output: {"action":"tool","tool":"<tool_name>","query":"<search query>"}
-When you have enough information for a plan, output the plan JSON directly with "title" and "steps" fields.
+When you have enough information for a plan, output the plan JSON directly. You MUST include both "title" (string) and "steps" (array) fields.
 """
 
 
