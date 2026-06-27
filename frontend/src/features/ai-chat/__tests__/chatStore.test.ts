@@ -244,3 +244,82 @@ describe('chatStore', () => {
     expect(state.messageOrder.length).toBe(0);
   });
 });
+
+describe('loadHistory validation', () => {
+  it('skips messages with null/empty id', () => {
+    const msgs = [
+      { id: 'm1', role: 'user' as const, content: 'hi', status: 'done' as const },
+      { id: '', role: 'user' as const, content: 'bad', status: 'done' as const },
+      { id: null as unknown as string, role: 'user' as const, content: 'bad2', status: 'done' as const },
+    ];
+    useChatStore.getState().loadHistory(msgs as any);
+    const state = useChatStore.getState();
+    expect(state.messageOrder).toEqual(['m1']);
+  });
+
+  it('deduplicates messages by id', () => {
+    const msgs = [
+      { id: 'm1', role: 'user' as const, content: 'first', status: 'done' as const },
+      { id: 'm1', role: 'user' as const, content: 'duplicate', status: 'done' as const },
+    ];
+    useChatStore.getState().loadHistory(msgs);
+    const state = useChatStore.getState();
+    expect(state.messageOrder).toEqual(['m1']);
+    expect(state.messages['m1'].content).toBe('first');
+  });
+
+  it('forces status to done for all history messages', () => {
+    const msgs = [
+      { id: 'm1', role: 'user' as const, content: 'hi', status: 'streaming' as const },
+    ];
+    useChatStore.getState().loadHistory(msgs);
+    expect(useChatStore.getState().messages['m1'].status).toBe('done');
+  });
+});
+
+describe('normalizeToolCalls', () => {
+  it('handles toolCalls as JSON string', () => {
+    const msgs = [{
+      id: 'm1', role: 'assistant' as const, content: '',
+      status: 'done' as const,
+      toolCalls: '[{"id":"tc-1","name":"search","arguments":{},"status":"done"}]',
+    }];
+    useChatStore.getState().loadHistory(msgs as any);
+    const tcs = useChatStore.getState().messages['m1'].toolCalls ?? [];
+    expect(tcs).toHaveLength(1);
+    expect(tcs[0].name).toBe('search');
+  });
+
+  it('handles already-parsed toolCalls array', () => {
+    const msgs = [{
+      id: 'm2', role: 'assistant' as const, content: '',
+      status: 'done' as const,
+      toolCalls: [{ id: 'tc-1', name: 'search', arguments: {}, status: 'done' }],
+    }];
+    useChatStore.getState().loadHistory(msgs as any);
+    const tcs = useChatStore.getState().messages['m2'].toolCalls ?? [];
+    expect(tcs).toHaveLength(1);
+  });
+
+  it('returns empty array for null toolCalls', () => {
+    const msgs = [{
+      id: 'm3', role: 'assistant' as const, content: '',
+      status: 'done' as const,
+      toolCalls: null,
+    }];
+    useChatStore.getState().loadHistory(msgs as any);
+    const tcs = useChatStore.getState().messages['m3'].toolCalls ?? [];
+    expect(tcs).toEqual([]);
+  });
+
+  it('returns empty array for malformed JSON string', () => {
+    const msgs = [{
+      id: 'm4', role: 'assistant' as const, content: '',
+      status: 'done' as const,
+      toolCalls: 'not valid json',
+    }];
+    useChatStore.getState().loadHistory(msgs as any);
+    const tcs = useChatStore.getState().messages['m4'].toolCalls ?? [];
+    expect(tcs).toEqual([]);
+  });
+});

@@ -74,6 +74,53 @@ def _sanitize_delta(text: str) -> str:
     text = re.sub(r'```python\s*\n.*?\n```', '', text, flags=re.DOTALL)
     return text
 
+def _accumulate_tool_call(envelope: dict, acc: dict[str, dict]) -> None:
+    """Accumulate tool calls from SSE envelopes for DB persistence.
+
+    Handles both message.tool_call (LangGraph) and tool.started/finished/failed
+    (StreamingEventBus) envelope formats, merging by tool call ID.
+    """
+    envelope_type = envelope.get("type", "")
+    payload = envelope.get("payload", {}) or {}
+
+    if envelope_type == "message.tool_call":
+        tc = payload.get("toolCall")
+        if isinstance(tc, dict) and tc.get("id"):
+            tc_id = tc["id"]
+            existing = acc.get(tc_id, {})
+            # Merge: later updates (done/failed) override earlier (running)
+            merged = {**existing}
+            for k, v in tc.items():
+                if v is not None:
+                    merged[k] = v
+            if "arguments" not in merged:
+                merged["arguments"] = existing.get("arguments", {})
+            acc[tc_id] = merged
+    elif envelope_type in ("tool.started", "tool.finished", "tool.failed"):
+        tc_id = payload.get("tool_call_id")
+        if tc_id:
+            existing = acc.get(tc_id, {})
+            merged = {**existing, "id": tc_id}
+            if envelope_type == "tool.started":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["arguments"] = payload.get("arguments") or existing.get("arguments", {})
+                merged["status"] = "running"
+            elif envelope_type == "tool.finished":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["status"] = "done"
+                if "result" in payload:
+                    merged["result"] = payload["result"]
+                # Preserve arguments from started event
+                if "arguments" not in merged:
+                    merged["arguments"] = existing.get("arguments", {})
+            elif envelope_type == "tool.failed":
+                merged["name"] = payload.get("tool") or existing.get("name", "unknown")
+                merged["status"] = "failed"
+                if "error" in payload:
+                    merged["result"] = payload["error"]
+            acc[tc_id] = merged
+
+
 MOCK_RESPONSES = [
     "Hello! I am AI Assistant V0.2. How can I help you today?",
     "This is a mock response. The AI service is running in mock mode without a real LLM API key.",
@@ -230,6 +277,8 @@ async def stream_generate(request: GenerateRequest):
 
                 graph_done_flag = False
                 bus_done_flag = False
+                tool_calls_accumulated: dict[str, dict] = {}
+                content_accumulated = ""
 
                 while not (graph_done_flag and bus_done_flag):
                     source, data = await merge_queue.get()
@@ -244,6 +293,11 @@ async def stream_generate(request: GenerateRequest):
                         graph_done_flag = True
                         event_bus.close()
                     else:
+                        # Accumulate tool calls and content for persistence
+                        _accumulate_tool_call(data, tool_calls_accumulated)
+                        if data.get("type") == "message.delta":
+                            p = data.get("payload", data) or {}
+                            content_accumulated += str(p.get("delta", ""))
                         yield to_sse_data(data)
 
                 # Cleanup
@@ -252,8 +306,10 @@ async def stream_generate(request: GenerateRequest):
                 # If collaboration produced a result, stream it directly (skip answer_node)
                 logging.info("[CHAT] final_state has_collab=%s",
                              bool(final_state and final_state.get("collab_result")))
+                collab_text = ""
                 if final_state and final_state.get("collab_result"):
                     collab_text = str(final_state["collab_result"])
+                    content_accumulated += collab_text
                     logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
                     for char in collab_text:
                         yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
@@ -267,14 +323,14 @@ async def stream_generate(request: GenerateRequest):
                 # Async persist message to database
                 try:
                     pool = get_pool()
-                    if pool and final_state:
+                    if pool:
                         from db.chat_message_repository import save_message
                         message_dict = {
                             "id": message_id,
                             "conversation_id": trace_ctx.conversation_id,
                             "role": "assistant",
-                            "content": extract_last_assistant_text(final_state),
-                            "toolCalls": final_state.get("tool_steps", []),
+                            "content": content_accumulated,
+                            "toolCalls": list(tool_calls_accumulated.values()),
                             "status": "done",
                             "agentId": trace_ctx.agent_id,
                         }

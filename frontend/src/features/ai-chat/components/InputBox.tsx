@@ -8,6 +8,15 @@ interface InputBoxProps {
 export function InputBox({ onSend, disabled }: InputBoxProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposing = useRef(false);
+
+  const handleCompositionStart = useCallback(() => {
+    isComposing.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposing.current = false;
+  }, []);
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -30,6 +39,7 @@ export function InputBox({ onSend, disabled }: InputBoxProps) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isComposing.current) return; // IME guard — block Enter during composition
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
@@ -54,6 +64,8 @@ export function InputBox({ onSend, disabled }: InputBoxProps) {
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           placeholder="输入消息..."
           rows={1}
           className="flex-1 resize-none border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-[96px]"
