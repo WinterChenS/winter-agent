@@ -84,7 +84,7 @@ function CodeBlock({ className, children }: CodeBlockProps) {
 
 function InlineCode({ children }: { children?: React.ReactNode }) {
   return (
-    <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+    <code className="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">
       {children}
     </code>
   );
@@ -100,23 +100,23 @@ const components: Components = {
   },
   table: ({ children }) => (
     <div className="overflow-x-auto my-2">
-      <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
+      <table className="min-w-full border-collapse border border-gray-300">
         {children}
       </table>
     </div>
   ),
   th: ({ children }) => (
-    <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-gray-50 dark:bg-gray-800 font-semibold text-left">
+    <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left text-gray-900">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
+    <td className="border border-gray-300 px-3 py-2 text-gray-800">
       {children}
     </td>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-2">
+    <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-700 my-2">
       {children}
     </blockquote>
   ),
@@ -130,7 +130,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   if (!content) return null;
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
+    <div className="text-gray-900 prose prose-sm max-w-none">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
