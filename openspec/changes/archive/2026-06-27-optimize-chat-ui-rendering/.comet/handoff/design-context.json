@@ -1,0 +1,17 @@
+{
+  "change": "optimize-chat-ui-rendering",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "16a30a8acdb87974086e996ad3be4033e5b2cfcbc028409b8bbdefcc48ea0cf8",
+  "files": [
+    { "path": "openspec/changes/optimize-chat-ui-rendering/proposal.md", "sha256": "c8305693f901ae706fa9f130b3f46761df452b3580a12fd718ac66cd12a89e79" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/design.md", "sha256": "9a19fb0ae5c18f42db7a49ad43c967707d2e85b44e534bf4da896e30e86059ea" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/tasks.md", "sha256": "e82fdc2baa69ce165c6e349e98cac3da4436226df94a5bac3e72a33742bdc0bd" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/specs/ai-chat-ui/spec.md", "sha256": "26c7db60e708bb711d8acfb9a657b1034adc56520b910737956e8906648abfd1" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/specs/chat-history-restore/spec.md", "sha256": "df77116d5c82d912fda998a074e86edc6a2c9900db6d24f78acc036be2ea24c3" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/specs/ime-input-guard/spec.md", "sha256": "e1baa65fc231f06dfc137a72b5f149c5b1d44dd9ddf47ecdaf4500638f824ac7" },
+    { "path": "openspec/changes/optimize-chat-ui-rendering/specs/sse-event-protocol/spec.md", "sha256": "8f5a43c7f0f8f76bebe7c7651b8277d4ffaa52efc538a117aafc20512be14377" }
+  ]
+}

@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-06-27-unify-chart-pipeline-ve
 branch_status: handled
 created_at: 2026-06-27
 verified_at: 2026-06-27
-archived: false
+archived: true
 handoff_context: openspec/changes/unify-chart-pipeline/.comet/handoff/design-context.json
 handoff_hash: 317b773afcc23150c11094d48557e3b0c09a07b4fa6e4496298ce1405c8aab00

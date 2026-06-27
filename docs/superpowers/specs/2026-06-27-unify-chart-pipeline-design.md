@@ -2,6 +2,8 @@
 comet_change: unify-chart-pipeline
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-27-unify-chart-pipeline
+status: final
 ---
 
 # Unify Chart Pipeline — Technical Design
