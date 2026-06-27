@@ -526,3 +526,124 @@ async def test_execution_node_multi_step():
 
     # Only step 1 tools executed
     mock_exec.assert_called_once()
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# composer_node Tests
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _make_composer_state(**overrides) -> State:
+    """Build a minimal State for composer_node tests."""
+    defaults = dict(
+        messages=[HumanMessage(content="What are the AI trends in 2026?")],
+        execution_plan={
+            "title": "AI Trends Research",
+            "steps": [
+                {"step_id": 1, "description": "Search trends", "required_tools": ["search"], "expected_artifacts": []},
+            ],
+        },
+        execution_results=[{"step_id": 1, "status": "completed", "data": [{"tool": "search"}], "artifacts": []}],
+        artifacts=[{"artifact_id": "chart_0", "type": "chart", "purpose": "trend chart", "source_step_id": 1, "content_ref": "trend.png"}],
+        current_plan_step=1,
+        plan_phase="composing",
+        conversation_id="test-composer-1",
+        current_tool=None,
+        tool_input=None,
+        tool_result=None,
+        reasoning_steps=[],
+        iteration_count=0,
+        tool_steps=[],
+        last_tool_name=None,
+        last_tool_query=None,
+        consecutive_search_count=0,
+        last_guard_reason=None,
+        trace_id="",
+        turn_id="",
+        span_id="",
+        parent_span_id=None,
+        active_agent="default",
+        chart_specs=[],
+        pending_chart_spec=None,
+        pending_text_block=None,
+        blocks=[],
+        route="start",
+        router_result=None,
+        selected_agents=None,
+        selected_strategy=None,
+        runtimes=None,
+        collab_result=None,
+        agent_results=None,
+    )
+    defaults.update(overrides)
+    return State(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_composer_node_generates_report():
+    """Verify composer_node produces a structured report with plan_phase='done'."""
+    from graph.nodes import composer_node
+    from unittest.mock import patch, AsyncMock
+
+    state = _make_composer_state()
+
+    with patch("graph.nodes._build_llm") as mock_build:
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = type("R", (), {"content": "# AI Trends Report\n\nExecutive summary..."})()
+        mock_build.return_value = mock_llm
+
+        result = await composer_node(state)
+
+    assert result["plan_phase"] == "done"
+    assert len(result["messages"]) > 0
+    last_msg = result["messages"][-1]
+    assert last_msg.content == "# AI Trends Report\n\nExecutive summary..."
+    # Verify _build_llm was called with streaming=True, json_mode=False
+    mock_build.assert_called_once_with(streaming=True, json_mode=False)
+
+
+@pytest.mark.asyncio
+async def test_composer_node_error_fallback():
+    """Verify composer_node returns fallback message on LLM error."""
+    from graph.nodes import composer_node
+    from unittest.mock import patch, AsyncMock
+
+    state = _make_composer_state()
+
+    with patch("graph.nodes._build_llm") as mock_build:
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.side_effect = Exception("LLM temporarily unavailable")
+        mock_build.return_value = mock_llm
+
+        result = await composer_node(state)
+
+    assert result["plan_phase"] == "done"
+    assert len(result["messages"]) > 0
+    last_msg = result["messages"][-1]
+    assert "Sorry, an error occurred" in last_msg.content or "error" in last_msg.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_composer_node_no_plan_direct_response():
+    """Verify composer_node handles state with no execution_plan (trivial query path)."""
+    from graph.nodes import composer_node
+    from unittest.mock import patch, AsyncMock
+
+    state = _make_composer_state(
+        execution_plan=None,
+        execution_results=[],
+        artifacts=[],
+        current_plan_step=0,
+        plan_phase="composing",
+    )
+
+    with patch("graph.nodes._build_llm") as mock_build:
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = type("R", (), {"content": "Sure, here's a direct answer."})()
+        mock_build.return_value = mock_llm
+
+        result = await composer_node(state)
+
+    assert result["plan_phase"] == "done"
+    last_msg = result["messages"][-1]
+    assert "direct answer" in last_msg.content

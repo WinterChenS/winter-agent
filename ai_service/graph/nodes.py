@@ -1247,3 +1247,100 @@ async def execution_node(state: State) -> dict:
             extra={"step_id": step_id, "status": step_status, "tool_count": len(required_tools)},
         )],
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# composer_node: Phase 3 — Generate structured final report from plan + results
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _build_composer_system_prompt(
+    plan: dict | None,
+    results: list[dict],
+    artifacts: list[dict],
+    now_str: str,
+) -> str:
+    """Build the system prompt for the composer LLM, including plan, results, and artifacts."""
+    plan_section = json.dumps(plan, ensure_ascii=False, indent=2) if plan else "No plan was generated (direct response)."
+
+    results_section = (
+        json.dumps(results, ensure_ascii=False, indent=2)
+        if results
+        else "No research results available."
+    )
+
+    def _format_artifacts(artifacts_list: list[dict]) -> str:
+        if not artifacts_list:
+            return "No visual artifacts available."
+        lines = ["Available Visual Assets:"]
+        for a in artifacts_list:
+            aid = a.get("artifact_id", "?")
+            atype = a.get("type", "?")
+            purpose = a.get("purpose", "")
+            content_ref = a.get("content_ref", "")
+            lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
+        return "\n".join(lines)
+
+    artifacts_section = _format_artifacts(artifacts)
+
+    return f"""\
+You are a professional data analyst. Generate a structured report based on the research results.
+
+[Execution Plan]
+{plan_section}
+
+[Research Results]
+{results_section}
+
+[Available Visual Assets]
+{artifacts_section}
+
+[Instructions]
+- Write a professional analysis report
+- Interleave text with images naturally: introduction -> [IMAGE] -> analysis -> [IMAGE] -> conclusion
+- Use Markdown image syntax: ![description](image_url)
+- Do NOT output code blocks, localhost URLs, or raw tool output
+- Reply in the same language as the user's question
+- Structure: title, executive summary, sections per plan step, conclusion
+- If no research data was collected, just answer the user's question directly and conversationally
+
+Current time: {now_str}
+"""
+
+
+async def composer_node(state: State) -> dict:
+    """Phase 3: Generate structured report from plan + results + artifacts.
+
+    Builds a system prompt with:
+    - The execution plan
+    - Research results per step
+    - Available visual artifacts (charts)
+
+    Uses Normal Mode (streaming) LLM with no tool binding.
+    Output is streamed via astream_events -> SSE as message.delta.
+    """
+    plan = state.get("execution_plan")
+    results = state.get("execution_results", [])
+    artifacts = state.get("artifacts", [])
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    system_prompt = _build_composer_system_prompt(plan, results, artifacts, now_str)
+
+    messages = [SystemMessage(content=system_prompt)] + list(state["messages"])
+
+    llm = _build_llm(streaming=True, json_mode=False)
+
+    try:
+        response = await llm.ainvoke(messages)
+    except Exception as exc:
+        logger.exception("composer_node: LLM invoke failed")
+        fallback = "Sorry, an error occurred while generating the answer. Please try again."
+        return {
+            "messages": [AIMessage(content=fallback)],
+            "plan_phase": "done",
+        }
+
+    return {
+        "messages": [response],
+        "plan_phase": "done",
+    }
