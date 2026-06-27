@@ -1,59 +1,33 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import MagicMock
 
-from graph.multi_agent_graph import create_multi_agent_graph
-from core.router_agent import RouterAgent, RouterResult
-from core.agent_factory import AgentFactory, AgentRuntime
-from core.collaboration import CollaborationEngine, CollaborationResult
-from models.agent import AgentDefinition
+from graph.multi_agent_graph import create_plan_execute_graph
 
 
 @pytest.mark.asyncio
-async def test_graph_builds_and_routes():
-    """Verify the multi-agent graph can be built and compiles."""
-    # Mock dependencies
-    router = MagicMock(spec=RouterAgent)
-    router.route.return_value = RouterResult(
-        agents=[AgentDefinition(name="test", display_name="T", system_prompt="Hi")],
-        strategy="sequential",
-        source="keyword",
-    )
-
-    factory = MagicMock(spec=AgentFactory)
-    mock_llm = MagicMock()
-    mock_llm.ainvoke.return_value = type("R", (), {"content": "Test response"})()
-    factory.build.return_value = AgentRuntime(
-        name="test", llm=mock_llm, system_prompt="Hi", tools=[], strategy="sequential"
-    )
-
-    engine = MagicMock(spec=CollaborationEngine)
-    engine.execute.return_value = CollaborationResult(
-        content="Final merged result",
-        agent_results=[{"agent": "test", "status": "ok", "output": "result"}],
-    )
-
-    graph = create_multi_agent_graph(router, factory, engine)
+async def test_plan_execute_graph_builds():
+    """Verify the plan-execute-compose graph can be built and compiles with correct nodes."""
+    graph = create_plan_execute_graph()
 
     assert graph is not None
-    # Verify nodes exist
-    nodes = list(graph.nodes.keys())
-    assert "router" in nodes
-    assert "collaboration" in nodes  # factory merged into collaboration
-    assert "merge" in nodes
+    node_names = list(graph.nodes.keys())
+    assert "planning" in node_names
+    assert "execution" in node_names
+    assert "composer" in node_names
 
 
 @pytest.mark.asyncio
-async def test_graph_no_agents_falls_through():
-    """When Router returns no agents, should skip to chart_planner."""
-    router = MagicMock(spec=RouterAgent)
-    router.route.return_value = RouterResult(
-        agents=[], strategy="sequential", source="none"
-    )
-
-    factory = MagicMock(spec=AgentFactory)
-    engine = MagicMock(spec=CollaborationEngine)
-
-    graph = create_multi_agent_graph(router, factory, engine)
-    assert graph is not None
+async def test_plan_execute_graph_has_conditional_edges():
+    """Verify the graph has the correct number of nodes and edges."""
+    graph = create_plan_execute_graph()
+    # compiled graph includes __start__ in nodes; 3 custom nodes + __start__ = 4
+    node_names = list(graph.nodes.keys())
+    assert "planning" in node_names
+    assert "execution" in node_names
+    assert "composer" in node_names
+    assert len(node_names) == 4  # __start__ + 3 custom nodes
+    # The get_graph edges show __start__ -> planning (verifying entry point)
+    g = graph.get_graph()
+    edges = {(e.source, e.target) for e in g.edges}
+    assert ("__start__", "planning") in edges

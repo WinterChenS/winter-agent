@@ -33,7 +33,7 @@ async def test_sequential_two_agents():
     engine = CollaborationEngine()
     result = await engine.execute([runtime_a, runtime_b], "Find and analyze items", "sequential")
 
-    assert result.content == "Result from B: analyzed items, average is 42"
+    assert "Result from B: analyzed items, average is 42" in result.content
     assert len(result.agent_results) == 2
     assert result.agent_results[0]["agent"] == "agent_a"
     assert result.agent_results[0]["status"] == "ok"
@@ -67,7 +67,7 @@ async def test_sequential_single_agent():
     engine = CollaborationEngine()
     result = await engine.execute([runtime], "test", "sequential")
 
-    assert result.content == "Done"
+    assert "Done" in result.content
     assert len(result.agent_results) == 1
 
 

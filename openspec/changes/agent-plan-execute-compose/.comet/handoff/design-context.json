@@ -1,0 +1,16 @@
+{
+  "change": "agent-plan-execute-compose",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "6f9b8a1ff2ced51334c4ed4d2e012cee50958e63ef2e246356da1151ffdfd76c",
+  "files": [
+    { "path": "openspec/changes/agent-plan-execute-compose/proposal.md", "sha256": "5789f7807737962967a54b7315be9014189d33a927f1dbd6f79ab8b0954555df" },
+    { "path": "openspec/changes/agent-plan-execute-compose/design.md", "sha256": "6c2cfa6a3a8b5773f1d56d679730a3209c7835eaba74a95a8abb3f9b17e3a208" },
+    { "path": "openspec/changes/agent-plan-execute-compose/tasks.md", "sha256": "03be79e5bf80496d0c96a36a9718d96907977300e0dc4756664a3d5c8e35ab8f" },
+    { "path": "openspec/changes/agent-plan-execute-compose/specs/agent-chat-routing/spec.md", "sha256": "9ff5f07d3774bc270903915622e944a45798bf91481c0a1e738dbef55fab2c4f" },
+    { "path": "openspec/changes/agent-plan-execute-compose/specs/agent-execution-plan/spec.md", "sha256": "69c510d0bdd802486f04191302bd510e60aa50c22d9be81638ca6d3232e3572a" },
+    { "path": "openspec/changes/agent-plan-execute-compose/specs/artifact-dedup/spec.md", "sha256": "a751c0121076df9473001e7b77be8fa213d46c8f2ece723c16e9e28a2b187caf" }
+  ]
+}
