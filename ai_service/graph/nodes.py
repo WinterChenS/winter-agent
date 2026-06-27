@@ -829,6 +829,9 @@ Rules:
 - expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar"
 - Limit to 5 steps maximum
 - For simple questions (1 search is enough), output a single step
+
+To use a tool, output: {"action":"tool","tool":"<tool_name>","query":"<search query>"}
+When you have enough information for a plan, output: {"action":"plan_ready","plan":{...}}
 """
 
 
@@ -842,7 +845,7 @@ def _build_planning_system_prompt(now_str: str, tool_descriptions: str) -> str:
 
 
 _GREETING_PATTERNS = re.compile(
-    r"^(hello|hi|hey|good morning|good afternoon|good evening|how are you|nice to meet you|thanks|thank you|bye|goodbye)$",
+    r"(hello|hi|hey|good morning|good afternoon|good evening|how are you|nice to meet you|thanks|thank you|bye|goodbye)",
     re.IGNORECASE,
 )
 
@@ -850,9 +853,9 @@ _GREETING_PATTERNS = re.compile(
 def _is_trivial_query(text: str) -> bool:
     """Detect trivial queries that don't need planning: short text or greetings."""
     stripped = text.strip()
-    if len(stripped) < 20:
+    if len(stripped) < 8:
         return True
-    if _GREETING_PATTERNS.match(stripped):
+    if _GREETING_PATTERNS.search(stripped):
         return True
     return False
 
@@ -884,8 +887,6 @@ async def planning_node(state: State) -> dict:
     4. On failure: retry once with error feedback -> fallback plan
     5. Set plan_phase to "executing" (or "composing" if empty)
     """
-    from langchain_core.messages import AIMessage, SystemMessage
-
     # Extract user query
     user_query = ""
     for msg in reversed(list(state.get("messages", []))):
