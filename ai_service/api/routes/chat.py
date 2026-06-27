@@ -302,6 +302,7 @@ async def stream_generate(request: GenerateRequest):
                 # If collaboration produced a result, stream it directly (skip answer_node)
                 logging.info("[CHAT] final_state has_collab=%s",
                              bool(final_state and final_state.get("collab_result")))
+                collab_text = ""
                 if final_state and final_state.get("collab_result"):
                     collab_text = str(final_state["collab_result"])
                     logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
@@ -323,7 +324,7 @@ async def stream_generate(request: GenerateRequest):
                             "id": message_id,
                             "conversation_id": trace_ctx.conversation_id,
                             "role": "assistant",
-                            "content": extract_last_assistant_text(final_state),
+                            "content": collab_text or extract_last_assistant_text(final_state),
                             "toolCalls": list(tool_calls_accumulated.values()),
                             "status": "done",
                             "agentId": trace_ctx.agent_id,
