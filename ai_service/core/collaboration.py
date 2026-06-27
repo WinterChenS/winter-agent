@@ -163,6 +163,8 @@ class CollaborationEngine:
                         self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
                                   agent=agent_name, result=result_str[:500],
                                   status="done")
+                        # Parse [图片已上传] section from tool result for image.uploaded events
+                        _parse_and_emit_images(self, result_str)
                     except Exception as e:
                         result_str = f"Tool error: {e}"
                         self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
@@ -303,6 +305,14 @@ Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
             return scan_and_upload_images(output_text)
         except Exception:
             return {}
+
+def _parse_and_emit_images(engine, result_text: str) -> None:
+    """Parse [图片已上传] section and emit image.uploaded events."""
+    import re
+    for m in re.finditer(r'(\S+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://\S+)', result_text):
+        fname, url = m.group(1), m.group(2)
+        engine._emit("image.uploaded", filename=fname, url=url)
+
 
 def _find_tool(tools: list, name: str):
     for t in tools:
