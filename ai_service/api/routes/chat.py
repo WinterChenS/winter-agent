@@ -52,11 +52,7 @@ from domain.event_envelope import (
     envelope_token,
     to_sse_data,
 )
-from graph.graph import create_agent_graph
-from graph.multi_agent_graph import create_multi_agent_graph
-from core.router_agent import RouterAgent
-from core.agent_factory import AgentFactory
-from core.collaboration import CollaborationEngine
+from graph.multi_agent_graph import create_plan_execute_graph
 from core.runtime import get_checkpointer, get_tool_registry, get_agent_repository, get_pool
 from observability.trace import ensure_trace_context
 
@@ -195,19 +191,9 @@ async def stream_generate(request: GenerateRequest):
                 checkpointer = get_checkpointer()
 
                 # ── Multi-Agent Graph with Real-Time Streaming ────────────
-                from core.streaming_event_bus import StreamingEventBus
+                graph = create_plan_execute_graph(checkpointer=checkpointer)
 
-                event_bus = StreamingEventBus()
-                agent_repo = get_agent_repository()
-                router = RouterAgent(repository=agent_repo)
-                factory = AgentFactory()
-                engine = CollaborationEngine(event_bus=event_bus)
-                graph = create_multi_agent_graph(
-                    router=router, factory=factory, engine=engine,
-                    checkpointer=checkpointer, event_bus=event_bus,
-                )
-
-                logging.info("[CHAT] streaming multi-agent graph with event bus")
+                logging.info("[CHAT] streaming plan-execute-compose graph")
 
                 inputs = {
                     "messages": [HumanMessage(content=request.message)],
@@ -216,6 +202,12 @@ async def stream_generate(request: GenerateRequest):
                     "chart_specs": [],
                     "blocks": [],
                     "route": "start",
+                    # Plan-Execute-Compose state defaults
+                    "execution_plan": None,
+                    "execution_results": [],
+                    "artifacts": [],
+                    "current_plan_step": 0,
+                    "plan_phase": "planning",
                 }
 
                 thread_id = trace_ctx.conversation_id
@@ -254,44 +246,20 @@ async def stream_generate(request: GenerateRequest):
                     finally:
                         await merge_queue.put(("graph_done", None))
 
-                async def bus_runner():
-                    try:
-                        async for bus_event in event_bus.events():
-                            envelope = {
-                                "type": bus_event.type,
-                                "schemaVersion": "1.0",
-                                "conversationId": trace_ctx.conversation_id,
-                                "messageId": message_id,
-                                "agentId": active_agent,
-                                "timestamp": bus_event.timestamp,
-                                "payload": bus_event.data,
-                            }
-                            await merge_queue.put(("bus", envelope))
-                    except Exception:
-                        pass
-                    finally:
-                        await merge_queue.put(("bus_done", None))
-
                 graph_task = asyncio.create_task(graph_runner())
-                bus_task = asyncio.create_task(bus_runner())
 
                 graph_done_flag = False
-                bus_done_flag = False
                 tool_calls_accumulated: dict[str, dict] = {}
                 content_accumulated = ""
 
-                while not (graph_done_flag and bus_done_flag):
+                while not graph_done_flag:
                     source, data = await merge_queue.get()
 
                     if source == "graph_done":
                         graph_done_flag = True
-                        event_bus.close()  # Signal bus_runner to stop
-                    elif source == "bus_done":
-                        bus_done_flag = True
                     elif source == "error":
                         yield to_sse_data(envelope_error(trace_ctx, str(data)))
                         graph_done_flag = True
-                        event_bus.close()
                     else:
                         # Accumulate tool calls and content for persistence
                         _accumulate_tool_call(data, tool_calls_accumulated)
@@ -301,21 +269,10 @@ async def stream_generate(request: GenerateRequest):
                         yield to_sse_data(data)
 
                 # Cleanup
-                await asyncio.gather(graph_task, bus_task, return_exceptions=True)
+                await asyncio.gather(graph_task, return_exceptions=True)
 
-                # If collaboration produced a result, stream it directly (skip answer_node)
-                logging.info("[CHAT] final_state has_collab=%s",
-                             bool(final_state and final_state.get("collab_result")))
-                collab_text = ""
-                if final_state and final_state.get("collab_result"):
-                    collab_text = str(final_state["collab_result"])
-                    content_accumulated += collab_text
-                    logging.info("[CHAT] streaming collab_result directly (%d chars)", len(collab_text))
-                    for char in collab_text:
-                        yield to_sse_data(envelope_message_delta(trace_ctx, message_id, char))
-                        await asyncio.sleep(0.01)
-                else:
-                    logging.warning("[CHAT] no collab_result in final_state — nothing to stream")
+                # Composer node handles output generation via graph streaming
+                logging.info("[CHAT] composer output streamed via astream_events")
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))
