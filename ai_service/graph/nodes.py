@@ -898,16 +898,16 @@ Specification:
 Available data context (from previous research steps):
 {data_context}
 
-Requirements:
-- Use matplotlib and the ChartTheme (already initialized, available as plt)
-- Set figure size to (12, 6)
-- Use Chinese-friendly fonts (ChartTheme handles this via plt.rcParams)
-- Include title, axis labels, legend if applicable
-- Use auto-detected colors from the theme
-- Output ONLY valid Python code. No markdown wrappers, no explanation.
-- Save using plt.savefig(fname, dpi=200, bbox_inches='tight') where fname is a descriptive filename ending in .png
-- Do NOT call plt.show()
-- Add plt.close() at the end
+CRITICAL RULES — follow exactly:
+1. Start with: import matplotlib.pyplot as plt; import numpy as np
+2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
+3. Use plt.rcParams to set Chinese fonts: plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']; plt.rcParams['axes.unicode_minus'] = False
+4. Set figure size to (12, 6)
+5. Include title, axis labels, legend if applicable
+6. Output ONLY valid Python code — no markdown wrappers, no explanation
+7. Save using plt.savefig('chart_output.png', dpi=200, bbox_inches='tight')
+8. Do NOT call plt.show()
+9. End with plt.close()
 """
 
 
@@ -962,7 +962,9 @@ async def _generate_chart_code(
         return f'''import matplotlib.pyplot as plt
 import numpy as np
 
-# Sample data
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+
 x = np.arange(10)
 y = np.random.randn(10).cumsum()
 
