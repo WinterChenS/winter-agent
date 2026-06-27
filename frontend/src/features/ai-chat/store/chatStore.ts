@@ -8,6 +8,9 @@ interface ChatState {
   agentId: string | null;
   conversationId: string | null;
   isSending: boolean;
+  agentStatus: 'idle' | 'thinking' | 'calling_tool' | 'generating';
+  activeAgent: string | null;
+  activeAgentDisplay: string | null;
 
   addMessage: (msg: Message) => void;
   appendDelta: (id: string, delta: string) => void;
@@ -17,6 +20,8 @@ interface ChatState {
   setAgentId: (id: string) => void;
   setConversationId: (id: string) => void;
   setIsSending: (v: boolean) => void;
+  setAgentStatus: (status: ChatState['agentStatus']) => void;
+  setActiveAgent: (name: string | null, display: string | null) => void;
   loadHistory: (msgs: Message[]) => void;
   clearMessages: () => void;
 }
@@ -55,6 +60,9 @@ export const useChatStore = create<ChatState>((set) => ({
   agentId: null,
   conversationId: null,
   isSending: false,
+  agentStatus: 'idle',
+  activeAgent: null,
+  activeAgentDisplay: null,
 
   addMessage: (msg) => set(state => ({
     messages: { ...state.messages, [msg.id]: msg },
@@ -97,6 +105,8 @@ export const useChatStore = create<ChatState>((set) => ({
   setAgentId: (agentId) => set({ agentId }),
   setConversationId: (id) => set({ conversationId: id }),
   setIsSending: (v) => set({ isSending: v }),
+  setAgentStatus: (status) => set({ agentStatus: status }),
+  setActiveAgent: (name, display) => set({ activeAgent: name, activeAgentDisplay: display }),
 
   loadHistory: (msgs) => {
     const messages: Record<string, Message> = {};

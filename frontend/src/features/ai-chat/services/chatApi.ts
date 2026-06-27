@@ -76,29 +76,90 @@ export async function sendChatMessage(req: ChatRequest): Promise<void> {
 
 function handleEvent(event: SseEvent): void {
   const { type, messageId, delta, toolCall, status } = event;
+  const payload = event.payload || {};
   const store = useChatStore.getState();
 
   switch (type) {
-    case 'message.delta':
-      if (messageId && delta) store.appendDelta(messageId, delta);
+    case 'conversation.started':
+      store.setAgentStatus('thinking');
       break;
+
+    case 'agent.started':
+      store.setAgentStatus('calling_tool');
+      store.setActiveAgent(payload.agent as string, payload.display as string);
+      break;
+
+    case 'agent.finished':
+      store.setActiveAgent(null, null);
+      store.setAgentStatus('generating');
+      break;
+
+    case 'tool.started': {
+      const tcId = (payload.tool_call_id as string) || '';
+      if (messageId && tcId) {
+        store.upsertToolCall(messageId, {
+          id: tcId,
+          name: (payload.tool as string) || 'unknown',
+          arguments: (payload.arguments as Record<string, unknown>) || {},
+          status: 'running',
+        });
+      }
+      break;
+    }
+
+    case 'tool.finished': {
+      const tcId2 = (payload.tool_call_id as string) || '';
+      if (messageId && tcId2) {
+        store.upsertToolCall(messageId, {
+          id: tcId2,
+          name: (payload.tool as string) || 'unknown',
+          status: 'done',
+          result: payload.result,
+        });
+      }
+      break;
+    }
+
+    case 'tool.failed': {
+      const tcId3 = (payload.tool_call_id as string) || '';
+      if (messageId && tcId3) {
+        store.upsertToolCall(messageId, {
+          id: tcId3,
+          name: (payload.tool as string) || 'unknown',
+          status: 'failed',
+          result: payload.error,
+        });
+      }
+      break;
+    }
+
     case 'message.tool_call':
       if (messageId && toolCall) store.upsertToolCall(messageId, toolCall);
       break;
+
+    case 'message.delta':
+      if (messageId && delta) store.appendDelta(messageId, delta);
+      break;
+
     case 'message.reasoning':
       if (messageId && delta) store.appendReasoning(messageId, delta);
       break;
+
     case 'message.done':
+    case 'conversation.finished':
       if (messageId && status) {
         store.completeMessage(messageId, status as 'done' | 'error');
       }
       store.setIsSending(false);
+      store.setAgentStatus('idle');
       break;
+
     case 'error':
       if (messageId) store.completeMessage(messageId, 'error');
       store.setIsSending(false);
       break;
+
     default:
-      // Ignore legacy event types (chart, tool_summary, agent_step, etc.)
+      // Ignore legacy event types
   }
 }
