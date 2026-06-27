@@ -2,6 +2,8 @@
 comet_change: agent-expert-pool
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-26-agent-expert-pool
+status: final
 ---
 
 # Agent Expert Pool — Design Doc

@@ -2,6 +2,7 @@
 change: agent-expert-pool
 design-doc: docs/superpowers/specs/2026-06-25-agent-expert-pool-design.md
 base-ref: 1a41b51e52e938af482d8d81d5a1e195dd3cc5cc
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 # Agent Expert Pool Implementation Plan
@@ -26,6 +27,7 @@ base-ref: 1a41b51e52e938af482d8d81d5a1e195dd3cc5cc
 - Frontend admin page uses existing Tailwind CSS + React Router patterns.
 - All new files under `ai_service/agents/` and `frontend/src/pages/`.
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ## File Structure
@@ -87,6 +89,7 @@ Phase 1:
                                                             └── Task 10 (E2E test)
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 1: AgentDefinition Model + Repository + Migration SQL
@@ -546,6 +549,7 @@ git add ai_service/agents/__init__.py ai_service/agents/models.py ai_service/age
 git commit -m "feat: add AgentDefinition model, repository pattern, and migration SQL"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 2: Agent CRUD API Endpoints
@@ -790,6 +794,7 @@ git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py ai_se
 git commit -m "feat: add Agent CRUD API endpoints"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 3: AgentFactory + AgentRuntime
@@ -1025,6 +1030,7 @@ git add ai_service/agents/factory.py ai_service/tests/test_agent_factory.py
 git commit -m "feat: add AgentFactory and AgentRuntime"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 4: RouterAgent — Keyword Matching + LLM Fallback
@@ -1268,6 +1274,7 @@ git add ai_service/agents/router.py ai_service/tests/test_agent_router.py
 git commit -m "feat: add RouterAgent with keyword matching and LLM fallback"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 5: Sequential Collaboration Strategy
@@ -1424,6 +1431,7 @@ git add ai_service/agents/collaboration/__init__.py ai_service/agents/collaborat
 git commit -m "feat: add sequential collaboration strategy"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 6: Parallel Collaboration Strategy
@@ -1516,6 +1524,7 @@ git add ai_service/agents/collaboration/parallel.py ai_service/tests/test_collab
 git commit -m "feat: add parallel collaboration strategy"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 7: Supervisor Collaboration Strategy
@@ -1662,6 +1671,7 @@ git add ai_service/agents/collaboration/supervisor.py ai_service/tests/test_coll
 git commit -m "feat: add supervisor collaboration strategy"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 8: Multi-Agent Graph Integration
@@ -1999,6 +2009,7 @@ git add ai_service/graph/state.py ai_service/graph/multi_agent_nodes.py ai_servi
 git commit -m "feat: integrate multi-agent pipeline into LangGraph"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 9: Agent Admin Frontend Page
@@ -2383,6 +2394,7 @@ git add frontend/src/pages/AgentAdmin.tsx frontend/src/services/agentApi.ts fron
 git commit -m "feat: add Agent admin frontend page"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ### Task 10: End-to-End Integration Test
@@ -2515,6 +2527,7 @@ git add ai_service/tests/test_end_to_end.py
 git commit -m "test: add E2E integration test for agent expert pool"
 ```
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ## Self-Review Checklist
@@ -2550,6 +2563,7 @@ No TBD, TODO, or placeholder patterns found. All code is complete and copy-paste
 - `AgentFactory.build()` returns `AgentRuntime` — consistent in Tasks 3, 8, 10.
 - Frontend `agentApi.ts` interfaces align with backend API response shapes.
 
+archived-with: 2026-06-26-agent-expert-pool
 ---
 
 ## Execution Handoff

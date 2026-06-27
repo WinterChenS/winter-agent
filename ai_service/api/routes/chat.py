@@ -43,6 +43,7 @@ def _is_internal_react_message(content: str) -> bool:
     return False
 from decorator.timeit import timeit
 from domain.event_envelope import (
+    build_envelope,
     envelope_chart,
     envelope_error,
     envelope_message_delta,
@@ -134,19 +135,20 @@ async def stream_generate(request: GenerateRequest):
             else:
                 checkpointer = get_checkpointer()
 
-                # ── Multi-Agent Graph ──────────────────────────────────────
+                # ── Multi-Agent Graph with Real-Time Streaming ────────────
+                from core.streaming_event_bus import StreamingEventBus
+
+                event_bus = StreamingEventBus()
                 agent_repo = get_agent_repository()
                 router = RouterAgent(repository=agent_repo)
                 factory = AgentFactory()
-                engine = CollaborationEngine()
+                engine = CollaborationEngine(event_bus=event_bus)
                 graph = create_multi_agent_graph(
-                    router=router,
-                    factory=factory,
-                    engine=engine,
-                    checkpointer=checkpointer,
+                    router=router, factory=factory, engine=engine,
+                    checkpointer=checkpointer, event_bus=event_bus,
                 )
 
-                logging.info("[CHAT] using multi-agent graph: router→factory→collaboration→chart→answer")
+                logging.info("[CHAT] streaming multi-agent graph with event bus")
 
                 inputs = {
                     "messages": [HumanMessage(content=request.message)],
@@ -154,63 +156,119 @@ async def stream_generate(request: GenerateRequest):
                     "active_agent": active_agent,
                     "chart_specs": [],
                     "blocks": [],
-                    "route": "tool",
+                    "route": "start",
                 }
 
                 thread_id = trace_ctx.conversation_id
                 config: RunnableConfig = {"configurable": {"thread_id": thread_id}, "recursion_limit": 256}
 
-                tool_summary_sent = False
                 final_state = None
-                saw_tool_event = False
                 assistant_text_emitted = False
-                active_tool_span_id: str | None = None
-                charts_sent: set = set()  # Track chart IDs already sent to avoid duplicates
+                charts_sent: set = set()
 
-                async for event in graph.astream_events(inputs, config=config, version="v2"):
-                    mapped, active_tool_span_id, captured_final_state = map_langgraph_event_to_envelopes(
-                        event, event_ctx, active_tool_span_id,
-                        message_id=message_id,
+                # Emit conversation.started
+                yield to_sse_data(build_envelope(
+                    "conversation.started", trace_ctx,
+                    payload={"messageId": message_id, "agentId": active_agent},
+                ))
+
+                # Run graph stream + event bus reader concurrently
+                async def graph_runner():
+                    nonlocal final_state, assistant_text_emitted
+                    graph_events = graph.astream_events(inputs, config=config, version="v2")
+                    async for event in graph_events:
+                        mapped, _, captured = map_langgraph_event_to_envelopes(
+                            event, event_ctx, None, message_id=message_id,
+                        )
+                        if captured is not None:
+                            final_state = captured
+                        for envelope in mapped:
+                            if envelope.get("type") == "message.delta":
+                                assistant_text_emitted = True
+                            yield envelope
+
+                async def bus_reader():
+                    async for bus_event in event_bus.events():
+                        yield {
+                            "type": bus_event.type,
+                            "schemaVersion": "1.0",
+                            "conversationId": trace_ctx.conversation_id,
+                            "messageId": message_id,
+                            "agentId": active_agent,
+                            "timestamp": bus_event.timestamp,
+                            "payload": bus_event.data,
+                        }
+
+                # Merge both streams
+                graph_done = False
+                bus_done = False
+                graph_gen = graph_runner()
+                bus_gen = bus_reader()
+                pending_graph: list = []
+                pending_bus: list = []
+
+                while not graph_done or not bus_done or pending_graph or pending_bus:
+                    # Prioritize bus events (progress) over graph events (tokens)
+                    if pending_bus:
+                        for env in pending_bus:
+                            yield to_sse_data(env)
+                        pending_bus.clear()
+
+                    if pending_graph:
+                        env = pending_graph.pop(0)
+                        yield to_sse_data(env)
+                        continue
+
+                    if pending_bus:
+                        continue
+
+                    # Try both sources
+                    tasks = []
+                    if not graph_done:
+                        tasks.append(("graph", graph_gen.__anext__()))
+                    if not bus_done:
+                        tasks.append(("bus", bus_gen.__anext__()))
+
+                    if not tasks:
+                        break
+
+                    done_set, _ = await asyncio.wait(
+                        [t[1] for t in tasks],
+                        return_when=asyncio.FIRST_COMPLETED,
+                        timeout=0.1,
                     )
-                    if captured_final_state is not None:
-                        final_state = captured_final_state
 
-                    for envelope in mapped:
-                        envelope_type = envelope.get("type")
-                        if envelope_type in {"tool_start", "tool_result"}:
-                            saw_tool_event = True
-                        if envelope_type == "message.delta":
-                            assistant_text_emitted = True
-                        yield to_sse_data(envelope)
+                    for task in done_set:
+                        for name, t in tasks:
+                            if t is task:
+                                try:
+                                    result = task.result()
+                                    if name == "graph":
+                                        pending_graph.append(result)
+                                    else:
+                                        pending_bus.append(result)
+                                except StopAsyncIteration:
+                                    if name == "graph":
+                                        graph_done = True
+                                    else:
+                                        bus_done = True
+                                break
 
-                    # Inline: send charts from chart_planner_node output
-                    if final_state:
-                        chart_specs = final_state.get("chart_specs")
-                        if isinstance(chart_specs, list):
-                            for cs in chart_specs:
-                                if isinstance(cs, dict):
-                                    cid = str(cs.get("id", ""))
-                                    if cid and cid not in charts_sent:
-                                        charts_sent.add(cid)
-                                        yield to_sse_data(envelope_chart(trace_ctx, cs))
+                event_bus.close()
 
-                # Fallback: extract answer text if no tokens emitted
-                if not assistant_text_emitted:
-                    fallback_text = extract_last_assistant_text(final_state)
-                    if fallback_text:
-                        yield to_sse_data(envelope_message_delta(trace_ctx, message_id, fallback_text))
-
-                # Emit guard reason
-                guard_envelope = emit_guard_reason_envelope(final_state, event_ctx)
-                if guard_envelope:
-                    yield to_sse_data(guard_envelope)
-
-                # Emit tool summary
-                if final_state and not tool_summary_sent:
-                    summary_envelope = emit_final_summary_envelope(final_state, event_ctx)
-                    if summary_envelope:
-                        yield to_sse_data(summary_envelope)
-                        tool_summary_sent = True
+                # Yield remaining bus events
+                remaining = []
+                async for bus_event in bus_gen:
+                    remaining.append(bus_event)
+                for env in remaining:
+                    yield to_sse_data(env)
+                # Consume remaining graph
+                if not graph_done:
+                    try:
+                        async for env in graph_gen:
+                            yield to_sse_data(env)
+                    except Exception:
+                        pass
 
                 # Stream complete
                 yield to_sse_data(envelope_message_done(trace_ctx, message_id, status="done"))

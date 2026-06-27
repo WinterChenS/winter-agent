@@ -15,6 +15,7 @@ class AgentRuntime:
     """A fully assembled agent ready to execute."""
 
     name: str
+    display_name: str
     llm: ChatOpenAI
     system_prompt: str
     tools: list  # list of BaseTool instances
@@ -53,6 +54,7 @@ class AgentFactory:
 
         return AgentRuntime(
             name=definition.name,
+            display_name=definition.display_name or definition.name,
             llm=llm,
             system_prompt=prompt,
             tools=tools,

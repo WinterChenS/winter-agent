@@ -39,7 +39,7 @@ async def router_node(state: State, *, router: RouterAgent) -> dict:
     }
 
 
-async def collaboration_node(state: State, *, factory: AgentFactory, engine: CollaborationEngine) -> dict:
+async def collaboration_node(state: State, *, factory: AgentFactory, engine: CollaborationEngine, event_bus=None) -> dict:
     """Build agent runtimes and execute collaboration.
     Combined into one node to avoid msgpack serialization of AgentRuntime objects."""
     agent_names = state.get("selected_agents", [])
@@ -111,12 +111,13 @@ def create_multi_agent_graph(
     factory: AgentFactory,
     engine: CollaborationEngine,
     checkpointer=None,
+    event_bus=None,
 ):
     workflow = StateGraph(State)
 
     # Multi-agent nodes — wrap async functions for LangGraph
     async def _router(s): return await router_node(s, router=router)
-    async def _collaboration(s): return await collaboration_node(s, factory=factory, engine=engine)
+    async def _collaboration(s): return await collaboration_node(s, factory=factory, engine=engine, event_bus=event_bus)
 
     workflow.add_node("router", _router)
     workflow.add_node("collaboration", _collaboration)

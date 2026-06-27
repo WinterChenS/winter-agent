@@ -5,9 +5,10 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from core.agent_factory import AgentRuntime
+from core.streaming_event_bus import StreamingEventBus
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,13 @@ class CollaborationResult:
 
 
 class CollaborationEngine:
+    def __init__(self, event_bus: StreamingEventBus | None = None) -> None:
+        self._bus = event_bus
+
+    def _emit(self, event_type: str, **data: Any) -> None:
+        if self._bus:
+            self._bus.emit(event_type, **data)
+
     async def execute(
         self,
         runtimes: list[AgentRuntime],
@@ -35,169 +43,198 @@ class CollaborationEngine:
             msg = f"Unknown strategy: {strategy}"
             raise ValueError(msg)
 
-    async def _sequential(
+    async def _run_agent_with_tools(
         self,
-        runtimes: list[AgentRuntime],
-        user_query: str,
+        runtime: AgentRuntime,
+        query: str,
+    ) -> dict[str, Any]:
+        """Run one agent with tool binding. Emits agent.started, tool.*, agent.finished events."""
+        agent_name = runtime.name
+        t0 = int(asyncio.get_event_loop().time() * 1000)
+
+        self._emit("agent.started", agent=agent_name, display=runtime.display_name)
+
+        # Build LLM with tools bound
+        llm = runtime.llm
+        if runtime.tools:
+            # Convert tool registry tools to LangChain tools (they have .name, .description, .invoke)
+            lc_tools = []
+            for t in runtime.tools:
+                # Each tool from registry has: name, description, fn (callable)
+                if hasattr(t, 'name') and hasattr(t, 'fn'):
+                    from langchain_core.tools import tool
+                    @tool(t.name, description=t.description or t.name)
+                    async def _wrapped(query: str = "", _tool=t) -> str:
+                        return str(await _tool.fn(query))
+                    lc_tools.append(_wrapped)
+            if lc_tools:
+                llm = llm.bind_tools(lc_tools)
+
+        messages = [
+            SystemMessage(content=runtime.system_prompt),
+            HumanMessage(content=query),
+        ]
+
+        # Tool call loop (max 5 rounds)
+        tool_call_history: list[dict] = []
+        max_rounds = 5
+        for round_idx in range(max_rounds):
+            response = await llm.ainvoke(messages)
+
+            # Check for tool calls
+            tool_calls = getattr(response, 'tool_calls', None)
+            if not tool_calls:
+                # No more tools — final answer
+                elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+                self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+                return {
+                    "agent": agent_name,
+                    "status": "ok",
+                    "output": str(response.content).strip(),
+                    "tool_calls": tool_call_history,
+                }
+
+            # Process tool calls
+            messages.append(response)
+            for tc in tool_calls:
+                tc_id = tc.get("id", f"tc-{round_idx}")
+                tc_name = tc.get("name", "unknown")
+                tc_args = tc.get("args", {})
+
+                self._emit("tool.started", tool_call_id=tc_id, tool=tc_name,
+                          agent=agent_name, arguments=tc_args)
+
+                # Execute tool
+                tool_obj = _find_tool(runtime.tools, tc_name)
+                if tool_obj and hasattr(tool_obj, 'fn'):
+                    try:
+                        query_arg = str(tc_args.get("query", json.dumps(tc_args)))
+                        result = await tool_obj.fn(query_arg)
+                        result_str = str(result)
+                        self._emit("tool.finished", tool_call_id=tc_id, tool=tc_name,
+                                  agent=agent_name, result=result_str[:500],
+                                  status="done")
+                    except Exception as e:
+                        result_str = f"Tool error: {e}"
+                        self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
+                                  agent=agent_name, error=str(e), status="failed")
+                else:
+                    result_str = f"Tool '{tc_name}' not found in runtime tools."
+                    self._emit("tool.failed", tool_call_id=tc_id, tool=tc_name,
+                              agent=agent_name, error=f"Tool not found: {tc_name}",
+                              status="failed")
+
+                tool_call_history.append({
+                    "id": tc_id, "name": tc_name,
+                    "arguments": tc_args, "status": "done",
+                    "result": result_str[:500],
+                })
+                messages.append(ToolMessage(content=result_str, tool_call_id=tc_id))
+
+        # Max rounds reached
+        elapsed = int(asyncio.get_event_loop().time() * 1000) - t0
+        self._emit("agent.finished", agent=agent_name, elapsed_ms=elapsed)
+        last_response = response if 'response' in dir() else None
+        return {
+            "agent": agent_name,
+            "status": "ok",
+            "output": str(last_response.content).strip() if last_response else "",
+            "tool_calls": tool_call_history,
+        }
+
+    async def _sequential(
+        self, runtimes: list[AgentRuntime], user_query: str,
     ) -> CollaborationResult:
         context = user_query
-        agent_results: list[dict[str, Any]] = []
+        agent_results: list[dict] = []
 
         for runtime in runtimes:
-            messages = [
-                SystemMessage(content=runtime.system_prompt),
-                HumanMessage(content=context),
-            ]
-            try:
-                response = await runtime.llm.ainvoke(messages)
-                content = response.content.strip()
-                agent_results.append(
-                    {"agent": runtime.name, "status": "ok", "output": content}
-                )
-                # Pass result to next agent
-                context = (
-                    f"Previous agent ({runtime.name}) result:\n{content}\n\n"
-                    f"Original request: {user_query}"
-                )
-            except Exception as e:
-                agent_results.append(
-                    {"agent": runtime.name, "status": "error", "error": str(e)}
-                )
+            result = await self._run_agent_with_tools(runtime, context)
+            agent_results.append(result)
+            if result["status"] == "error":
                 break
+            context = (
+                f"Previous agent ({runtime.name}) result:\n{result['output']}\n\n"
+                f"Original request: {user_query}"
+            )
 
-        final_content = (
-            agent_results[-1].get("output", "")
-            if agent_results
-            else ""
-        )
-        return CollaborationResult(content=final_content, agent_results=agent_results)
+        final = agent_results[-1].get("output", "") if agent_results else ""
+        return CollaborationResult(content=final, agent_results=agent_results)
 
     async def _parallel(
-        self,
-        runtimes: list[AgentRuntime],
-        user_query: str,
+        self, runtimes: list[AgentRuntime], user_query: str,
     ) -> CollaborationResult:
-        async def run_single(runtime):
-            try:
-                messages = [
-                    SystemMessage(content=runtime.system_prompt),
-                    HumanMessage(content=user_query),
-                ]
-                response = await runtime.llm.ainvoke(messages)
-                return {"agent": runtime.name, "status": "ok", "output": response.content.strip()}
-            except Exception as e:
-                return {"agent": runtime.name, "status": "error", "error": str(e)}
-
-        agent_results = await asyncio.gather(*[run_single(r) for r in runtimes], return_exceptions=True)
-
-        # Handle exceptions from gather itself
+        results = await asyncio.gather(
+            *[self._run_agent_with_tools(r, user_query) for r in runtimes],
+            return_exceptions=True,
+        )
         cleaned = []
-        for r in agent_results:
+        for r in results:
             if isinstance(r, Exception):
                 cleaned.append({"agent": "unknown", "status": "error", "error": str(r)})
             else:
                 cleaned.append(r)
 
-        # Merge results
-        parts = []
-        for r in cleaned:
-            if r["status"] == "ok":
-                parts.append(f"[{r['agent']}]: {r['output']}")
-        merged = "\n\n".join(parts)
-
-        return CollaborationResult(content=merged, agent_results=cleaned)
+        parts = [f"[{r['agent']}]: {r['output']}" for r in cleaned if r["status"] == "ok"]
+        return CollaborationResult(content="\n\n".join(parts), agent_results=cleaned)
 
     async def _supervisor(
-        self,
-        runtimes: list[AgentRuntime],
-        user_query: str,
+        self, runtimes: list[AgentRuntime], user_query: str,
     ) -> CollaborationResult:
         if len(runtimes) < 2:
-            # Fall back to sequential with just the one agent
             return await self._sequential(runtimes, user_query)
 
         supervisor = runtimes[0]
         workers = runtimes[1:]
-        agent_results: list[dict[str, Any]] = []
 
-        # Step 1: Supervisor decomposes the task
-        decompose_prompt = f"""You are a task supervisor. Decompose this user request into subtasks for workers.
-
-User request: {user_query}
+        decompose_prompt = f"""You are a task supervisor. Decompose this user request:
+{user_query}
 
 Available workers: {', '.join([w.name for w in workers])}
 
-Output a JSON array of subtasks:
-[{{"worker": "worker_name", "task": "specific task description"}}]
-
-Rules:
-- Assign each subtask to the most appropriate worker
-- Each worker should get at most one task
-- Keep it concise — output ONLY the JSON array
-"""
+Output JSON array: [{{"worker": "worker_name", "task": "specific task"}}]"""
         try:
-            response = await supervisor.llm.ainvoke([
+            resp = await supervisor.llm.ainvoke([
                 SystemMessage(content=supervisor.system_prompt),
                 HumanMessage(content=decompose_prompt),
             ])
-            subtasks = json.loads(response.content.strip())
+            subtasks = json.loads(str(resp.content).strip())
         except Exception:
-            # Fallback: run workers in parallel on the original query
             return await self._parallel(runtimes, user_query)
 
-        # Step 2: Execute subtasks in parallel
         worker_map = {w.name: w for w in workers}
 
         async def run_worker(task_info):
-            worker_name = task_info.get("worker", "")
+            name = task_info.get("worker", "")
             task = task_info.get("task", user_query)
-            worker = worker_map.get(worker_name)
-            if not worker:
-                return {"agent": worker_name, "status": "error", "error": "Worker not found"}
-            try:
-                response = await worker.llm.ainvoke([
-                    SystemMessage(content=worker.system_prompt),
-                    HumanMessage(content=task),
-                ])
-                return {"agent": worker_name, "status": "ok", "output": response.content.strip()}
-            except Exception as e:
-                return {"agent": worker_name, "status": "error", "error": str(e)}
+            w = worker_map.get(name)
+            if not w:
+                return {"agent": name, "status": "error", "error": "Not found"}
+            return await self._run_agent_with_tools(w, task)
 
-        worker_results = await asyncio.gather(*[run_worker(t) for t in subtasks], return_exceptions=True)
+        worker_results = await asyncio.gather(*[run_worker(t) for t in subtasks])
 
-        # Clean results
-        cleaned = []
-        for r in worker_results:
-            if isinstance(r, Exception):
-                cleaned.append({"agent": "unknown", "status": "error", "error": str(r)})
-            else:
-                cleaned.append(r)
+        # Supervisor synthesizes
+        outputs = "\n".join([f"[{r.get('agent')}]: {r.get('output', r.get('error', ''))}"
+                            for r in worker_results])
+        synth = f"""Original: {user_query}\n\nWorker results:\n{outputs}\n\nProvide final synthesized answer."""
+        try:
+            resp = await supervisor.llm.ainvoke([
+                SystemMessage(content=supervisor.system_prompt),
+                HumanMessage(content=synth),
+            ])
+            final = str(resp.content).strip()
+        except Exception:
+            final = outputs
 
-        agent_results = [{"agent": supervisor.name, "status": "ok", "output": f"Decomposed into {len(subtasks)} subtasks"}]
-        agent_results.extend(cleaned)
-
-        # Step 3: Supervisor synthesizes final answer
-        worker_outputs = "\n".join([
-            f"[{r['agent']}]: {r.get('output', r.get('error', ''))}"
-            for r in cleaned
+        return CollaborationResult(content=final, agent_results=[
+            {"agent": supervisor.name, "status": "ok"},
+            *worker_results,
         ])
 
-        synthesize_prompt = f"""Based on the worker results below, provide the final answer to the user.
 
-Original request: {user_query}
-
-Worker results:
-{worker_outputs}
-
-Provide a comprehensive final answer that synthesizes all the results."""
-
-        try:
-            response = await supervisor.llm.ainvoke([
-                SystemMessage(content=supervisor.system_prompt),
-                HumanMessage(content=synthesize_prompt),
-            ])
-            final_content = response.content.strip()
-        except Exception:
-            final_content = worker_outputs
-
-        return CollaborationResult(content=final_content, agent_results=agent_results)
+def _find_tool(tools: list, name: str):
+    for t in tools:
+        if hasattr(t, 'name') and t.name == name:
+            return t
+    return None
