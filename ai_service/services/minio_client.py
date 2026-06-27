@@ -8,6 +8,9 @@ import uuid
 from datetime import timedelta
 from pathlib import Path
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from minio import Minio
 from minio.error import S3Error
 
@@ -19,11 +22,19 @@ WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def _get_client() -> Minio | None:
     """Build MinIO client from environment variables. Returns None if not configured."""
+    # Ensure .env is loaded (may not be loaded in subprocess contexts)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+
     endpoint = os.getenv("MINIO_ENDPOINT", "")
     access_key = os.getenv("MINIO_ACCESS_KEY", "")
     secret_key = os.getenv("MINIO_SECRET_KEY", "")
     if not all([endpoint, access_key, secret_key]):
-        logger.warning("MinIO not configured, skipping image upload")
+        logger.warning("MinIO not configured, skipping image upload (endpoint=%s, key=%s)",
+                       bool(endpoint), bool(access_key))
         return None
 
     # Strip https:// prefix for Minio client
