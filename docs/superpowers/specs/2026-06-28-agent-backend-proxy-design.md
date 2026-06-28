@@ -2,6 +2,8 @@
 comet_change: agent-backend-proxy
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-agent-backend-proxy
+status: final
 ---
 
 # Agent Backend Proxy — 技术设计文档

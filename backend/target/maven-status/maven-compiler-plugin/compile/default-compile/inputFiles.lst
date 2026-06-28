@@ -1,5 +1,6 @@
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/AiChatBackendApplication.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/client/AIClient.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/client/AgentClient.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/DataInitializer.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/JwtAuthFilter.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/JwtUtil.java
@@ -8,10 +9,14 @@
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/AgentController.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/AuthController.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/ChatController.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/dto/AgentRequest.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/dto/AgentResponse.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/ChatRequest.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/ChatResponse.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/GenerateRequest.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/GenerateResponse.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/ImageMessage.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/model/SysUser.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/repository/UserRepository.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/service/AgentService.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/service/ChatService.java

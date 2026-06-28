@@ -2,6 +2,7 @@
 change: message-copy
 design-doc: docs/superpowers/specs/2026-06-28-message-copy-design.md
 base-ref: 233c8f3debee56414bc64bd5a48314425e8cf6c8
+archived-with: 2026-06-28-message-copy
 ---
 
 # 聊天消息复制功能实现计划

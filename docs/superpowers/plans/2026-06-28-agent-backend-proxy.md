@@ -2,6 +2,7 @@
 change: agent-backend-proxy
 design-doc: docs/superpowers/specs/2026-06-28-agent-backend-proxy-design.md
 base-ref: a343245c2db0ada74e19f575f1bbfe6b2cd70446
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 # Agent Backend Proxy Implementation Plan
@@ -26,6 +27,7 @@ base-ref: a343245c2db0ada74e19f575f1bbfe6b2cd70446
 - 每次 commit 前必须运行所有相关测试
 - 使用 TDD 循环：写测试 → 运行验证失败 → 实现 → 运行验证通过 → commit
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ## 文件结构总览
@@ -58,6 +60,7 @@ base-ref: a343245c2db0ada74e19f575f1bbfe6b2cd70446
 | `backend/src/main/java/com/example/aichat/controller/AgentController.java` | 完整重写为 8 个端点 |
 | `backend/pom.xml` | 新增 `spring-boot-starter-validation` 依赖 |
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 1: DB Migration — 创建 V003 迁移文件
@@ -120,6 +123,7 @@ git add ai_service/db/migrations/V003__agent_upgrade.sql
 git commit -m "feat(db): add V003 migration with 9 new agent columns and is_builtin backfill"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 2: Python Model — 扩展 AgentDefinition
@@ -211,6 +215,7 @@ git add ai_service/models/agent.py ai_service/tests/test_agent_model.py
 git commit -m "feat(python): extend AgentDefinition model with 9 new optional fields"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 3: Python Repo — 更新 SQL 常量和 helper
@@ -271,6 +276,7 @@ git add ai_service/repositories/agent_repository.py
 git commit -m "feat(python): update _AGENT_SELECT, _AGENT_COLS, _row_to_agent for new fields"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 4: Python Repo — 更新 create/update 方法
@@ -392,6 +398,7 @@ git add ai_service/repositories/agent_repository.py ai_service/tests/test_agent_
 git commit -m "feat(python): update PostgresAgentRepository create/update for new fields"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 5: Python Repo — 添加 set_enabled 方法
@@ -478,6 +485,7 @@ git add ai_service/repositories/agent_repository.py ai_service/tests/test_agent_
 git commit -m "feat(python): add set_enabled method to AgentRepository"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 6: Python Repo — 添加 clone 方法
@@ -643,6 +651,7 @@ git add ai_service/repositories/agent_repository.py ai_service/tests/test_agent_
 git commit -m "feat(python): add clone method to AgentRepository"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 7: Python API — 更新 create/update 读取 X-User
@@ -757,6 +766,7 @@ git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py
 git commit -m "feat(python): propagate X-User header to created_by/updated_by in create/update endpoints"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 8: Python API — 添加 enable/disable 端点
@@ -869,6 +879,7 @@ git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py
 git commit -m "feat(python): add POST enable/disable endpoints for agents"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 9: Python API — 添加 clone 端点
@@ -950,6 +961,7 @@ git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py
 git commit -m "feat(python): add POST clone endpoint for agents"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 10: SpringBoot — 添加 validation 依赖
@@ -980,6 +992,7 @@ git add backend/pom.xml
 git commit -m "chore(backend): add spring-boot-starter-validation dependency"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 11: SpringBoot — 创建 AgentRequest DTO
@@ -1111,6 +1124,7 @@ git add backend/src/main/java/com/example/aichat/dto/AgentRequest.java backend/s
 git commit -m "feat(backend): create AgentRequest DTO with validation annotations"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 12: SpringBoot — 创建 AgentResponse DTO
@@ -1224,6 +1238,7 @@ git add backend/src/main/java/com/example/aichat/dto/AgentResponse.java backend/
 git commit -m "feat(backend): create AgentResponse DTO with JSON mapping"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 13: SpringBoot — 配置 agentWebClient Bean
@@ -1293,6 +1308,7 @@ git add backend/src/main/java/com/example/aichat/config/WebFluxConfig.java
 git commit -m "feat(backend): add agentWebClient bean with X-User header injection"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 14: SpringBoot — 创建 AgentClient（读取方法）
@@ -1450,6 +1466,7 @@ git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend
 git commit -m "feat(backend): create AgentClient with listAll and getById methods"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 15: SpringBoot — AgentClient 添加写入方法
@@ -1590,6 +1607,7 @@ git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend
 git commit -m "feat(backend): AgentClient add create, update, delete methods"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 16: SpringBoot — AgentClient 添加操作方法
@@ -1713,6 +1731,7 @@ git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend
 git commit -m "feat(backend): AgentClient add enable, disable, clone methods"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 17: SpringBoot — 创建 AgentService
@@ -1920,6 +1939,7 @@ git add backend/src/main/java/com/example/aichat/service/AgentService.java backe
 git commit -m "feat(backend): create AgentService with logging and CRUD delegation"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 18: SpringBoot — AgentService 异常处理
@@ -2040,6 +2060,7 @@ git add backend/src/main/java/com/example/aichat/service/AgentService.java \
 git commit -m "feat(backend): AgentService exception handling — connection errors to 503"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 19: SpringBoot — 重写 AgentController GET 端点
@@ -2185,6 +2206,7 @@ git add backend/src/main/java/com/example/aichat/controller/AgentController.java
 git commit -m "feat(backend): rewrite AgentController with GET list and detail endpoints"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 20: SpringBoot — AgentController 添加 POST/PUT/DELETE
@@ -2293,6 +2315,7 @@ git add backend/src/main/java/com/example/aichat/controller/AgentController.java
 git commit -m "feat(backend): AgentController add POST, PUT, DELETE endpoints"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 21: SpringBoot — AgentController 添加操作方法端点
@@ -2401,6 +2424,7 @@ git add backend/src/main/java/com/example/aichat/controller/AgentController.java
 git commit -m "feat(backend): AgentController add enable, disable, clone endpoints"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Task 22: 集成验证
@@ -2504,6 +2528,7 @@ git add -A
 git commit -m "chore: final verification and fixes for agent-backend-proxy"
 ```
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ## 自检清单
@@ -2547,6 +2572,7 @@ git commit -m "chore: final verification and fixes for agent-backend-proxy"
 | `AgentClient.*` 方法签名 | Tasks 14-16 | Tasks 17-21 | 一致 |
 | `AgentService.*` 方法签名 | Tasks 17-18 | Tasks 19-21 | 一致 |
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ## 执行交接
@@ -2563,6 +2589,7 @@ git commit -m "chore: final verification and fixes for agent-backend-proxy"
 
 请问选择哪种方式？
 
+archived-with: 2026-06-28-agent-backend-proxy
 ---
 
 ### Critical Files for Implementation

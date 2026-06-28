@@ -1,6 +1,6 @@
 ## 1. Sidebar Navigation
 
-- [ ] 1.1 Rewrite `Sidebar.tsx` as ChatGPT-style navigation (top fixed nav + Recent Chats)
+- [x] 1.1 Rewrite `Sidebar.tsx` as ChatGPT-style navigation (top fixed nav + Recent Chats)
 - [ ] 1.2 Add Today/Yesterday grouping for Recent Chats
 - [ ] 1.3 Add future-slot menu items (Tools, Knowledge, MCP, Settings) with locked styling
 - [ ] 1.4 Integrate new Sidebar into `ChatInterface.tsx`
