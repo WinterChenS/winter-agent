@@ -23,8 +23,8 @@
 
 ## 5. SpringBoot AgentClient
 
-- [ ] 5.1 Create `AgentClient` component with WebClient methods: listAll, getById, create, update, delete, enable, disable, clone
-- [ ] 5.2 Configure base URL from `aichat.ai-service-url` property
+- [x] 5.1 Create `AgentClient` component with WebClient methods: listAll, getById, create, update, delete, enable, disable, clone
+- [x] 5.2 Configure base URL from `aichat.ai-service-url` property
 
 ## 6. SpringBoot AgentService
 
