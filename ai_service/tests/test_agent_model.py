@@ -48,3 +48,42 @@ def test_name_max_length():
             display_name="Too Long Name",
             system_prompt="...",
         )
+
+
+def test_agent_definition_new_fields_defaults():
+    agent = AgentDefinition(
+        name="new_fields",
+        display_name="New Fields",
+        system_prompt="Test.",
+    )
+    assert agent.icon == ""
+    assert agent.agent_type == ""
+    assert agent.avatar_url == ""
+    assert agent.is_builtin is False
+    assert agent.tags == []
+    assert agent.metadata == {}
+    assert agent.created_by == ""
+    assert agent.updated_by == ""
+    assert agent.version == 1
+
+
+def test_agent_definition_new_fields_custom():
+    agent = AgentDefinition(
+        name="custom",
+        display_name="Custom",
+        system_prompt="Test.",
+        icon="🤖",
+        agent_type="assistant",
+        avatar_url="https://example.com/avatar.png",
+        is_builtin=True,
+        tags=["ai", "chat"],
+        metadata={"tier": "premium"},
+        created_by="admin",
+        updated_by="admin",
+        version=3,
+    )
+    assert agent.icon == "🤖"
+    assert agent.agent_type == "assistant"
+    assert agent.tags == ["ai", "chat"]
+    assert agent.metadata == {"tier": "premium"}
+    assert agent.version == 3

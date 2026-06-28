@@ -156,3 +156,29 @@ TBD - created by archiving change ai-chat-layer-rewrite. Update Purpose after ar
 - **AND** 调用 history API 加载 session `abc123` 的消息
 - **AND** 侧边栏显示该 session 为 active 状态
 
+### Requirement: Active Agent Status Display
+聊天 Header SHALL 实时展示当前活跃 Agent 的图标和名称，基于 SSE agent.started / agent.finished 事件动态切换。
+
+#### Scenario: Agent started event triggers display
+- **WHEN** SSE 收到 `agent.started` 事件（含 agentId 和 display_name）
+- **THEN** Header 显示该 Agent 的图标和 display_name，并显示状态文字（如 "Thinking..."）
+
+#### Scenario: Agent finished event clears status
+- **WHEN** SSE 收到 `agent.finished` 事件
+- **THEN** Header 清除临时状态文字，恢复只显示 Agent 图标和名称
+
+#### Scenario: Multi-agent chain display
+- **WHEN** 多个 Agent 按顺序启动和完成
+- **THEN** Header 依次显示每个 Agent 的状态，上一 Agent 完成后更新为下一 Agent
+
+### Requirement: Sidebar Integration
+ChatInterface SHALL 集成新的 ChatGPT 风格侧边栏，替换旧版 session-list 侧边栏。
+
+#### Scenario: Sidebar renders in ChatInterface
+- **WHEN** ChatInterface 加载
+- **THEN** 新的 Sidebar 组件显示，包含顶部分组导航和 Recent Chats 列表
+
+#### Scenario: Sidebar responsive on mobile
+- **WHEN** 视口宽度 < 768px
+- **THEN** Sidebar 默认隐藏，点击汉堡菜单按钮滑入显示，带半透明遮罩
+

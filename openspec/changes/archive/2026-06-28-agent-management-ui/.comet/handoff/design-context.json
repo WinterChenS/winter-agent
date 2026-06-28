@@ -1,0 +1,17 @@
+{
+  "change": "agent-management-ui",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "dff20f5fb9d52ef60d6b143edf5d936b54ffff517ff73a3da993db88ad7fd304",
+  "files": [
+    { "path": "openspec/changes/agent-management-ui/proposal.md", "sha256": "e25bc987a4789d654268e4352e25ba3267819b01b7c50e6976937d786926f616" },
+    { "path": "openspec/changes/agent-management-ui/design.md", "sha256": "ba5d880550d71314bd0874eb800d2dfe45dfaeb1d3bcf7b7fff84fe8b5af8053" },
+    { "path": "openspec/changes/agent-management-ui/tasks.md", "sha256": "0e6801b38bd6076125aafc796df005478244e4d815a35e50cfebbc827e4e4145" },
+    { "path": "openspec/changes/agent-management-ui/specs/agent-management-page/spec.md", "sha256": "f2c94eaaf3e1af3bdba710544afbfce0fd9dbb17e9a01aa7f7392a6d5fc5c30f" },
+    { "path": "openspec/changes/agent-management-ui/specs/ai-chat-ui/spec.md", "sha256": "3fac81beb6b76d07064ad6c59fe14697bf7a2e56637eabcf279bd6d0575979cf" },
+    { "path": "openspec/changes/agent-management-ui/specs/prompt-editor/spec.md", "sha256": "8c4a7b5f4e0861fb3845fc4680eb30d69da4adbe4c7efff5d2d2b0763f3b5c3b" },
+    { "path": "openspec/changes/agent-management-ui/specs/sidebar-navigation/spec.md", "sha256": "b19c1af3f439c0b61632ca2a409b9cf7ed93770069a1eb4c26e39626b353df21" }
+  ]
+}

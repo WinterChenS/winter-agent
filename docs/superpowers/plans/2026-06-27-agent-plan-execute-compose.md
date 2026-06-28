@@ -2,6 +2,7 @@
 change: agent-plan-execute-compose
 design-doc: docs/superpowers/specs/2026-06-27-agent-plan-execute-compose-design.md
 base-ref: a9329e81fa5e649a59f3aa0a21ea2f604cc1bbdb
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 # Agent Plan-Execute-Compose Workflow Implementation Plan
@@ -26,6 +27,7 @@ base-ref: a9329e81fa5e649a59f3aa0a21ea2f604cc1bbdb
 - All SSE event types (`message.delta`, `message.done`, `message.tool_call`, `tool.started`, `tool.finished`, `conversation.started`) remain unchanged
 - Test framework: pytest with pytest.mark.asyncio
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ## File Structure
@@ -46,6 +48,7 @@ Task 1 (state) ──> Task 2 (planning_node) ──> Task 4 (execution_node) �
        └──> Task 3 (dedup helpers) ────────────┘
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 1: Add New State Fields
@@ -82,6 +85,7 @@ git add ai_service/graph/state.py
 git commit -m "feat(agent-plan): add state fields for plan-execute-compose workflow (execution_plan, execution_results, artifacts, current_plan_step, plan_phase)"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 2: Implement Planning Node
@@ -433,6 +437,7 @@ git add ai_service/graph/nodes.py ai_service/tests/test_multi_agent_graph.py
 git commit -m "feat(agent-plan): add planning_node with JSON Mode LLM, fast-path detection, and fallback plan generation"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 3: Implement Artifact Dedup Helpers
@@ -526,6 +531,7 @@ git add ai_service/graph/nodes.py
 git commit -m "feat(agent-plan): add artifact dedup helpers (_tokenize_purpose, _check_artifact_dedup, _register_artifact)"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 4: Implement Execution Node
@@ -703,6 +709,7 @@ git add ai_service/graph/nodes.py
 git commit -m "feat(agent-plan): add execution_node with tool execution, artifact dedup, and step result storage"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 5: Implement Response Composer Node
@@ -805,6 +812,7 @@ git add ai_service/graph/nodes.py
 git commit -m "feat(agent-plan): add composer_node with structured report generation from plan and results"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 6: Rewrite Multi-Agent Graph Topology
@@ -951,6 +959,7 @@ git add ai_service/graph/multi_agent_graph.py ai_service/tests/test_multi_agent_
 git commit -m "feat(agent-plan): rewrite graph topology to plan->execute->composer, remove old multi-agent routing"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ### Task 7: Update API Integration (chat.py)
@@ -1144,6 +1153,7 @@ git add ai_service/api/routes/chat.py
 git commit -m "feat(agent-plan): update chat.py to use plan-execute-compose graph, remove RouterAgent/CollaborationEngine deps and collab_result fallback"
 ```
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ## Self-Review
@@ -1181,6 +1191,7 @@ No placeholders found. Every step contains actual code and commands.
 - Artifact dedup signatures match between Task 3 and Task 4 usage.
 - `create_plan_execute_graph(checkpointer)` — new function name used consistently in Task 6 and Task 7.
 
+archived-with: 2026-06-27-agent-plan-execute-compose
 ---
 
 ## Execution Handoff

@@ -24,6 +24,17 @@ class AgentDefinition(BaseModel):
     collaboration_strategy: str = "sequential"
     priority: int = 0
     enabled: bool = True
+    icon: str = ""
+    agent_type: str = ""
+    avatar_url: str = ""
+    is_builtin: bool = False
+    tags: list[str] = []
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_by: str = ""
+    updated_by: str = ""
+    version: int = 1
+    created_at: str = ""
+    updated_at: str = ""
 
     @field_validator("collaboration_strategy")
     @classmethod

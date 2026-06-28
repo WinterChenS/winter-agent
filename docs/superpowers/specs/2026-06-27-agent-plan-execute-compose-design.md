@@ -2,6 +2,8 @@
 comet_change: agent-plan-execute-compose
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-27-agent-plan-execute-compose
+status: final
 ---
 
 # Agent Plan-Execute-Compose Workflow Design

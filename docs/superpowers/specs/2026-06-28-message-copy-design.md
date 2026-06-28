@@ -2,6 +2,8 @@
 comet_change: message-copy
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-message-copy
+status: final
 ---
 
 # Message Copy Feature Design
