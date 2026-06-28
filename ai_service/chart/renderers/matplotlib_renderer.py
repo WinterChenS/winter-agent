@@ -32,6 +32,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
             "__output_path__": output_path,
             "plt": plt,
             "cn_font": FontManager.get_cn_font(),
+            "Palette": Palette,
             "__chart_metadata__": None,
         }
 
