@@ -7,7 +7,7 @@
 
 - [x] 2.1 Extend `AgentDefinition` Pydantic model with new fields (icon, agent_type, avatar_url, is_builtin, tags, metadata, created_by, updated_by, version)
 - [x] 2.2 Add `set_enabled(agent_id, enabled)` method to `AgentRepository` base and `PostgresAgentRepository`
-- [ ] 2.3 Add `clone(agent_id)` method to `AgentRepository` base and `PostgresAgentRepository`
+- [x] 2.3 Add `clone(agent_id)` method to `AgentRepository` base and `PostgresAgentRepository`
 - [x] 2.4 Update `_row_to_agent()` and `create()`/`update()` to handle new fields
 
 ## 3. Python Agent API Endpoints
