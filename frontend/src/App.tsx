@@ -4,6 +4,7 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { ChatInterface } from './pages/ChatInterface';
 import { LoginPage } from './pages/LoginPage';
 import { AdminAgents } from './pages/AdminAgents';
+import { AgentManagement } from './views/AgentManagement/AgentManagement';
 
 function App() {
   return (
@@ -15,6 +16,9 @@ function App() {
         } />
         <Route path="/chat/:id" element={
           <PrivateRoute><ChatInterface /></PrivateRoute>
+        } />
+        <Route path="/agents" element={
+          <PrivateRoute><AgentManagement /></PrivateRoute>
         } />
         <Route path="/admin/agents" element={
           <PrivateRoute><AdminAgents /></PrivateRoute>
