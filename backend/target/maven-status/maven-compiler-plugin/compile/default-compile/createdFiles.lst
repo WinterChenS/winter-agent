@@ -1,5 +1,4 @@
 com/example/aichat/config/SecurityConfig.class
-com/example/aichat/config/ValidationErrorHandler.class
 com/example/aichat/config/DataInitializer.class
 com/example/aichat/model/ImageMessage.class
 com/example/aichat/model/ChatResponse.class
