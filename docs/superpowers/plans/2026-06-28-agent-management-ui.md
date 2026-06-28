@@ -64,7 +64,7 @@
 **Interfaces:**
 - Produces: `AgentResponse` interface with all backend fields; `agentApi` object with methods `listAgents`, `getAgent`, `createAgent`, `updateAgent`, `deleteAgent`, `toggleAgent`, `cloneAgent`
 
-- [ ] **Step 1: Extend AgentInfo type**
+- [x] **Step 1: Extend AgentInfo type**
 
 Add the full agent definition type to `frontend/src/features/ai-chat/types/agent.ts`:
 
@@ -112,7 +112,7 @@ export interface AgentCreateRequest {
 }
 ```
 
-- [ ] **Step 2: Create agent API service**
+- [x] **Step 2: Create agent API service**
 
 Create `frontend/src/services/agent.ts`:
 
@@ -180,7 +180,7 @@ export const agentApi = {
 };
 ```
 
-- [ ] **Step 3: Write failing tests for agent API service**
+- [x] **Step 3: Write failing tests for agent API service**
 
 Create `frontend/src/services/__tests__/agent.test.ts`:
 
@@ -303,7 +303,7 @@ describe('agentApi', () => {
 });
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+- [x] **Step 4: Run tests to verify they fail**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/services/__tests__/agent.test.ts`
 Expected: Tests fail because `agent.ts` doesn't exist yet (but wait — the test imports from `../agent` which we haven't created yet, so the import itself fails. Let me first create the `__tests__` directory if needed.)
@@ -318,12 +318,12 @@ Then write the test file. After that run vitest — it will fail because `agent.
 
 Expected: `FAIL  src/services/__tests__/agent.test.ts` with Cannot find module error.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/services/__tests__/agent.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/features/ai-chat/types/agent.ts frontend/src/services/agent.ts frontend/src/services/__tests__/agent.test.ts
@@ -341,7 +341,7 @@ git commit -m "feat: add agent API service and extended AgentInfo type"
 **Interfaces:**
 - Produces: `useAgent()` hook returning `{ agents, loading, error, fetchAgents, createAgent, updateAgent, deleteAgent, toggleEnable, cloneAgent }`
 
-- [ ] **Step 1: Write failing tests for useAgent hook**
+- [x] **Step 1: Write failing tests for useAgent hook**
 
 Create `frontend/src/hooks/__tests__/useAgent.test.ts`:
 
@@ -486,12 +486,12 @@ describe('useAgent', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/hooks/__tests__/useAgent.test.ts`
 Expected: FAIL with "Cannot find module" error because `useAgent.ts` doesn't exist yet.
 
-- [ ] **Step 3: Implement useAgent hook**
+- [x] **Step 3: Implement useAgent hook**
 
 Create `frontend/src/hooks/useAgent.ts`:
 
@@ -561,12 +561,12 @@ export function useAgent() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/hooks/__tests__/useAgent.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/hooks/useAgent.ts frontend/src/hooks/__tests__/useAgent.test.ts
@@ -585,7 +585,7 @@ git commit -m "feat: add useAgent composable hook with full CRUD"
 - Consumes: `sessions: Conversation[]` (from `useSessions`), `activeSessionId`, navigation callbacks
 - Produces: Rewritten sidebar with nav items (AI Studio, New Chat, Agents, Tools/Knowledge/MCP/Settings as locked placeholders), Recent Chats section grouped by Today/Yesterday
 
-- [ ] **Step 1: Write failing tests for the new Sidebar**
+- [x] **Step 1: Write failing tests for the new Sidebar**
 
 Create `frontend/src/components/__tests__/Sidebar.test.tsx`:
 
@@ -653,12 +653,12 @@ describe('Sidebar', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/Sidebar.test.tsx`
 Expected: FAIL (old Sidebar doesn't have the nav items)
 
-- [ ] **Step 3: Implement the new Sidebar**
+- [x] **Step 3: Implement the new Sidebar**
 
 Rewrite `frontend/src/components/Sidebar.tsx`:
 
@@ -878,12 +878,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 };
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/Sidebar.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/Sidebar.tsx frontend/src/components/__tests__/Sidebar.test.tsx
@@ -903,7 +903,7 @@ git commit -m "feat: rewrite sidebar with navigation menu and session grouping"
 - `AgentCard` props: `{ agent: AgentInfo; onEdit: (id: string) => void; onDelete: (id: string) => void; onToggle: (id: string, enabled: boolean) => void; onClone: (id: string) => void }`
 - `AgentStatus` props: `{ enabled: boolean; onToggle: () => void }`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/components/__tests__/AgentCard.test.tsx`:
 
@@ -974,12 +974,12 @@ describe('AgentStatus', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/AgentCard.test.tsx`
 Expected: FAIL (components don't exist yet)
 
-- [ ] **Step 3: Implement AgentStatus**
+- [x] **Step 3: Implement AgentStatus**
 
 Create `frontend/src/components/AgentStatus.tsx`:
 
@@ -1008,7 +1008,7 @@ export function AgentStatus({ enabled, onToggle }: AgentStatusProps) {
 }
 ```
 
-- [ ] **Step 4: Implement AgentCard**
+- [x] **Step 4: Implement AgentCard**
 
 Create `frontend/src/components/AgentCard.tsx`:
 
@@ -1086,12 +1086,12 @@ export function AgentCard({ agent, onEdit, onDelete, onToggle, onClone }: AgentC
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/AgentCard.test.tsx`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/AgentCard.tsx frontend/src/components/AgentStatus.tsx frontend/src/components/__tests__/AgentCard.test.tsx
@@ -1110,7 +1110,7 @@ git commit -m "feat: add AgentCard and AgentStatus components"
 - Uses: `useAgent` hook, `AgentCard` component, `AgentDrawer` component (passed as prop or imported)
 - Route: `/agents`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/pages/__tests__/AgentManagement.test.tsx`:
 
@@ -1227,12 +1227,12 @@ describe('AgentManagement', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/pages/__tests__/AgentManagement.test.tsx`
 Expected: FAIL (page doesn't exist yet)
 
-- [ ] **Step 3: Implement AgentManagement page**
+- [x] **Step 3: Implement AgentManagement page**
 
 Create `frontend/src/pages/AgentManagement.tsx`:
 
@@ -1395,12 +1395,12 @@ export function AgentManagement() {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/pages/__tests__/AgentManagement.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/pages/AgentManagement.tsx frontend/src/pages/__tests__/AgentManagement.test.tsx
@@ -1419,7 +1419,7 @@ git commit -m "feat: add AgentManagement page with search, sort, pagination"
 - `AgentDrawer` props: `{ open: boolean; agentId?: string; onClose: () => void; onSave: () => void }`
 - Internally uses `ToolSelector`, `TagInput`, `PromptEditor`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/components/__tests__/AgentDrawer.test.tsx`:
 
@@ -1459,7 +1459,7 @@ describe('AgentDrawer', () => {
 });
 ```
 
-- [ ] **Step 2: Create ToolSelector component**
+- [x] **Step 2: Create ToolSelector component**
 
 Create `frontend/src/components/ToolSelector.tsx`:
 
@@ -1497,7 +1497,7 @@ export function ToolSelector({ selected, available, onChange }: ToolSelectorProp
 }
 ```
 
-- [ ] **Step 3: Create TagInput component**
+- [x] **Step 3: Create TagInput component**
 
 Create `frontend/src/components/TagInput.tsx`:
 
@@ -1554,7 +1554,7 @@ export function TagInput({ tags, onChange, placeholder = '输入关键词后回�
 }
 ```
 
-- [ ] **Step 4: Implement AgentDrawer**
+- [x] **Step 4: Implement AgentDrawer**
 
 Create `frontend/src/components/AgentDrawer.tsx`:
 
@@ -1948,7 +1948,7 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
 }
 ```
 
-- [ ] **Step 5: Wire AgentDrawer into AgentManagement page**
+- [x] **Step 5: Wire AgentDrawer into AgentManagement page**
 
 Update `frontend/src/pages/AgentManagement.tsx` to import and use AgentDrawer:
 
@@ -1996,7 +1996,7 @@ Also add `fetchAgents` to the destructured `useAgent()` return:
 const { agents, loading, error, fetchAgents, createAgent, updateAgent, deleteAgent, toggleEnable, cloneAgent } = useAgent();
 ```
 
-- [ ] **Step 6: Update tests for AgentManagement to verify drawer integration**
+- [x] **Step 6: Update tests for AgentManagement to verify drawer integration**
 
 Update `frontend/src/pages/__tests__/AgentManagement.test.tsx` to add:
 
@@ -2008,12 +2008,12 @@ it('opens drawer when create button is clicked', () => {
 });
 ```
 
-- [ ] **Step 7: Run all tests to verify they pass**
+- [x] **Step 7: Run all tests to verify they pass**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/AgentDrawer.test.tsx src/pages/__tests__/AgentManagement.test.tsx`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/src/components/AgentDrawer.tsx frontend/src/components/ToolSelector.tsx frontend/src/components/TagInput.tsx frontend/src/components/__tests__/AgentDrawer.test.tsx frontend/src/pages/AgentManagement.tsx frontend/src/pages/__tests__/AgentManagement.test.tsx
@@ -2032,13 +2032,13 @@ git commit -m "feat: add AgentDrawer editor with form sections"
 **Interfaces:**
 - `PromptEditor` props: `{ value: string; onChange: (value: string) => void; minHeight?: string }`
 
-- [ ] **Step 1: Install CodeMirror 6 dependencies**
+- [x] **Step 1: Install CodeMirror 6 dependencies**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend && npm install @codemirror/view@^6.36.5 @codemirror/state@^6.5.2 @codemirror/lang-markdown@^6.3.7 @codemirror/commands@^6.8.1
 ```
 
-- [ ] **Step 2: Write failing tests for PromptEditor**
+- [x] **Step 2: Write failing tests for PromptEditor**
 
 Create `frontend/src/components/__tests__/PromptEditor.test.tsx`:
 
@@ -2068,7 +2068,7 @@ describe('PromptEditor', () => {
 });
 ```
 
-- [ ] **Step 3: Implement PromptEditor**
+- [x] **Step 3: Implement PromptEditor**
 
 Create `frontend/src/components/PromptEditor.tsx`:
 
@@ -2193,7 +2193,7 @@ export function PromptEditor({ value, onChange, minHeight = '200px' }: PromptEdi
 
 Note: CodeMirror 7 (CM6) uses the `codemirror` package as the main entry. If the installed version exports differently, adjust the import to match the actual API.
 
-- [ ] **Step 4: Integrate PromptEditor into AgentDrawer**
+- [x] **Step 4: Integrate PromptEditor into AgentDrawer**
 
 In `frontend/src/components/AgentDrawer.tsx`:
 1. Add import: `import { PromptEditor } from './PromptEditor';`
@@ -2210,12 +2210,12 @@ In `frontend/src/components/AgentDrawer.tsx`:
 </section>
 ```
 
-- [ ] **Step 5: Run PromptEditor tests**
+- [x] **Step 5: Run PromptEditor tests**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/PromptEditor.test.tsx`
 Expected: PASS (or skip if CodeMirror DOM requirements exceed jsdom capabilities — mark as known limitation)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/PromptEditor.tsx frontend/src/components/__tests__/PromptEditor.test.tsx frontend/src/components/AgentDrawer.tsx
@@ -2229,7 +2229,7 @@ git commit -m "feat: add CodeMirror 6 prompt editor with copy and fullscreen"
 **Files:**
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `frontend/src/__tests__/App.test.tsx`:
 
@@ -2269,7 +2269,7 @@ describe('App routing', () => {
 });
 ```
 
-- [ ] **Step 2: Update App.tsx routes**
+- [x] **Step 2: Update App.tsx routes**
 
 Modify `frontend/src/App.tsx`:
 
@@ -2303,12 +2303,12 @@ function App() {
 export default App;
 ```
 
-- [ ] **Step 3: Run tests to verify**
+- [x] **Step 3: Run tests to verify**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/__tests__/App.test.tsx`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/App.tsx frontend/src/__tests__/App.test.tsx
@@ -2328,7 +2328,7 @@ git commit -m "feat: add /agents route, remove /admin/agents route"
 - `AgentHeaderStatus` props: none (reads from Zustand store directly)
 - Connects to: useChatStore's `agentStatus`, `activeAgent`, `activeAgentDisplay`
 
-- [ ] **Step 1: Write failing tests for AgentHeaderStatus**
+- [x] **Step 1: Write failing tests for AgentHeaderStatus**
 
 Create `frontend/src/components/__tests__/AgentHeaderStatus.test.tsx`:
 
@@ -2384,7 +2384,7 @@ describe('AgentHeaderStatus', () => {
 });
 ```
 
-- [ ] **Step 2: Implement AgentHeaderStatus**
+- [x] **Step 2: Implement AgentHeaderStatus**
 
 Create `frontend/src/components/AgentHeaderStatus.tsx`:
 
@@ -2422,7 +2422,7 @@ export function AgentHeaderStatus() {
 }
 ```
 
-- [ ] **Step 3: Integrate into ChatInterface header**
+- [x] **Step 3: Integrate into ChatInterface header**
 
 Modify `frontend/src/pages/ChatInterface.tsx`:
 
@@ -2442,12 +2442,12 @@ Also remove the `agentId` and `agents` state management that was only used for t
 - Remove the `useState`, `useEffect`, and `fetch('/api/agents')` block
 - Remove the `AgentInfo` import
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd /Volumes/work/projects/winter-agent/frontend && npx vitest run src/components/__tests__/AgentHeaderStatus.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/AgentHeaderStatus.tsx frontend/src/components/__tests__/AgentHeaderStatus.test.tsx frontend/src/pages/ChatInterface.tsx
@@ -2464,7 +2464,7 @@ git commit -m "feat: add chat header agent status display"
 
 **Verification: no automated test needed, manual verification only**
 
-- [ ] **Step 1: Verify AdminAgents references**
+- [x] **Step 1: Verify AdminAgents references**
 
 Search for remaining references to `AdminAgents` in the codebase:
 
@@ -2474,13 +2474,13 @@ cd /Volumes/work/projects/winter-agent/frontend && grep -r "AdminAgents" src/ --
 
 Expected: no remaining imports or references (App.tsx import was already removed in Task 8)
 
-- [ ] **Step 2: Delete AdminAgents.tsx**
+- [x] **Step 2: Delete AdminAgents.tsx**
 
 ```bash
 rm frontend/src/pages/AdminAgents.tsx
 ```
 
-- [ ] **Step 3: Verify build passes**
+- [x] **Step 3: Verify build passes**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend && npx tsc --noEmit
@@ -2488,7 +2488,7 @@ cd /Volumes/work/projects/winter-agent/frontend && npx tsc --noEmit
 
 Expected: No errors
 
-- [ ] **Step 4: Run full test suite**
+- [x] **Step 4: Run full test suite**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend && npx vitest run
@@ -2496,7 +2496,7 @@ cd /Volumes/work/projects/winter-agent/frontend && npx vitest run
 
 Expected: All tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/pages/AdminAgents.tsx  # This will record the deletion
@@ -2510,18 +2510,18 @@ git commit -m "refactor: remove old AdminAgents page"
 **Files:**
 - No files created/modified — verification only
 
-- [ ] **Step 1: Verify chat SSE functionality**
+- [x] **Step 1: Verify chat SSE functionality**
 
 Check that the SSE handler in `frontend/src/features/ai-chat/services/chatApi.ts` still correctly updates `agentStatus` and `activeAgentDisplay`:
 - `agent.started` sets status to `calling_tool` and sets `activeAgent`
 - `agent.finished` sets status to `generating` then `idle`
 - These fields are what `AgentHeaderStatus` reads
 
-- [ ] **Step 2: Verify useSessions backward compat**
+- [x] **Step 2: Verify useSessions backward compat**
 
 The new Sidebar still receives the same `sessions` prop (from `useSessions` hook). Verify the SessionGroup component uses `createdAt` from `Conversation` type, which is unchanged in `frontend/src/types/chat.ts`.
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend && npx vitest run
@@ -2529,7 +2529,7 @@ cd /Volumes/work/projects/winter-agent/frontend && npx vitest run
 
 Expected: All tests pass including existing ones for `chatApi`, `chatStore`, `copyText`, and `ToolCallPanel`.
 
-- [ ] **Step 4: Final commit (if any fixes needed)**
+- [x] **Step 4: Final commit (if any fixes needed)**
 
 ```bash
 git commit -m "chore: verify existing functionality after refactor"
