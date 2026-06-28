@@ -7,7 +7,7 @@ import os
 
 from chart.chart_renderer import AbstractChartRenderer
 from chart.font_manager import FontManager
-from chart.chart_result import ChartResult, ChartMetadata, SeriesInfo
+from chart.chart_result import ChartResult, ChartMetadata, SeriesInfo, DataFacts
 from chart.palette import Palette
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,18 @@ class MatplotlibRenderer(AbstractChartRenderer):
         plt.close("all")
 
         # Build execution context with injected variables
+        # Intercept plt.close to capture figure references before they're destroyed
+        _saved_figures = []
+        _orig_close = plt.close
+        def _safe_close(fig=None):
+            if fig is not None and hasattr(fig, 'get_axes'):
+                _saved_figures.append(fig)
+            elif fig is None:
+                for n in plt.get_fignums():
+                    _saved_figures.append(plt.figure(n))
+            _orig_close(fig)
+        plt.close = _safe_close
+
         ctx = {
             "__output_path__": output_path,
             "plt": plt,
@@ -39,7 +51,10 @@ class MatplotlibRenderer(AbstractChartRenderer):
         exec(code, ctx)
 
         # Ensure tight_layout for Chinese label overlap prevention
-        figs = [plt.figure(n) for n in plt.get_fignums()]
+        figs = [plt.figure(n) for n in plt.get_fignums()] + _saved_figures
+        # Deduplicate by id
+        seen = set()
+        figs = [f for f in figs if id(f) not in seen and not seen.add(id(f))]
         for fig in figs:
             try:
                 fig.tight_layout()
@@ -183,6 +198,47 @@ class MatplotlibRenderer(AbstractChartRenderer):
                         color=color_hex,
                         color_name=Palette.get_color_name(color_hex),
                     ))
+
+        # Extract data facts from axes
+        metadata.data_facts = self._extract_data_facts(fig)
+
+    def _extract_data_facts(self, fig) -> DataFacts:
+        """Extract authoritative data range facts from figure axes.
+
+        These are MACHINE-EXTRACTED facts, not LLM-generated.
+        The composer MUST use these for descriptions instead of guessing.
+        """
+        for ax in fig.get_axes():
+            x_min, x_max = ax.get_xlim()
+            y_min, y_max = ax.get_ylim()
+            data_points = 0
+            for line in ax.get_lines():
+                data_points += len(line.get_xdata())
+            for container in ax.containers:
+                for patch in container.get_children():
+                    data_points += 1
+            for collection in ax.collections:
+                data_points += len(collection.get_offsets()) if hasattr(collection, 'get_offsets') else 0
+
+            return DataFacts(
+                x_min=self._fmt_val(x_min),
+                x_max=self._fmt_val(x_max),
+                y_min=self._fmt_val(y_min),
+                y_max=self._fmt_val(y_max),
+                data_points=data_points,
+            )
+        return DataFacts()
+
+    @staticmethod
+    def _fmt_val(val: float) -> str:
+        """Format a numeric value for display."""
+        if val is None:
+            return ""
+        if isinstance(val, (int, float)):
+            if abs(val) >= 1000 or (abs(val) < 0.01 and val != 0):
+                return f"{val:.2f}"
+            return f"{val:.4g}".rstrip("0").rstrip(".")
+        return str(val)
 
     def _save_metadata(self, output_path: str, metadata: ChartMetadata) -> None:
         """Save ChartMetadata as a JSON file alongside the PNG output."""

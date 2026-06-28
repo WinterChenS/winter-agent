@@ -1,35 +1,24 @@
-# Task 9 Report: Clean up old AdminAgents page
+# Task 9: Locate and update Data Analyst Agent system prompt
 
-## Status: Done
+## Search Results
 
-### Changes Made
+The Data Analyst Agent's system prompt was found in:
 
-1. **Deleted** `frontend/src/pages/AdminAgents.tsx` (old agent management page, 243 lines)
-2. **Removed** `/admin/agents` route and `AdminAgents` import from `frontend/src/App.tsx`
+- **`ai_service/db/migrations/002_seed_agents_and_setup.sql`** — The primary location. The Data Analyst agent (`data-analyst` / `data_analyst`) is seeded as Agent 5 in this migration, with a full system prompt string defined in the INSERT statement (lines 188-256).
 
-### Verification
+The prompt was **not** found in:
+- `graph/nodes.py` — contains generic "data analyst" references in other prompts (chart planner, report writer), not the Data Analyst agent itself.
+- `db/migrations/V003__agent_upgrade.sql` — only references `data_analyst` by name in a backfill UPDATE, does not contain the prompt.
 
-- **TypeScript compilation**: No new errors introduced. Pre-existing type mismatches (7) between old `types/chat.ts` and new `features/ai-chat/types/message.ts` remain unchanged.
-- **AdminAgents-specific errors**: Zero -- grep confirms no reference to AdminAgents remains in TS output.
-- **Test suite**: 7 failed / 5 passed (12 total). All 7 failures are pre-existing, unrelated to AdminAgents:
-  - `Sidebar.test.tsx` (multiple elements matched)
-  - `ToolCallPanel.test.tsx` (rendering)
-  - `AgentStatusIndicator.test.tsx` (rendering)
-  - `AgentManagement.test.tsx` (new view tests)
-  - `AgentCard.test.tsx` (new component tests)
-  - `PromptEditor.test.tsx` (new component tests)
+## Changes Made
 
-### Chat Feature Integrity Check
+Three new rules were added to the `## Chart Guidelines (MANDATORY)` section of the Data Analyst system prompt:
 
-Confirmed unaffected:
-- **ChatInterface.tsx** -- still imports and uses `MessageList`, `InputBox`, `ChatContainer`, `AgentStatusIndicator`, `useChatStream`, `useConversation`, `useChatStore`
-- **MessageBubble.tsx** -- still imports `ReasoningPanel`, `ToolCallPanel`, `MarkdownRenderer`, `StreamingRenderer`
-- **chatApi.ts** -- SSE stream handling (fetch + ReadableStream) is unchanged
-- **chatStore.ts** -- Zustand store (create, set, getState) is unchanged
-- **chat.ts types** -- types kept for Sidebar/system compatibility, no longer mentioning AdminAgents
+1. `颜色描述必须来自 Chart Metadata，不得根据图片推测`
+2. `引用图例格式: 系列名（颜色名），颜色信息来自图表元数据`
+3. `使用 ChartResult.summary 作为图表描述，不要自行解释图表`
 
-### Commit
+## Commit
 
-```
-5012db1 chore(frontend): remove old AdminAgents page and verify compatibility
-```
+`74e75fe` — `feat: update Data Analyst prompt with chart metadata rules`
+1 file changed, 3 insertions(+)

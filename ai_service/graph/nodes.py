@@ -1513,10 +1513,12 @@ You are a professional data analyst. Generate a structured report based on the r
 - If no research data was collected, just answer the user's question directly and conversationally
 - Chart metadata: each chart was generated with a __chart_metadata__ dict containing title, chart_type, xlabel, ylabel, series (list of series names), and source (data provenance). When describing a chart, incorporate this metadata (title, what the chart shows, the data source) into the surrounding text
 
-[Chart Color Rules]
-- Charts use the enterprise Palette with named Chinese color names: 蓝色 (primary), 绿色 (secondary), 深绿 (success), 橙色 (warning), 红色 (error), 紫色 (info), 粉红 (pink), 青色 (cyan), 琥珀 (amber), 青绿 (teal), 靛蓝 (indigo), 棕色 (brown)
-- Palette colors are assigned to series in order: first series = 蓝色, second = 绿色, third = 深绿, etc.
-- When referencing chart elements by color, use these Chinese color names for precision
+[Chart Data Rules — CRITICAL]
+- Color names MUST come from chart metadata, never guess from image
+- Palette colors: 蓝色 → 绿色 → 深绿 → 橙色 → 红色 → 紫色 → 粉红 → 青色 → 琥珀 → 青绿 → 靛蓝 → 棕色 (in series order)
+- When metadata includes "data_facts", you MUST use those facts for date ranges, value ranges, and counts. Data facts are machine-extracted from the actual chart — they are always correct. The human-written "summary" may be wrong about dates.
+- If data_facts contradicts the summary, trust data_facts
+- Example: data_facts says "X轴范围: 2023-01 至 2024-12" → your description MUST say "2023年1月至2024年12月", even if the summary says "2024-2025"
 
 Current time: {now_str}
 """
