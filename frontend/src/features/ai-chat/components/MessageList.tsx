@@ -65,7 +65,7 @@ export function MessageList() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-2" ref={scrollRef} onScroll={handleScroll}>
+    <div className="flex-1 min-h-0 overflow-y-auto py-2" ref={scrollRef} onScroll={handleScroll}>
       {orderedMessages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
@@ -76,9 +76,12 @@ export function MessageList() {
             scrollToBottom(true);
             setUserScrolledUp(false);
           }}
-          className="fixed bottom-28 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors z-50"
+          className="fixed bottom-28 right-6 w-9 h-9 flex items-center justify-center bg-white border border-gray-200 rounded-full shadow-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors z-50"
+          aria-label="回到底部"
         >
-          ↓ 回到底部
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
         </button>
       )}
     </div>
