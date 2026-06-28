@@ -132,7 +132,7 @@ git commit -m "feat(db): add V003 migration with 9 new agent columns and is_buil
 - Consumes: `AgentDefinition` 现有模型
 - Produces: `AgentDefinition` 新增 9 个可选字段
 
-- [ ] **Step 1: 写新字段的测试**
+- [x] **Step 1: 写新字段的测试**
 
 在 `ai_service/tests/test_agent_model.py` 末尾追加：
 
@@ -176,12 +176,12 @@ def test_agent_definition_new_fields_custom():
     assert agent.version == 3
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_model.py::test_agent_definition_new_fields_defaults tests/test_agent_model.py::test_agent_definition_new_fields_custom -v`
 预期输出: 两个测试均 FAIL，错误类型为 `pydantic.ValidationError` 或字段不存在。
 
-- [ ] **Step 3: 在 AgentDefinition 中新增字段**
+- [x] **Step 3: 在 AgentDefinition 中新增字段**
 
 在 `ai_service/models/agent.py` 的 `AgentDefinition` 类中的 `enabled: bool = True` 之后追加：
 
@@ -199,12 +199,12 @@ def test_agent_definition_new_fields_custom():
 
 注意：`metadata` 使用 `Field(default_factory=dict)` 而非 `{}`，避免可变默认值陷阱。
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_model.py -v`
 预期输出: 全部测试 PASS（原有 4 个 + 新增 2 个，共 6 个）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ai_service/models/agent.py ai_service/tests/test_agent_model.py
@@ -385,7 +385,7 @@ await conn.execute(
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/ -v`
 预期输出: 全部测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ai_service/repositories/agent_repository.py ai_service/tests/test_agent_api.py
@@ -426,7 +426,7 @@ async def test_set_enabled_nonexistent_returns_none(repo: AgentRepository) -> No
     assert result is None
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_set_enabled tests/test_agent_api.py::test_set_enabled_nonexistent_returns_none -v`
 预期输出: FAIL — `AgentRepository` ABC 未定义 `set_enabled`。
@@ -466,12 +466,12 @@ async def set_enabled(self, agent_id: str, enabled: bool) -> AgentDefinition | N
         return _row_to_agent(record)
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_set_enabled tests/test_agent_api.py::test_set_enabled_nonexistent_returns_none -v`
 预期输出: 两个测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ai_service/repositories/agent_repository.py ai_service/tests/test_agent_api.py
@@ -527,7 +527,7 @@ async def test_clone_name_conflict(repo: AgentRepository) -> None:
     assert cloned2.name == "bot-copy-2"
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_clone_basic tests/test_agent_api.py::test_clone_nonexistent tests/test_agent_api.py::test_clone_name_conflict -v`
 预期输出: FAIL — `AgentRepository` ABC 未定义 `clone`。
@@ -706,7 +706,7 @@ async def test_create_agent_defaults_to_system(client: TestClient) -> None:
     assert data["created_by"] == "system"
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_create_agent_sets_created_by tests/test_agent_api.py::test_create_agent_defaults_to_system -v`
 预期输出: FAIL — `created_by` 值为空字符串而非 "admin"/"system"。
@@ -745,12 +745,12 @@ async def update_agent(agent_id: str, agent: AgentDefinition, request: Request) 
     return result
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_create_agent_sets_created_by tests/test_agent_api.py::test_create_agent_defaults_to_system -v`
 预期输出: 两个测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py
@@ -822,7 +822,7 @@ async def test_disable_nonexistent_returns_404(client: TestClient) -> None:
     assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_enable_agent tests/test_agent_api.py::test_disable_agent tests/test_agent_api.py::test_enable_nonexistent_returns_404 tests/test_agent_api.py::test_disable_nonexistent_returns_404 -v`
 预期输出: FAIL — 404，端点不存在。
@@ -857,12 +857,12 @@ async def disable_agent(agent_id: str, request: Request) -> AgentDefinition:
     return result
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_enable_agent tests/test_agent_api.py::test_disable_agent tests/test_agent_api.py::test_enable_nonexistent_returns_404 tests/test_agent_api.py::test_disable_nonexistent_returns_404 -v`
 预期输出: 四个测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ai_service/api/routes/agents.py ai_service/tests/test_agent_api.py
@@ -913,7 +913,7 @@ async def test_clone_nonexistent_endpoint_returns_404(client: TestClient) -> Non
     assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_clone_agent_endpoint tests/test_agent_api.py::test_clone_nonexistent_endpoint_returns_404 -v`
 预期输出: FAIL — 404，端点不存在。
@@ -933,7 +933,7 @@ async def clone_agent(agent_id: str, request: Request) -> AgentDefinition:
     return result
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/ai_service && python -m pytest tests/test_agent_api.py::test_clone_agent_endpoint tests/test_agent_api.py::test_clone_nonexistent_endpoint_returns_404 -v`
 预期输出: 两个测试 PASS。
@@ -1099,12 +1099,12 @@ public record AgentRequest(
 ) {}
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -pl . -Dtest=AgentRequestTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/dto/AgentRequest.java backend/src/test/java/com/example/aichat/dto/AgentRequestTest.java
@@ -1212,12 +1212,12 @@ public record AgentResponse(
 ) {}
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentResponseTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/dto/AgentResponse.java backend/src/test/java/com/example/aichat/dto/AgentResponseTest.java
@@ -1438,12 +1438,12 @@ public class AgentClient {
 
 注意：构造函数接收 `agentWebClient` bean（Spring 按类型和名称自动装配），`baseUrl` 已在 WebClient bean 中配置，`@Value` 保留用于向下兼容。
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentClientTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend/src/test/java/com/example/aichat/client/AgentClientTest.java
@@ -1538,7 +1538,7 @@ void delete_returnsVoid() {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentClientTest#create_returnsAgent+AgentClientTest#update_returnsAgent+AgentClientTest#delete_returnsVoid -q`
 预期输出: 编译错误 — AgentClient 没有这些方法。
@@ -1578,12 +1578,12 @@ public Mono<Void> delete(String id) {
 import com.example.aichat.dto.AgentRequest;
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentClientTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend/src/test/java/com/example/aichat/client/AgentClientTest.java
@@ -1671,7 +1671,7 @@ void clone_returnsAgent() {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentClientTest -q`
 预期输出: 编译错误 — AgentClient 没有 enable/disable/clone 方法。
@@ -1701,12 +1701,12 @@ public Mono<AgentResponse> clone(String id) {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentClientTest -q`
 预期输出: BUILD SUCCESS，所有 AgentClient 测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/client/AgentClient.java backend/src/test/java/com/example/aichat/client/AgentClientTest.java
@@ -1908,12 +1908,12 @@ public class AgentService {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentServiceTest -q`
 预期输出: BUILD SUCCESS，AgentService 测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/service/AgentService.java backend/src/test/java/com/example/aichat/service/AgentServiceTest.java
@@ -2124,7 +2124,7 @@ class AgentControllerTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: 编译失败或测试失败 — 旧的 AgentController 使用 `String` 而非 `AgentService`。
@@ -2172,12 +2172,12 @@ public class AgentController {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/controller/AgentController.java \
@@ -2250,7 +2250,7 @@ void deleteAgent_returnsOk() {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: 测试失败 — Controller 缺少这些端点。
@@ -2280,12 +2280,12 @@ public Mono<ResponseEntity<Void>> deleteAgent(@PathVariable String id) {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: BUILD SUCCESS，测试 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/example/aichat/controller/AgentController.java \
@@ -2356,7 +2356,7 @@ void cloneAgent_returnsCloned() {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: 测试失败 — Controller 缺少 enable/disable/clone 端点。
@@ -2383,7 +2383,7 @@ public Mono<ResponseEntity<AgentResponse>> cloneAgent(@PathVariable String id) {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行: `cd /Volumes/work/projects/winter-agent/backend && mvn test -Dtest=AgentControllerTest -q`
 预期输出: BUILD SUCCESS，所有 Controller 测试 PASS。
