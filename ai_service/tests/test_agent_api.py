@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+import dataclasses
+
+# Monkey-patch: Python 3.9 doesn't support dataclass(slots=True)
+_original_dataclass = dataclasses.dataclass
+
+
+def _patched_dataclass(*args: object, **kwargs: object) -> object:
+    kwargs.pop("slots", None)
+    return _original_dataclass(*args, **kwargs)
+
+
+dataclasses.dataclass = _patched_dataclass  # type: ignore[assignment]
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -207,6 +220,55 @@ class TestEnableDisableEndpoints:
 
     def test_disable_nonexistent_agent_returns_404(self, client):
         resp = client.post("/api/v1/agents/nonexistent/disable", headers={"X-User": "admin"})
+        assert resp.status_code == 404
+
+
+class TestHttpEndpoints:
+    """HTTP-level tests for list, get, and delete endpoints."""
+
+    def test_list_agents_returns_all(self, client):
+        client.post("/api/v1/agents/", json={
+            "name": "agent-a", "display_name": "Agent A", "system_prompt": "A"
+        })
+        client.post("/api/v1/agents/", json={
+            "name": "agent-b", "display_name": "Agent B", "system_prompt": "B"
+        })
+        resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+
+    def test_list_agents_empty(self, client):
+        resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_get_agent_by_id_found(self, client):
+        create_resp = client.post("/api/v1/agents/", json={
+            "name": "get-test", "display_name": "Get Test", "system_prompt": "Test"
+        })
+        agent_id = create_resp.json()["id"]
+        resp = client.get(f"/api/v1/agents/{agent_id}")
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "get-test"
+
+    def test_get_agent_by_id_not_found(self, client):
+        resp = client.get("/api/v1/agents/nonexistent")
+        assert resp.status_code == 404
+
+    def test_delete_agent_removes_it(self, client):
+        create_resp = client.post("/api/v1/agents/", json={
+            "name": "delete-me", "display_name": "Delete Me", "system_prompt": "Test"
+        })
+        agent_id = create_resp.json()["id"]
+        resp = client.delete(f"/api/v1/agents/{agent_id}")
+        assert resp.status_code == 200
+        # Verify it's gone
+        get_resp = client.get(f"/api/v1/agents/{agent_id}")
+        assert get_resp.status_code == 404
+
+    def test_delete_nonexistent_returns_404(self, client):
+        resp = client.delete("/api/v1/agents/nonexistent")
         assert resp.status_code == 404
 
 
