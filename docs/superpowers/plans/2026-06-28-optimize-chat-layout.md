@@ -58,7 +58,7 @@ git status
 
 **说明：** 当前 `ChatContainer.tsx` 是包含业务逻辑（agent 列表获取、header、MessageList + InputBox 编排）的旧组件，仅被 `App.tsx` 中已废弃的 `/chat-legacy` 路由引用。将其完全替换为纯布局组件。
 
-- [ ] **Step 1: 用纯布局实现替换 ChatContainer.tsx**
+- [x] **Step 1: 用纯布局实现替换 ChatContainer.tsx**
 
 将文件内容完全替换为：
 
@@ -76,7 +76,7 @@ export function ChatContainer({ children }: ChatContainerProps) {
 }
 ```
 
-- [ ] **Step 2: 验证 TypeScript 编译无错误**
+- [x] **Step 2: 验证 TypeScript 编译无错误**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -85,7 +85,7 @@ npx tsc --noEmit --pretty 2>&1 | head -30
 
 预期输出：无类型错误。该组件无外部依赖，只使用 React.ReactNode。
 
-- [ ] **Step 3: 提交本次更改**
+- [x] **Step 3: 提交本次更改**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -102,7 +102,7 @@ git commit -m "feat: 创建 ChatContainer 纯布局组件，约束最大宽度 8
 
 **说明：** 在 main 区域（包裹 MessageList）和 footer 区域（包裹 InputBox 容器）各使用一次 ChatContainer。Footer 原有的 `px-4` 需要移除，否则会与 ChatContainer 的 `px-4` 叠加产生双倍内边距。
 
-- [ ] **Step 1: 添加 ChatContainer 导入**
+- [x] **Step 1: 添加 ChatContainer 导入**
 
 在 `ChatInterface.tsx` 的 import 区域添加：
 
@@ -112,7 +112,7 @@ import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
 
 放在 `import { InputBox }` 那一行之后。
 
-- [ ] **Step 2: 在 main 区域包裹 ChatContainer**
+- [x] **Step 2: 在 main 区域包裹 ChatContainer**
 
 将：
 
@@ -132,7 +132,7 @@ import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
         </main>
 ```
 
-- [ ] **Step 3: 在 footer 区域包裹 ChatContainer 并移除重复 px-4**
+- [x] **Step 3: 在 footer 区域包裹 ChatContainer 并移除重复 px-4**
 
 将：
 
@@ -156,7 +156,7 @@ import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
         </footer>
 ```
 
-- [ ] **Step 4: 验证 TypeScript 编译无错误**
+- [x] **Step 4: 验证 TypeScript 编译无错误**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -165,7 +165,7 @@ npx tsc --noEmit --pretty 2>&1 | head -30
 
 预期输出：无类型错误。
 
-- [ ] **Step 5: 提交本次更改**
+- [x] **Step 5: 提交本次更改**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -182,7 +182,7 @@ git commit -m "feat: 在 ChatInterface main 和 footer 区域集成 ChatContaine
 
 **说明：** 当前 `MessageList` 的滚动容器上有 `px-4` 提供水平内边距。ChatContainer 已在外层统一提供响应式内边距，因此移除组件自身的 `px-4`。
 
-- [ ] **Step 1: 移除 px-4 class**
+- [x] **Step 1: 移除 px-4 class**
 
 将（第 68 行）：
 
@@ -196,7 +196,7 @@ git commit -m "feat: 在 ChatInterface main 和 footer 区域集成 ChatContaine
     <div className="h-full overflow-y-auto py-2" ref={scrollRef} onScroll={handleScroll}>
 ```
 
-- [ ] **Step 2: 验证 TypeScript 编译无错误**
+- [x] **Step 2: 验证 TypeScript 编译无错误**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -205,7 +205,7 @@ npx tsc --noEmit --pretty 2>&1 | head -30
 
 预期输出：无类型错误。
 
-- [ ] **Step 3: 提交本次更改**
+- [x] **Step 3: 提交本次更改**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -222,7 +222,7 @@ git commit -m "refactor: 移除 MessageList 的 px-4，由 ChatContainer 统一�
 
 **说明：** 居中布局后消息区域变窄（max-width 820px），气泡最大宽度从 80% 增加到 85% 以利用更多可用空间。
 
-- [ ] **Step 1: 修改 max-w 值**
+- [x] **Step 1: 修改 max-w 值**
 
 将（第 18 行）：
 
@@ -236,7 +236,7 @@ git commit -m "refactor: 移除 MessageList 的 px-4，由 ChatContainer 统一�
         className={`max-w-[85%] rounded-lg p-3 ${
 ```
 
-- [ ] **Step 2: 验证 TypeScript 编译无错误**
+- [x] **Step 2: 验证 TypeScript 编译无错误**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -245,7 +245,7 @@ npx tsc --noEmit --pretty 2>&1 | head -30
 
 预期输出：无类型错误。
 
-- [ ] **Step 3: 提交本次更改**
+- [x] **Step 3: 提交本次更改**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -262,7 +262,7 @@ git commit -m "style: MessageBubble max-w 80% -> 85% 适应居中布局"
 
 **说明：** 移除未使用的 `ChatContainer` 导入和已废弃的 `/chat-legacy` 路由。旧 ChatContainer 的业务逻辑功能已完全由 `ChatInterface.tsx` 承担。
 
-- [ ] **Step 1: 移除 ChatContainer 导入**
+- [x] **Step 1: 移除 ChatContainer 导入**
 
 删除 `App.tsx` 中的这一行：
 
@@ -272,7 +272,7 @@ import { ChatContainer } from './features/ai-chat';
 
 同时删除该行下方的空行以保持 import 区域紧凑。
 
-- [ ] **Step 2: 移除已废弃路由**
+- [x] **Step 2: 移除已废弃路由**
 
 删除以下代码块：
 
@@ -283,7 +283,7 @@ import { ChatContainer } from './features/ai-chat';
         } />
 ```
 
-- [ ] **Step 3: 验证 App.tsx 最终结果**
+- [x] **Step 3: 验证 App.tsx 最终结果**
 
 确认文件内容为：
 
@@ -317,7 +317,7 @@ function App() {
 export default App;
 ```
 
-- [ ] **Step 4: 验证 TypeScript 编译无错误**
+- [x] **Step 4: 验证 TypeScript 编译无错误**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -326,7 +326,7 @@ npx tsc --noEmit --pretty 2>&1 | head -30
 
 预期输出：无类型错误。
 
-- [ ] **Step 5: 提交本次更改**
+- [x] **Step 5: 提交本次更改**
 
 ```bash
 cd /Volumes/work/projects/winter-agent
@@ -340,7 +340,7 @@ git commit -m "chore: 移除已废弃 /chat-legacy 路由和未使用的 ChatCon
 
 **说明：** 确认所有修改不破坏已有功能。
 
-- [ ] **Step 1: 运行前端测试**
+- [x] **Step 1: 运行前端测试**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -349,7 +349,7 @@ npx vitest run 2>&1
 
 预期输出：所有测试通过（PASS）。
 
-- [ ] **Step 2: 运行完整的 TypeScript 检查**
+- [x] **Step 2: 运行完整的 TypeScript 检查**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -358,7 +358,7 @@ npx tsc --noEmit --pretty 2>&1
 
 预期输出：无错误，退出码 0。
 
-- [ ] **Step 3: 提交验证通过的状态（如有测试修复）**
+- [x] **Step 3: 提交验证通过的状态（如有测试修复）**
 
 如果测试全部通过且已有提交覆盖所有更改，则无需额外提交。如有测试修复：
 
@@ -374,7 +374,7 @@ git commit -m "test: 修复测试适配新布局"
 
 **说明：** 在浏览器中手动验证不同视口下的布局效果。
 
-- [ ] **Step 1: 启动开发服务器**
+- [x] **Step 1: 启动开发服务器**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/frontend
@@ -383,7 +383,7 @@ npm run dev
 
 在浏览器中打开显示的 URL（通常为 `http://localhost:5173`）。
 
-- [ ] **Step 2: 验证居中布局**
+- [x] **Step 2: 验证居中布局**
 
 | 视口宽度 | 期望效果 |
 |----------|----------|
@@ -395,7 +395,7 @@ npm run dev
 
 验证 ChatContainer 的响应式 padding 是否正确：`px-4`（<768px）→ `md:px-6`（768-1200px）→ `xl:px-8`（>1200px）。
 
-- [ ] **Step 3: 验证功能正常**
+- [x] **Step 3: 验证功能正常**
 
 - 发送一条新消息，确认消息正常显示且居中
 - 确认流式输出（streaming）正常
@@ -404,7 +404,7 @@ npm run dev
 - 退出登录
 - 移动端侧边栏展开/收起
 
-- [ ] **Step 4: 验证对齐一致性**
+- [x] **Step 4: 验证对齐一致性**
 
 确认 main 区域（MessageList）和 footer 区域（InputBox）的文本内容在水平方向上对齐。消息文本的起始位置应与输入框文本的起始位置一致。
 
