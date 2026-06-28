@@ -149,7 +149,7 @@ export function ChatInterface() {
         </header>
 
         <main className="flex-1 overflow-hidden relative">
-          <ChatContainer>
+          <ChatContainer className="flex-1 min-h-0 flex flex-col">
             <MessageList />
           </ChatContainer>
         </main>

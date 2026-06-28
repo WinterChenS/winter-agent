@@ -7,7 +7,7 @@ subagent_dispatch: null
 tdd_mode: direct
 review_mode: standard
 isolation: branch
-verify_mode: null
+verify_mode: light
 auto_transition: true
 base_ref: 1d9019ef9276422e9a5312360895eb8a04c5f5ec
 design_doc: docs/superpowers/specs/2026-06-28-optimize-chat-layout-design.md
