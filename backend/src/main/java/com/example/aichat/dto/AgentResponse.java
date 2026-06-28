@@ -2,7 +2,6 @@ package com.example.aichat.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +24,8 @@ public record AgentResponse(
         Map<String, Object> metadata,
         @JsonProperty("created_by") String createdBy,
         @JsonProperty("updated_by") String updatedBy,
-        @JsonProperty("created_at") LocalDateTime createdAt,
-        @JsonProperty("updated_at") LocalDateTime updatedAt,
+        @JsonProperty("created_at") String createdAt,
+        @JsonProperty("updated_at") String updatedAt,
         @JsonProperty("is_builtin") Boolean isBuiltin,
         Integer version
 ) {

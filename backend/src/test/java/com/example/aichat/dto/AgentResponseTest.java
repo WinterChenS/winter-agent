@@ -6,7 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +23,7 @@ class AgentResponseTest {
 
     @Test
     void shouldCreateWithAllFields() {
-        var now = LocalDateTime.now();
+        var now = "2026-06-28T12:00:00";
         var response = new AgentResponse(
                 "abc123def456",
                 "test-agent",
@@ -76,7 +75,7 @@ class AgentResponseTest {
 
     @Test
     void shouldSerializeToSnakeCaseJson() throws JsonProcessingException {
-        var now = LocalDateTime.of(2026, 6, 28, 12, 0, 0);
+        var now = "2026-06-28T12:00:00";
         var response = new AgentResponse(
                 "abc123", "test-agent", "Test Agent",
                 "description", "robot", "chat",
@@ -162,8 +161,8 @@ class AgentResponseTest {
         assertEquals(Map.of("key", "value"), response.metadata());
         assertEquals("admin", response.createdBy());
         assertEquals("admin", response.updatedBy());
-        assertEquals(LocalDateTime.of(2026, 6, 28, 12, 0, 0), response.createdAt());
-        assertEquals(LocalDateTime.of(2026, 6, 28, 12, 0, 0), response.updatedAt());
+        assertEquals("2026-06-28T12:00:00", response.createdAt());
+        assertEquals("2026-06-28T12:00:00", response.updatedAt());
         assertEquals(false, response.isBuiltin());
         assertEquals(1, response.version());
     }

@@ -12,7 +12,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -50,7 +49,7 @@ class AgentClientTest {
             List.of("hello"), "sequential",
             1, true, List.of("tag1"), null,
             "admin", null,
-            LocalDateTime.now(), null,
+            "2026-06-28T12:00:00", null,
             false, 1
     );
 

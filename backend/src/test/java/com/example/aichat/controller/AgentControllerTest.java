@@ -12,7 +12,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 class AgentControllerTest {
@@ -29,7 +28,7 @@ class AgentControllerTest {
             List.of("hello"), "sequential",
             1, true, List.of("tag1"), null,
             "admin", null,
-            LocalDateTime.now(), null,
+            "2026-06-28T12:00:00", null,
             false, 1
     );
 
