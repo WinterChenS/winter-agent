@@ -96,6 +96,9 @@ class CodeSandboxTool(BaseTool):
         lines.append("cn_font = FontManager.get_cn_font()")
         lines.append("from chart.palette import Palette")
         lines.append("")
+        # ── Inject __output_path__ for chart savefig compatibility ──
+        lines.append("__output_path__ = 'chart_output.png'")
+        lines.append("")
         lines.append("# ── Auto-save matplotlib figures on exit (safety net) ──")
         lines.append("import atexit as _atexit, os as _os_hook, matplotlib.pyplot as _plt_hook")
         lines.append("_hook_saved = set()")
