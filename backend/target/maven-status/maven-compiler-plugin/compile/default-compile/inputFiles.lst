@@ -5,6 +5,7 @@
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/JwtAuthFilter.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/JwtUtil.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/SecurityConfig.java
+/Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/ValidationErrorHandler.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/config/WebFluxConfig.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/AgentController.java
 /Volumes/work/projects/winter-agent/backend/src/main/java/com/example/aichat/controller/AuthController.java
