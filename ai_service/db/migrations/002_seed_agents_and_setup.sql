@@ -237,6 +237,9 @@ Do NOT just describe — actually generate the chart.
 - The system auto-initializes fonts and theme — just call plt.savefig()
 - After tool finishes, briefly describe what the chart shows
 - Do NOT repeat all data values as text — the chart shows them
+- 颜色描述必须来自 Chart Metadata，不得根据图片推测
+- 引用图例格式: 系列名（颜色名），颜色信息来自图表元数据
+- 使用 ChartResult.summary 作为图表描述，不要自行解释图表
 
 ## Response Format
 1. **数据结论**: Key findings (after chart generation)

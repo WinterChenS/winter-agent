@@ -1,23 +1,9 @@
 """Enterprise chart theme — unified font, color, DPI, and layout configuration."""
 from __future__ import annotations
 
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 
-
-def _find_chinese_font() -> str | None:
-    """Find the first available Chinese-capable font on the system."""
-    candidates = [
-        "PingFang SC", "Heiti SC", "STHeiti", "Arial Unicode MS",  # macOS
-        "Microsoft YaHei", "SimHei", "KaiTi", "FangSong",  # Windows
-        "Noto Sans CJK SC", "Noto Sans SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",  # Linux
-    ]
-    for f in fm.fontManager.ttflist:
-        for c in candidates:
-            if c.lower() in f.name.lower():
-                return f.name
-    return None
+from chart.font_manager import FontManager
 
 
 class ChartTheme:
@@ -25,20 +11,7 @@ class ChartTheme:
 
     @staticmethod
     def initialize() -> None:
-        # Clear font cache to pick up system fonts
-        try:
-            fm._load_fontmanager(try_read_cache=False)
-        except Exception:
-            pass
-
-        cn_font = _find_chinese_font()
-        if cn_font:
-            plt.rcParams["font.sans-serif"] = [cn_font, "DejaVu Sans"]
-        else:
-            plt.rcParams["font.sans-serif"] = [
-                "PingFang SC", "Microsoft YaHei", "SimHei",
-                "Heiti SC", "Noto Sans CJK SC", "Arial Unicode MS",
-            ]
+        FontManager.initialize()
         plt.rcParams["axes.unicode_minus"] = False
         plt.rcParams["figure.dpi"] = 200
         plt.rcParams["figure.figsize"] = (16, 9)

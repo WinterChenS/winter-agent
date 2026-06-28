@@ -1,0 +1,18 @@
+{
+  "change": "chart-infrastructure-v2",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "debddf4219f55d3493198f4f126a9aaff1159c7387ed5da2e80940cae371ad17",
+  "files": [
+    { "path": "openspec/changes/chart-infrastructure-v2/proposal.md", "sha256": "d90066c128966bb67d6bf04f1355ad172d5e311fd1d833ae2977efa440231896" },
+    { "path": "openspec/changes/chart-infrastructure-v2/design.md", "sha256": "b66bd53cb8c1c1c29ab0b7055a4b0d140e821655b8e08ff3f5fe69bc841c443a" },
+    { "path": "openspec/changes/chart-infrastructure-v2/tasks.md", "sha256": "27e63b6ac90e086e7f38802fe784d58867562ed59eeb8062394962ca6529a1c5" },
+    { "path": "openspec/changes/chart-infrastructure-v2/specs/chart-font-management/spec.md", "sha256": "7718ed0b10e9355cd1c88aa702e155cbc78df2ebe4f46eb391c3b8c7b7eb45f4" },
+    { "path": "openspec/changes/chart-infrastructure-v2/specs/chart-markdown-composition/spec.md", "sha256": "8386b486711654eb559ed0925371f8a83822efe9e588721b847081d4dee93a71" },
+    { "path": "openspec/changes/chart-infrastructure-v2/specs/chart-palette/spec.md", "sha256": "df068e5201f95f65946a5a303dbeae2e08e5ee3a206368f9427875b96096f28d" },
+    { "path": "openspec/changes/chart-infrastructure-v2/specs/chart-rendering/spec.md", "sha256": "84ffc6615d0b1dcf363b6b4ed8e231705550cc0144a52d0beddd4ffec3b20541" },
+    { "path": "openspec/changes/chart-infrastructure-v2/specs/chart-result-metadata/spec.md", "sha256": "4ae9ad6f1bee322cfb5aec407a6306a805dc07d83e8d4e99bae9fd30be8ede39" }
+  ]
+}
