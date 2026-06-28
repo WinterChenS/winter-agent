@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -29,6 +30,7 @@ public class AgentService {
         return agentClient.listAll()
                 .doOnSuccess(agents -> log.info("Listed {} agents", agents.size()))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("listAgents", e));
     }
 
@@ -37,6 +39,7 @@ public class AgentService {
         return agentClient.getById(id)
                 .doOnSuccess(agent -> log.info("Found agent: {}", id))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("getAgent", e));
     }
 
@@ -45,6 +48,7 @@ public class AgentService {
         return agentClient.create(req)
                 .doOnSuccess(agent -> log.info("Created agent: {} ({})", agent.name(), agent.id()))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("createAgent", e));
     }
 
@@ -53,6 +57,7 @@ public class AgentService {
         return agentClient.update(id, req)
                 .doOnSuccess(agent -> log.info("Updated agent: {}", id))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("updateAgent", e));
     }
 
@@ -61,6 +66,7 @@ public class AgentService {
         return agentClient.delete(id)
                 .doOnSuccess(unused -> log.info("Deleted agent: {}", id))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("deleteAgent", e));
     }
 
@@ -69,6 +75,7 @@ public class AgentService {
         return agentClient.enable(id)
                 .doOnSuccess(agent -> log.info("Enabled agent: {}", id))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("enableAgent", e));
     }
 
@@ -77,6 +84,7 @@ public class AgentService {
         return agentClient.disable(id)
                 .doOnSuccess(agent -> log.info("Disabled agent: {}", id))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("disableAgent", e));
     }
 
@@ -85,11 +93,18 @@ public class AgentService {
         return agentClient.clone(id)
                 .doOnSuccess(agent -> log.info("Cloned agent: {} ({})", agent.name(), agent.id()))
                 .onErrorResume(this::isConnectionError, this::serviceUnavailable)
+                .onErrorResume(e -> e instanceof WebClientResponseException, this::handleUpstreamError)
                 .doOnError(e -> logUnexpectedError("cloneAgent", e));
     }
 
     private boolean isConnectionError(Throwable e) {
         return e instanceof WebClientRequestException || e instanceof ConnectException;
+    }
+
+    private <T> Mono<T> handleUpstreamError(Throwable e) {
+        WebClientResponseException wcre = (WebClientResponseException) e;
+        log.warn("Upstream service returned {}: {}", wcre.getStatusCode(), wcre.getResponseBodyAsString());
+        return Mono.error(new ResponseStatusException(wcre.getStatusCode(), "上游服务返回错误"));
     }
 
     private <T> Mono<T> serviceUnavailable(Throwable e) {

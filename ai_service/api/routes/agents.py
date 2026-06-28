@@ -54,20 +54,18 @@ async def delete_agent(agent_id: str) -> dict[str, str]:
 @router.post("/{agent_id}/enable")
 async def enable_agent(agent_id: str, x_user: str = Header(default="")) -> AgentDefinition:
     repo = get_agent_repository()
-    result = await repo.set_enabled(agent_id, True)
+    result = await repo.set_enabled(agent_id, True, updated_by=x_user)
     if not result:
         raise HTTPException(status_code=404, detail="Agent not found")
-    result.updated_by = x_user
     return result
 
 
 @router.post("/{agent_id}/disable")
 async def disable_agent(agent_id: str, x_user: str = Header(default="")) -> AgentDefinition:
     repo = get_agent_repository()
-    result = await repo.set_enabled(agent_id, False)
+    result = await repo.set_enabled(agent_id, False, updated_by=x_user)
     if not result:
         raise HTTPException(status_code=404, detail="Agent not found")
-    result.updated_by = x_user
     return result
 
 

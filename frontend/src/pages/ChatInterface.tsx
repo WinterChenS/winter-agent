@@ -9,6 +9,7 @@ import { useChatStream } from '../features/ai-chat/hooks/useChatStream';
 import { useConversation } from '../features/ai-chat/hooks/useConversation';
 import { MessageList } from '../features/ai-chat/components/MessageList';
 import type { AgentInfo } from '../features/ai-chat/types/agent';
+import { agentApi } from '../features/ai-chat/services/agent';
 import { InputBox } from '../features/ai-chat/components/InputBox';
 import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
 import { AgentStatusIndicator } from '../features/ai-chat/components/AgentStatusIndicator';
@@ -26,12 +27,8 @@ export function ChatInterface() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    fetch('/api/agents', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(res => res.json())
-      .then(data => setAgents(Array.isArray(data) ? data : []))
+    agentApi.listAgents()
+      .then(setAgents)
       .catch(() => setAgents([]));
   }, []);
   const { send, isSending } = useChatStream();

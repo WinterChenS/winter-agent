@@ -31,7 +31,7 @@ class AgentRepository(ABC):
     async def list_enabled(self) -> list[AgentDefinition]: ...
 
     @abstractmethod
-    async def set_enabled(self, agent_id: str, enabled: bool) -> AgentDefinition | None: ...
+    async def set_enabled(self, agent_id: str, enabled: bool, updated_by: str = "") -> AgentDefinition | None: ...
 
     @abstractmethod
     async def clone(self, agent_id: str, created_by: str = "") -> AgentDefinition | None: ...
@@ -68,11 +68,12 @@ class MockAgentRepository(AgentRepository):
     async def list_enabled(self) -> list[AgentDefinition]:
         return [a for a in self._agents.values() if a.enabled]
 
-    async def set_enabled(self, agent_id: str, enabled: bool) -> AgentDefinition | None:
+    async def set_enabled(self, agent_id: str, enabled: bool, updated_by: str = "") -> AgentDefinition | None:
         agent = self._agents.get(agent_id)
         if agent is None:
             return None
         agent.enabled = enabled
+        agent.updated_by = updated_by
         return agent
 
     async def clone(self, agent_id: str, created_by: str = "") -> AgentDefinition | None:
@@ -235,11 +236,11 @@ class PostgresAgentRepository(AgentRepository):
             records = await rows.fetchall()
             return [_row_to_agent(r) for r in records]
 
-    async def set_enabled(self, agent_id: str, enabled: bool) -> AgentDefinition | None:
+    async def set_enabled(self, agent_id: str, enabled: bool, updated_by: str = "") -> AgentDefinition | None:
         async with self._pool.connection() as conn:
             rows = await conn.execute(
-                "UPDATE agent_definitions SET enabled = %s, updated_at = NOW() WHERE id = %s RETURNING *",
-                (enabled, agent_id),
+                "UPDATE agent_definitions SET enabled = %s, updated_at = NOW(), updated_by = %s WHERE id = %s RETURNING *",
+                (enabled, updated_by, agent_id),
             )
             record = await rows.fetchone()
             if record is None:

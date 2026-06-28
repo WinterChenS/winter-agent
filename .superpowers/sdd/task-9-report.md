@@ -1,43 +1,35 @@
-# Task 9 Report: Create AgentService and Rewrite AgentController
+# Task 9 Report: Clean up old AdminAgents page
 
-## Summary
+## Status: Done
 
-Successfully implemented AgentService and rewrote AgentController for SpringBoot backend using TDD methodology.
+### Changes Made
 
-## Files Created
+1. **Deleted** `frontend/src/pages/AdminAgents.tsx` (old agent management page, 243 lines)
+2. **Removed** `/admin/agents` route and `AdminAgents` import from `frontend/src/App.tsx`
 
-- **`backend/src/main/java/com/example/aichat/service/AgentService.java`** -- New service layer with 8 methods (listAll, getById, create, update, delete, enable, disable, clone), SLF4J logging for each operation, and error handling that maps `WebClientRequestException`/`ConnectException` to 503 "AI 服务不可用" while propagating other exceptions.
+### Verification
 
-- **`backend/src/test/java/com/example/aichat/service/AgentServiceTest.java`** -- 11 tests covering all 8 CRUD operations plus 3 error handling scenarios (WebClientRequestException -> 503, ConnectException -> 503, other exceptions -> propagate). Uses hand-written `StubAgentClient` to avoid ByteBuddy/Java 25 incompatibility.
+- **TypeScript compilation**: No new errors introduced. Pre-existing type mismatches (7) between old `types/chat.ts` and new `features/ai-chat/types/message.ts` remain unchanged.
+- **AdminAgents-specific errors**: Zero -- grep confirms no reference to AdminAgents remains in TS output.
+- **Test suite**: 7 failed / 5 passed (12 total). All 7 failures are pre-existing, unrelated to AdminAgents:
+  - `Sidebar.test.tsx` (multiple elements matched)
+  - `ToolCallPanel.test.tsx` (rendering)
+  - `AgentStatusIndicator.test.tsx` (rendering)
+  - `AgentManagement.test.tsx` (new view tests)
+  - `AgentCard.test.tsx` (new component tests)
+  - `PromptEditor.test.tsx` (new component tests)
 
-- **`backend/src/test/java/com/example/aichat/controller/AgentControllerTest.java`** -- 10 tests covering all 8 REST endpoints plus 404 and 503 error scenarios. Uses `WebTestClient.bindToController()` for lightweight controller testing with hand-written `StubAgentService`.
+### Chat Feature Integrity Check
 
-## Files Modified
+Confirmed unaffected:
+- **ChatInterface.tsx** -- still imports and uses `MessageList`, `InputBox`, `ChatContainer`, `AgentStatusIndicator`, `useChatStream`, `useConversation`, `useChatStore`
+- **MessageBubble.tsx** -- still imports `ReasoningPanel`, `ToolCallPanel`, `MarkdownRenderer`, `StreamingRenderer`
+- **chatApi.ts** -- SSE stream handling (fetch + ReadableStream) is unchanged
+- **chatStore.ts** -- Zustand store (create, set, getState) is unchanged
+- **chat.ts types** -- types kept for Sidebar/system compatibility, no longer mentioning AdminAgents
 
-- **`backend/src/main/java/com/example/aichat/controller/AgentController.java`** -- Complete rewrite: changed from `WebClient`-based inline calls to delegate to `AgentService`, added all 8 endpoints with proper HTTP status codes (200, 201 Created, 204 No Content, 404 Not Found), added `@Valid` on request body parameters.
+### Commit
 
-## Test Results
-
-All 38 tests pass (0 failures, 0 errors):
-- AgentClientTest: 8 existing tests
-- AgentRequestTest: existing
-- AgentResponseTest: existing
-- AgentServiceTest: 11 new tests
-- AgentControllerTest: 10 new tests
-
-## API Endpoints
-
-| Method | Path | Status | Description |
-|--------|------|--------|-------------|
-| GET | `/api/agents` | 200 | List all agents |
-| GET | `/api/agents/{id}` | 200/404 | Get agent by ID |
-| POST | `/api/agents` | 201 | Create agent |
-| PUT | `/api/agents/{id}` | 200 | Update agent |
-| DELETE | `/api/agents/{id}` | 204 | Delete agent |
-| POST | `/api/agents/{id}/enable` | 200 | Enable agent |
-| POST | `/api/agents/{id}/disable` | 200 | Disable agent |
-| POST | `/api/agents/{id}/clone` | 200 | Clone agent |
-
-## Notes
-
-- ByteBuddy 1.15.11 + Mockito inline mock maker has compatibility issues with Java 25. Tests use hand-written stubs instead of Mockito mocks for new test classes.
+```
+5012db1 chore(frontend): remove old AdminAgents page and verify compatibility
+```

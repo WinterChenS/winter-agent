@@ -3,7 +3,6 @@ package com.example.aichat.controller;
 import com.example.aichat.dto.AgentRequest;
 import com.example.aichat.dto.AgentResponse;
 import com.example.aichat.service.AgentService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,14 +34,14 @@ public class AgentController {
     }
 
     @PostMapping
-    public Mono<ResponseEntity<AgentResponse>> createAgent(@Valid @RequestBody AgentRequest req) {
+    public Mono<ResponseEntity<AgentResponse>> createAgent(@RequestBody AgentRequest req) {
         return agentService.create(req)
                 .map(agent -> ResponseEntity.status(HttpStatus.CREATED).body(agent));
     }
 
     @PutMapping("/{id}")
     public Mono<ResponseEntity<AgentResponse>> updateAgent(@PathVariable String id,
-                                                           @Valid @RequestBody AgentRequest req) {
+                                                           @RequestBody AgentRequest req) {
         return agentService.update(id, req)
                 .map(ResponseEntity::ok);
     }

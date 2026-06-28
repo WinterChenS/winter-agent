@@ -2,6 +2,8 @@
 comet_change: agent-management-ui
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-agent-management-ui
+status: final
 ---
 
 # Agent Management UI — 技术设计文档

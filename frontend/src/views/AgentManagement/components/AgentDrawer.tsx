@@ -41,6 +41,7 @@ const defaultFormData: AgentCreateRequest = {
 export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps) {
   const [form, setForm] = useState<AgentCreateRequest>(defaultFormData);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isEdit = !!agentId;
 
   useEffect(() => {
@@ -74,6 +75,11 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
   }, []);
 
   const handleSave = async () => {
+    setSaveError(null);
+    if (!form.name.trim() || !form.display_name.trim() || !form.system_prompt.trim()) {
+      setSaveError('请填写必填字段（名称、显示名称、System Prompt）');
+      return;
+    }
     setSaving(true);
     try {
       if (isEdit && agentId) {
@@ -85,6 +91,7 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
       onClose();
     } catch (e) {
       console.error('Save failed', e);
+      setSaveError(e instanceof Error ? e.message : '保存失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -126,6 +133,12 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
 
             {/* Form body */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {saveError}
+                </div>
+              )}
+
               {/* Basic Info */}
               <section>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3">基本信息</h3>
