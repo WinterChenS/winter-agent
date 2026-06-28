@@ -11,6 +11,7 @@ import { MessageList } from '../features/ai-chat/components/MessageList';
 import type { AgentInfo } from '../features/ai-chat/types/agent';
 import { InputBox } from '../features/ai-chat/components/InputBox';
 import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
+import { AgentStatusIndicator } from '../features/ai-chat/components/AgentStatusIndicator';
 
 export function ChatInterface() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -124,6 +125,7 @@ export function ChatInterface() {
               </option>
             ))}
           </select>
+          <AgentStatusIndicator />
           <div className="ml-auto flex items-center gap-4">
             {messages.length > 0 && (
               <button
