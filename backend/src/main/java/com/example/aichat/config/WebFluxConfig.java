@@ -26,6 +26,7 @@ public class WebFluxConfig {
     public WebClient agentWebClient(@Value("${aichat.ai-service-url}") String baseUrl) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        mapper.setSerializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
 
         return WebClient.builder().baseUrl(baseUrl)
                 .filter((request, next) ->
