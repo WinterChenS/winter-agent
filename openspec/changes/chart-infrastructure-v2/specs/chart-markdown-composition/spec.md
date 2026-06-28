@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Markdown color descriptions reference metadata
 When composing Markdown reports, the system SHALL reference chart metadata (`ChartResult.metadata` and `ChartResult.summary`) for all color descriptions. The system MUST NOT allow the LLM to infer or guess colors from the chart image.

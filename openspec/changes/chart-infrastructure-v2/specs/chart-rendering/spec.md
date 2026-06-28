@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: ChartRenderer.render() returns ChartResult
 `ChartRenderer.render(code, output_path)` SHALL return a `ChartResult` object instead of a plain string. The ChartResult SHALL contain the image path, structured metadata extracted from the rendered figure, and a summary.
