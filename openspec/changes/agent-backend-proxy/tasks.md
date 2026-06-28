@@ -28,14 +28,14 @@
 
 ## 6. SpringBoot AgentService
 
-- [ ] 6.1 Create `AgentService` with business logic: CRUD delegation, enable/disable, clone
-- [ ] 6.2 Add logging for each operation
-- [ ] 6.3 Add exception handling (connection errors → 503, 4xx/5xx propagation)
+- [x] 6.1 Create `AgentService` with business logic: CRUD delegation, enable/disable, clone
+- [x] 6.2 Add logging for each operation
+- [x] 6.3 Add exception handling (connection errors → 503, 4xx/5xx propagation)
 
 ## 7. SpringBoot AgentController
 
-- [ ] 7.1 Rewrite `AgentController` with full endpoints: GET list/detail, POST create, PUT update, DELETE delete, POST enable, POST disable, POST clone
-- [ ] 7.2 Wire endpoints through `SecurityConfig` (require JWT authentication)
+- [x] 7.1 Rewrite `AgentController` with full endpoints: GET list/detail, POST create, PUT update, DELETE delete, POST enable, POST disable, POST clone
+- [x] 7.2 Wire endpoints through `SecurityConfig` (require JWT authentication)
 
 ## 8. Verification
 
