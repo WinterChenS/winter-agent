@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from models.agent import AgentDefinition
 from core.runtime import get_agent_repository
@@ -17,8 +17,9 @@ async def list_agents() -> list[AgentDefinition]:
 
 
 @router.post("/")
-async def create_agent(agent: AgentDefinition) -> AgentDefinition:
+async def create_agent(agent: AgentDefinition, x_user: str = Header(default="")) -> AgentDefinition:
     repo = get_agent_repository()
+    agent.created_by = x_user
     return await repo.create(agent)
 
 
@@ -32,8 +33,9 @@ async def get_agent(agent_id: str) -> AgentDefinition:
 
 
 @router.put("/{agent_id}")
-async def update_agent(agent_id: str, agent: AgentDefinition) -> AgentDefinition:
+async def update_agent(agent_id: str, agent: AgentDefinition, x_user: str = Header(default="")) -> AgentDefinition:
     repo = get_agent_repository()
+    agent.updated_by = x_user
     result = await repo.update(agent_id, agent)
     if not result:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -47,3 +49,32 @@ async def delete_agent(agent_id: str) -> dict[str, str]:
     if not ok:
         raise HTTPException(status_code=404, detail="Agent not found")
     return {"status": "deleted"}
+
+
+@router.post("/{agent_id}/enable")
+async def enable_agent(agent_id: str, x_user: str = Header(default="")) -> AgentDefinition:
+    repo = get_agent_repository()
+    result = await repo.set_enabled(agent_id, True)
+    if not result:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    result.updated_by = x_user
+    return result
+
+
+@router.post("/{agent_id}/disable")
+async def disable_agent(agent_id: str, x_user: str = Header(default="")) -> AgentDefinition:
+    repo = get_agent_repository()
+    result = await repo.set_enabled(agent_id, False)
+    if not result:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    result.updated_by = x_user
+    return result
+
+
+@router.post("/{agent_id}/clone")
+async def clone_agent(agent_id: str, x_user: str = Header(default="")) -> AgentDefinition:
+    repo = get_agent_repository()
+    result = await repo.clone(agent_id, created_by=x_user)
+    if not result:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return result

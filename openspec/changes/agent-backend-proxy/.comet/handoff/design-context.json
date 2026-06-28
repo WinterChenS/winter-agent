@@ -1,0 +1,17 @@
+{
+  "change": "agent-backend-proxy",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "c331e1a62babb5c95ea96a25c7a9e6608bf9d8a635b0e0130694988e02fec0c1",
+  "files": [
+    { "path": "openspec/changes/agent-backend-proxy/proposal.md", "sha256": "3842e148f5962d7ae2fd7a57fe486e5440cd80f14fe457acabc665b36af33f4c" },
+    { "path": "openspec/changes/agent-backend-proxy/design.md", "sha256": "62a6e52be8b3c1b20a7997f5d9c41fb3292288355cf1f6dafce1a154155a4272" },
+    { "path": "openspec/changes/agent-backend-proxy/tasks.md", "sha256": "1de768808dbb36de2c668b85e8a2281be177c0d052bbd2a41f3d7df611010711" },
+    { "path": "openspec/changes/agent-backend-proxy/specs/agent-clone-api/spec.md", "sha256": "39cb7193ec10a1b8b8d0291918097230ad2851147926924f3cfce436416eb5b7" },
+    { "path": "openspec/changes/agent-backend-proxy/specs/agent-db-migration/spec.md", "sha256": "17bf978563c1155606dbc7c925991bacd652cea9241331e8e52d8cbad8e1deb4" },
+    { "path": "openspec/changes/agent-backend-proxy/specs/agent-gateway/spec.md", "sha256": "8b8ad4aff44f03550cd5858fd8e4de6204252c910bf87aa17a8ddee0989e1436" },
+    { "path": "openspec/changes/agent-backend-proxy/specs/agent-toggle-api/spec.md", "sha256": "eed004a3116130890d73ea28f38bfabb2d3682e378e0dff1a08bb523d3108f04" }
+  ]
+}
