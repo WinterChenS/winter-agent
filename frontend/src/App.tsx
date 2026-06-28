@@ -3,7 +3,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ChatInterface } from './pages/ChatInterface';
 import { LoginPage } from './pages/LoginPage';
-import { AdminAgents } from './pages/AdminAgents';
 import { AgentManagement } from './views/AgentManagement/AgentManagement';
 
 function App() {
@@ -19,9 +18,6 @@ function App() {
         } />
         <Route path="/agents" element={
           <PrivateRoute><AgentManagement /></PrivateRoute>
-        } />
-        <Route path="/admin/agents" element={
-          <PrivateRoute><AdminAgents /></PrivateRoute>
         } />
       </Routes>
     </AuthProvider>
