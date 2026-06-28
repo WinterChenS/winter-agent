@@ -1,0 +1,13 @@
+{
+  "change": "optimize-chat-layout",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "8ecdde25fcc2fcc435a1d2f52c5b13351dbb546f16d1df0dd556357afe638da1",
+  "files": [
+    { "path": "openspec/changes/optimize-chat-layout/proposal.md", "sha256": "247c246b67c985a9f66aa4b2b80c47133845de176cb4b7da132ebcf8e6cb59a1" },
+    { "path": "openspec/changes/optimize-chat-layout/design.md", "sha256": "a511b3eb11d38a50fe356d80a65959699ca8ab5a0ef3dd4b8ec78b67b82f2a05" },
+    { "path": "openspec/changes/optimize-chat-layout/tasks.md", "sha256": "1b12cc7709febbe20bc077cd0c7ba52d897ec0f8ef0317c07c279061614bacbc" }
+  ]
+}
