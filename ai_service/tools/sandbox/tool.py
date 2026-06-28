@@ -90,6 +90,11 @@ class CodeSandboxTool(BaseTool):
         # ── Chart theme (font, DPI, style) ──
         lines.append("from chart.chart_theme import ChartTheme")
         lines.append("ChartTheme.initialize()")
+
+        # ── Inject cn_font and Palette for chart generation ──
+        lines.append("from chart.font_manager import FontManager")
+        lines.append("cn_font = FontManager.get_cn_font()")
+        lines.append("from chart.palette import Palette")
         lines.append("")
         lines.append("# ── Auto-save matplotlib figures on exit (safety net) ──")
         lines.append("import atexit as _atexit, os as _os_hook, matplotlib.pyplot as _plt_hook")
