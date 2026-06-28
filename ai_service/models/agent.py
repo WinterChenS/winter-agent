@@ -33,6 +33,8 @@ class AgentDefinition(BaseModel):
     created_by: str = ""
     updated_by: str = ""
     version: int = 1
+    created_at: str = ""
+    updated_at: str = ""
 
     @field_validator("collaboration_strategy")
     @classmethod

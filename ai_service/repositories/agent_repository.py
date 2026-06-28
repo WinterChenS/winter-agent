@@ -118,13 +118,15 @@ class MockAgentRepository(AgentRepository):
 _AGENT_SELECT = """
     SELECT id, name, display_name, description, system_prompt,
            tools, model_config, trigger_keywords, collaboration_strategy,
-           priority, enabled, icon, agent_type, avatar_url, is_builtin,
+           priority, enabled, created_at, updated_at,
+           icon, agent_type, avatar_url, is_builtin,
            tags, metadata, created_by, updated_by, version
     FROM agent_definitions
 """
 _AGENT_COLS = ["id", "name", "display_name", "description", "system_prompt",
                "tools", "model_config", "trigger_keywords", "collaboration_strategy",
-               "priority", "enabled", "icon", "agent_type", "avatar_url", "is_builtin",
+               "priority", "enabled", "created_at", "updated_at",
+               "icon", "agent_type", "avatar_url", "is_builtin",
                "tags", "metadata", "created_by", "updated_by", "version"]
 
 def _row_to_agent(row: Any) -> AgentDefinition:
@@ -133,6 +135,11 @@ def _row_to_agent(row: Any) -> AgentDefinition:
     for field in ("tools", "model_config", "trigger_keywords", "tags", "metadata"):
         if isinstance(d.get(field), str):
             d[field] = _json.loads(d[field])
+    # Convert datetime objects to ISO strings
+    for field in ("created_at", "updated_at"):
+        val = d.get(field)
+        if hasattr(val, "isoformat"):
+            d[field] = val.isoformat()
     # Remove None values so Pydantic uses model defaults for NULL DB columns
     d = {k: v for k, v in d.items() if v is not None}
     return AgentDefinition(**d)

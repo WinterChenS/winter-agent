@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 from decimal import Decimal
 
 import pytest
@@ -40,6 +42,8 @@ def test_row_to_agent_new_fields():
         "parallel",                            # collaboration_strategy
         Decimal("3"),                          # priority
         True,                                  # enabled
+        datetime.datetime(2026, 6, 28, 0, 0),  # created_at
+        datetime.datetime(2026, 6, 28, 0, 0),  # updated_at
         "robot",                               # icon
         "assistant",                           # agent_type
         "https://example.com/avatar.png",      # avatar_url
@@ -85,6 +89,8 @@ def test_row_to_agent_new_fields_defaults():
         "sequential",                          # collaboration_strategy
         Decimal("0"),                          # priority
         True,                                  # enabled
+        datetime.datetime(2026, 6, 28, 0, 0),  # created_at
+        datetime.datetime(2026, 6, 28, 0, 0),  # updated_at
         None,                                  # icon
         None,                                  # agent_type
         None,                                  # avatar_url
@@ -122,6 +128,8 @@ def test_row_to_agent_json_deserialization():
         "sequential",                          # collaboration_strategy
         Decimal("0"),                          # priority
         True,                                  # enabled
+        datetime.datetime(2026, 6, 28, 0, 0),  # created_at
+        datetime.datetime(2026, 6, 28, 0, 0),  # updated_at
         None,                                  # icon
         None,                                  # agent_type
         None,                                  # avatar_url
