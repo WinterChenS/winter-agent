@@ -9,7 +9,7 @@ function authHeaders(): Record<string, string> {
 
 export const agentApi = {
   async listAgents(): Promise<AgentInfo[]> {
-    const res = await fetch('/api/agents/', { headers: authHeaders() });
+    const res = await fetch('/api/agents', { headers: authHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch agents: ${res.status}`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
@@ -22,7 +22,7 @@ export const agentApi = {
   },
 
   async createAgent(data: AgentCreateRequest): Promise<AgentInfo> {
-    const res = await fetch('/api/agents/', {
+    const res = await fetch('/api/agents', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(data),
