@@ -125,6 +125,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
                 name=s.get("name", ""),
                 color=s.get("color", ""),
                 color_name=s.get("color_name", ""),
+                y_axis=s.get("y_axis", "left"),
             ))
 
         metadata = ChartMetadata(
@@ -169,10 +170,15 @@ class MatplotlibRenderer(AbstractChartRenderer):
 
         # Extract series from legend
         if not metadata.series:
+            # Detect axis layout for y_axis assignment
+            all_axes = fig.get_axes()
+            has_twinx = len(all_axes) > 1
+
             for ax in fig.get_axes():
                 legend = ax.get_legend()
                 if legend is None:
                     continue
+                is_right = has_twinx and ax is all_axes[-1] and ax is not all_axes[0]
                 for handle, label in zip(legend.legend_handles or [],
                                           [t.get_text() for t in legend.get_texts()]):
                     color_hex = "#000000"
@@ -193,14 +199,53 @@ class MatplotlibRenderer(AbstractChartRenderer):
                                 color_hex = str(c)
                     except Exception:
                         pass
+                    # Determine y_axis: check which axes the handle belongs to
+                    y_axis = "left"
+                    if has_twinx and hasattr(handle, 'axes') and handle.axes is not all_axes[0]:
+                        y_axis = "right"
                     metadata.series.append(SeriesInfo(
                         name=label,
                         color=color_hex,
                         color_name=Palette.get_color_name(color_hex),
+                        y_axis=y_axis,
                     ))
 
         # Extract data facts from axes
         metadata.data_facts = self._extract_data_facts(fig)
+
+        # Auto-correct y_axis from figure state (override LLM guess)
+        self._detect_y_axes(metadata, fig)
+
+    def _detect_y_axes(self, metadata: ChartMetadata, fig) -> None:
+        """Auto-detect which y-axis each series uses, override LLM-assigned value.
+
+        Machine-extracted axis affiliation is always correct. The LLM may
+        hallucinate left/right in __chart_metadata__.
+        """
+        axes_list = fig.get_axes()
+        if len(axes_list) < 2:
+            return  # single axis — all series are "left"
+
+        # Build a set of labels known to belong to each axes
+        right_labels: set[str] = set()
+        for ax in axes_list:
+            is_right = ax is not axes_list[0]
+            if not is_right:
+                continue
+            # Collect labels from lines on the right axis
+            for line in ax.get_lines():
+                label = line.get_label()
+                if label and not label.startswith('_'):
+                    right_labels.add(label)
+            # Collect labels from containers (bar charts)
+            for container in ax.containers:
+                label = container.get_label()
+                if label and not label.startswith('_'):
+                    right_labels.add(label)
+
+        for s in metadata.series:
+            if s.name in right_labels:
+                s.y_axis = "right"
 
     def _extract_data_facts(self, fig) -> DataFacts:
         """Extract authoritative data range facts from figure axes.

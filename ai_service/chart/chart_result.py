@@ -17,6 +17,7 @@ class SeriesInfo:
     name: str
     color: str       # hex, e.g. "#2F80ED"
     color_name: str  # Chinese, e.g. "蓝色"
+    y_axis: str = "left"  # "left" or "right" — which y-axis this series uses
 
 
 @dataclass
@@ -76,7 +77,7 @@ class ChartMetadata:
             "xlabel": self.xlabel,
             "ylabel": self.ylabel,
             "series": [
-                {"name": s.name, "color": s.color, "color_name": s.color_name}
+                {"name": s.name, "color": s.color, "color_name": s.color_name, "y_axis": s.y_axis}
                 for s in self.series
             ],
         }
@@ -88,7 +89,8 @@ class ChartMetadata:
     def from_dict(cls, data: dict[str, Any]) -> ChartMetadata:
         """Deserialize from a dict (e.g., loaded from metadata.json)."""
         series_list = [
-            SeriesInfo(name=s["name"], color=s["color"], color_name=s["color_name"])
+            SeriesInfo(name=s["name"], color=s["color"], color_name=s["color_name"],
+                       y_axis=s.get("y_axis", "left"))
             for s in data.get("series", [])
         ]
         facts_raw = data.get("data_facts", {})
@@ -117,7 +119,8 @@ class ChartMetadata:
         lines: list[str] = []
         lines.append(f"图表: {self.title} ({self.chart_type})")
         for s in self.series:
-            lines.append(f" - {s.name}: {s.color_name} ({s.color})")
+            axis_label = f"（{s.y_axis}轴）" if s.y_axis == "right" else ""
+            lines.append(f" - {s.name}: {s.color_name} ({s.color}){axis_label}")
         range_hint = self.data_facts.to_range_hint()
         if range_hint:
             lines.append(f"数据事实（来源：图表自动提取，请使用此数据而非猜测）: {range_hint}")
