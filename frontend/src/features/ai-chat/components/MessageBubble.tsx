@@ -3,6 +3,7 @@ import { ReasoningPanel } from './ReasoningPanel';
 import { ToolCallPanel } from './ToolCallPanel';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { StreamingRenderer } from './StreamingRenderer';
+import { MessageActions } from './MessageActions';
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,7 +16,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       <div
-        className={`max-w-[85%] rounded-lg p-3 ${
+        className={`max-w-[85%] rounded-lg p-3 group relative ${
           isUser
             ? 'bg-blue-600 text-white'
             : 'bg-white border border-gray-200 text-gray-900'
@@ -69,6 +70,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ))}
           </div>
         )}
+
+        <MessageActions content={message.rawContent || message.content} />
 
         {message.status === 'error' && (
           <span className="block mt-1 text-xs text-red-500">

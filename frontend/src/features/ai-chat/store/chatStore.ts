@@ -106,7 +106,16 @@ export const useChatStore = create<ChatState>((set) => ({
   completeMessage: (id, status) => set(state => {
     const msg = state.messages[id];
     if (!msg) return state;
-    return { messages: { ...state.messages, [id]: { ...msg, status } } };
+    return {
+      messages: {
+        ...state.messages,
+        [id]: {
+          ...msg,
+          status,
+          ...(status === 'done' && !msg.rawContent ? { rawContent: msg.content || '' } : {}),
+        },
+      },
+    };
   }),
 
   setAgentId: (agentId) => set({ agentId }),

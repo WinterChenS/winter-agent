@@ -193,6 +193,30 @@ describe('chatStore', () => {
     expect(Object.keys(state.messages).length).toBe(0);
   });
 
+  it('completeMessage sets rawContent from content when status is done', () => {
+    useChatStore.getState().addMessage({
+      id: 'msg-raw',
+      role: 'assistant',
+      content: 'Hello **world**',
+      status: 'streaming',
+    });
+    useChatStore.getState().completeMessage('msg-raw', 'done');
+    const msg = useChatStore.getState().messages['msg-raw'];
+    expect(msg.rawContent).toBe('Hello **world**');
+  });
+
+  it('completeMessage error status does not set rawContent', () => {
+    useChatStore.getState().addMessage({
+      id: 'msg-err2',
+      role: 'assistant',
+      content: 'partial',
+      status: 'streaming',
+    });
+    useChatStore.getState().completeMessage('msg-err2', 'error');
+    const msg = useChatStore.getState().messages['msg-err2'];
+    expect(msg.rawContent).toBeUndefined();
+  });
+
   it('setAgentId updates agentId', () => {
     expect(useChatStore.getState().agentId).toBeNull();
     useChatStore.getState().setAgentId('agent-7');

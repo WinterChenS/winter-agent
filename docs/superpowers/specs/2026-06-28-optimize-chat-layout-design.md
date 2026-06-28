@@ -2,6 +2,8 @@
 comet_change: optimize-chat-layout
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-optimize-chat-layout
+status: final
 ---
 
 # Chat Layout Optimization Design

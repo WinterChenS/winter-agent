@@ -15,7 +15,7 @@ export function useChatStream() {
 
     useChatStore.getState().addMessage({
       id: generateUUID(), role: 'user', content: content.trim(),
-      status: 'done', createdAt: now,
+      rawContent: content.trim(), status: 'done', createdAt: now,
     });
 
     useChatStore.getState().addMessage({
