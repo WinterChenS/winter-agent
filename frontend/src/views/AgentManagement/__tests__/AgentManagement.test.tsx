@@ -169,15 +169,12 @@ describe('AgentManagement', () => {
     expect(page2Cards).toHaveLength(3);
   });
 
-  it('dispatches custom event on create button click', () => {
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+  it('opens drawer when create button is clicked', () => {
     renderWithRouter(<AgentManagement />);
 
     const createButton = screen.getByText('+ 新建 Agent');
     fireEvent.click(createButton);
 
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'agent:create' })
-    );
+    expect(screen.getByText('新建 Agent')).toBeDefined();
   });
 });

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAgent } from '../../features/ai-chat/hooks/useAgent';
 import { AgentCard } from './components/AgentCard';
+import { AgentDrawer } from './components/AgentDrawer';
 import type { AgentInfo } from '../../features/ai-chat/types/agent';
 
 const PAGE_SIZE = 12;
@@ -11,6 +12,8 @@ export function AgentManagement() {
   const [sortBy, setSortBy] = useState<'name' | 'priority' | 'created_at'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingAgentId, setEditingAgentId] = useState<string | undefined>();
 
   const filtered = useMemo(() => {
     let result = agents;
@@ -37,7 +40,8 @@ export function AgentManagement() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleCreate = () => {
-    window.dispatchEvent(new CustomEvent('agent:create'));
+    setEditingAgentId(undefined);
+    setDrawerOpen(true);
   };
 
   if (loading) {
@@ -58,7 +62,8 @@ export function AgentManagement() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <>
+      <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Agent 管理</h1>
@@ -116,7 +121,10 @@ export function AgentManagement() {
             <AgentCard
               key={agent.id}
               agent={agent}
-              onEdit={(id) => window.dispatchEvent(new CustomEvent('agent:edit', { detail: id }))}
+              onEdit={(id) => {
+                setEditingAgentId(id);
+                setDrawerOpen(true);
+              }}
               onDelete={async (id) => {
                 if (confirm('确认删除？')) await deleteAgent(id);
               }}
@@ -149,6 +157,14 @@ export function AgentManagement() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
+        </div>
+
+        <AgentDrawer
+          open={drawerOpen}
+          agentId={editingAgentId}
+          onClose={() => setDrawerOpen(false)}
+          onSave={fetchAgents}
+        />
+      </>
+    );
+  }
