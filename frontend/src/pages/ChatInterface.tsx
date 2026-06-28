@@ -10,6 +10,7 @@ import { useConversation } from '../features/ai-chat/hooks/useConversation';
 import { MessageList } from '../features/ai-chat/components/MessageList';
 import type { AgentInfo } from '../features/ai-chat/types/agent';
 import { InputBox } from '../features/ai-chat/components/InputBox';
+import { ChatContainer } from '../features/ai-chat/components/ChatContainer';
 
 export function ChatInterface() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -148,14 +149,16 @@ export function ChatInterface() {
         </header>
 
         <main className="flex-1 overflow-hidden relative">
-          <MessageList />
+          <ChatContainer>
+            <MessageList />
+          </ChatContainer>
         </main>
 
-        <footer className="bg-white px-4 py-4 shrink-0 shadow-[0_-1px_2px_rgba(0,0,0,0.05)] w-full">
-          <div className="max-w-4xl mx-auto w-full">
+        <footer className="bg-white py-4 shrink-0 shadow-[0_-1px_2px_rgba(0,0,0,0.05)] w-full">
+          <ChatContainer>
             <InputBox onSend={handleSendMessage} disabled={isSending} />
             <p className="text-xs text-center text-gray-400 mt-2">AI 可能会产生错误信息，请核实重要内容。</p>
-          </div>
+          </ChatContainer>
         </footer>
       </div>
     </div>
