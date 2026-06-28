@@ -68,7 +68,7 @@ describe('agentApi', () => {
     const agent = await agentApi.getAgent('agent-1');
     expect(agent.name).toBe('researcher');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/v1/agents/agent-1',
+      '/api/agents/agent-1',
       expect.anything()
     );
   });
@@ -92,7 +92,7 @@ describe('agentApi', () => {
     const result = await agentApi.createAgent(createData);
     expect(result.id).toBe('agent-2');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/v1/agents/',
+      '/api/agents/',
       expect.objectContaining({ method: 'POST' })
     );
   });
@@ -117,7 +117,7 @@ describe('agentApi', () => {
     const result = await agentApi.updateAgent('agent-1', { description: 'updated' });
     expect(result.description).toBe('updated');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/v1/agents/agent-1',
+      '/api/agents/agent-1',
       expect.objectContaining({ method: 'PUT' })
     );
   });
@@ -140,7 +140,7 @@ describe('agentApi', () => {
 
     await agentApi.deleteAgent('agent-1');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/v1/agents/agent-1',
+      '/api/agents/agent-1',
       expect.objectContaining({ method: 'DELETE' })
     );
   });
@@ -164,24 +164,31 @@ describe('agentApi', () => {
     expect(agentApi.updateAgent).toHaveBeenCalledWith('agent-1', { enabled: false });
   });
 
-  it('cloneAgent gets agent then creates copy', async () => {
-    const agentWithAllFields = {
+  it('cloneAgent calls POST /api/agents/{id}/clone and returns the cloned agent', async () => {
+    const clonedAgent = {
       ...mockAgent,
-      description: 'original',
-      system_prompt: 'You are helpful',
-      tools: ['search'],
-    };
-    vi.spyOn(agentApi, 'getAgent').mockResolvedValueOnce(agentWithAllFields);
-    vi.spyOn(agentApi, 'createAgent').mockResolvedValueOnce({
-      ...agentWithAllFields,
       id: 'agent-copy',
       name: 'researcher-copy',
-    });
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(clonedAgent),
+    } as Response);
 
     const result = await agentApi.cloneAgent('agent-1');
     expect(result.name).toBe('researcher-copy');
-    expect(agentApi.createAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ description: 'original' })
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/agents/agent-1/clone',
+      expect.objectContaining({ method: 'POST' })
     );
+  });
+
+  it('cloneAgent throws on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+    } as Response);
+
+    await expect(agentApi.cloneAgent('agent-1')).rejects.toThrow('Failed to clone agent: 404');
   });
 });
