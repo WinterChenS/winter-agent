@@ -66,19 +66,23 @@ class MockAgentRepository(AgentRepository):
 _AGENT_SELECT = """
     SELECT id, name, display_name, description, system_prompt,
            tools, model_config, trigger_keywords, collaboration_strategy,
-           priority, enabled
+           priority, enabled, icon, agent_type, avatar_url, is_builtin,
+           tags, metadata, created_by, updated_by, version
     FROM agent_definitions
 """
 _AGENT_COLS = ["id", "name", "display_name", "description", "system_prompt",
                "tools", "model_config", "trigger_keywords", "collaboration_strategy",
-               "priority", "enabled"]
+               "priority", "enabled", "icon", "agent_type", "avatar_url", "is_builtin",
+               "tags", "metadata", "created_by", "updated_by", "version"]
 
 def _row_to_agent(row: Any) -> AgentDefinition:
     """Convert a database row to an AgentDefinition."""
     d = dict(zip(_AGENT_COLS, row))
-    for field in ("tools", "model_config", "trigger_keywords"):
+    for field in ("tools", "model_config", "trigger_keywords", "tags", "metadata"):
         if isinstance(d.get(field), str):
             d[field] = _json.loads(d[field])
+    # Remove None values so Pydantic uses model defaults for NULL DB columns
+    d = {k: v for k, v in d.items() if v is not None}
     return AgentDefinition(**d)
 
 
@@ -112,8 +116,11 @@ class PostgresAgentRepository(AgentRepository):
                 """
                 INSERT INTO agent_definitions (id, name, display_name, description,
                     system_prompt, tools, model_config, trigger_keywords,
-                    collaboration_strategy, priority, enabled)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    collaboration_strategy, priority, enabled,
+                    icon, agent_type, avatar_url, is_builtin,
+                    tags, metadata, created_by, updated_by, version)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     agent.id, agent.name, agent.display_name, agent.description,
@@ -121,6 +128,9 @@ class PostgresAgentRepository(AgentRepository):
                     _json.dumps(agent.tools), _json.dumps(agent.model_params),
                     _json.dumps(agent.trigger_keywords), agent.collaboration_strategy,
                     agent.priority, agent.enabled,
+                    agent.icon, agent.agent_type, agent.avatar_url, agent.is_builtin,
+                    _json.dumps(agent.tags), _json.dumps(agent.metadata),
+                    agent.created_by, agent.updated_by, agent.version,
                 ),
             )
         return agent
@@ -138,7 +148,10 @@ class PostgresAgentRepository(AgentRepository):
                     name = %s, display_name = %s, description = %s,
                     system_prompt = %s, tools = %s, model_config = %s,
                     trigger_keywords = %s, collaboration_strategy = %s,
-                    priority = %s, enabled = %s
+                    priority = %s, enabled = %s,
+                    icon = %s, agent_type = %s, avatar_url = %s, is_builtin = %s,
+                    tags = %s, metadata = %s, created_by = %s, updated_by = %s,
+                    version = %s
                 WHERE id = %s
                 """,
                 (
@@ -146,7 +159,11 @@ class PostgresAgentRepository(AgentRepository):
                     agent.system_prompt,
                     _json.dumps(agent.tools), _json.dumps(agent.model_params),
                     _json.dumps(agent.trigger_keywords), agent.collaboration_strategy,
-                    agent.priority, agent.enabled, agent_id,
+                    agent.priority, agent.enabled,
+                    agent.icon, agent.agent_type, agent.avatar_url, agent.is_builtin,
+                    _json.dumps(agent.tags), _json.dumps(agent.metadata),
+                    agent.created_by, agent.updated_by, agent.version,
+                    agent_id,
                 ),
             )
         return agent
