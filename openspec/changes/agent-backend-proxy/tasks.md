@@ -12,9 +12,9 @@
 
 ## 3. Python Agent API Endpoints
 
-- [ ] 3.1 Add `POST /api/v1/agents/{id}/enable` endpoint
-- [ ] 3.2 Add `POST /api/v1/agents/{id}/disable` endpoint
-- [ ] 3.3 Add `POST /api/v1/agents/{id}/clone` endpoint (display_name append " (Copy)", name append "-copy")
+- [x] 3.1 Add `POST /api/v1/agents/{id}/enable` endpoint
+- [x] 3.2 Add `POST /api/v1/agents/{id}/disable` endpoint
+- [x] 3.3 Add `POST /api/v1/agents/{id}/clone` endpoint (display_name append " (Copy)", name append "-copy")
 
 ## 4. SpringBoot DTOs
 
