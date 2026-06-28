@@ -1044,7 +1044,10 @@ def _check_artifact_dedup(candidate: dict, existing: list[dict]) -> dict | None:
     return None  # no match
 
 
-def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, content_ref: str) -> str:
+def _register_artifact(
+    state, artifact_type: str, purpose: str, step_id: int, content_ref: str,
+    metadata: dict | None = None, summary: str | None = None,
+) -> str:
     """Register a new artifact in state and return its artifact_id."""
     existing = state.get("artifacts", [])
     artifact_id = f"{artifact_type}_{len(existing)}"
@@ -1055,6 +1058,10 @@ def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, co
         "source_step_id": step_id,
         "content_ref": content_ref,
     }
+    if metadata is not None:
+        entry["metadata"] = metadata
+    if summary is not None:
+        entry["summary"] = summary
     existing.append(entry)
     return artifact_id
 
@@ -1325,8 +1332,18 @@ async def execution_node(state: State, event_bus=None) -> dict:
                 else:
                     images = {}
                 if images:
+                    # Derive chart metadata from step context
+                    chart_type = expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"
                     for fname, url in images.items():
-                        artifact_id = _register_artifact(state, artifact_type="image", purpose=f"Chart: {step.get('description', '')[:60]}", step_id=step_id, content_ref=url)
+                        artifact_id = _register_artifact(
+                            state,
+                            artifact_type="image",
+                            purpose=f"Chart: {step.get('description', '')[:60]}",
+                            step_id=step_id,
+                            content_ref=url,
+                            metadata={"chart_type": chart_type, "filename": fname},
+                            summary=step.get("description", "")[:200],
+                        )
                         artifact_ids.append(artifact_id)
                         logger.info("[EXECUTION] registered chart artifact: %s -> %s", artifact_id, url)
                 else:
@@ -1452,6 +1469,15 @@ def _build_composer_system_prompt(
                             for s in series_info
                         )
                         meta_hint = f" [colors: {colors_str}]"
+                    else:
+                        # Show general metadata (chart_type, filename, etc.)
+                        other_meta = {k: v for k, v in a["metadata"].items() if k != "series"}
+                        if other_meta:
+                            meta_str = "; ".join(
+                                f"{k}={v}" for k, v in other_meta.items() if v is not None
+                            )
+                            if meta_str:
+                                meta_hint = f" [{meta_str}]"
                     if summary:
                         meta_hint += f" [summary: {summary}]"
                 lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref}){meta_hint}")
