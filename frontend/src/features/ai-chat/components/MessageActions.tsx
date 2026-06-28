@@ -22,7 +22,7 @@ export function MessageActions({ content, label }: MessageActionsProps) {
       onClick={handleCopy}
       aria-label={label || '复制消息'}
       className="
-        absolute top-1 right-1
+        absolute bottom-1 right-1
         p-1 rounded
         text-xs leading-none
         text-gray-400 hover:text-gray-600 hover:bg-gray-100
