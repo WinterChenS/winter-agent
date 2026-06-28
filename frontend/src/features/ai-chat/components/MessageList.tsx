@@ -65,7 +65,7 @@ export function MessageList() {
   }
 
   return (
-    <div className="h-full overflow-y-auto py-2" ref={scrollRef} onScroll={handleScroll}>
+    <div className="flex-1 min-h-0 overflow-y-auto py-2" ref={scrollRef} onScroll={handleScroll}>
       {orderedMessages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
