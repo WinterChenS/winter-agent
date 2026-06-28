@@ -2,6 +2,7 @@
 comet_change: agent-plan-execute-compose
 role: technical-design
 canonical_spec: openspec
+status: final
 archived-with: 2026-06-27-agent-plan-execute-compose
 status: final
 ---
