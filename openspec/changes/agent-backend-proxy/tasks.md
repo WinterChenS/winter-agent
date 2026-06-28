@@ -39,7 +39,7 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Verify migration applies cleanly and existing seed data is preserved
-- [ ] 8.2 Verify Python enable/disable/clone endpoints via curl/HTTP test
-- [ ] 8.3 Verify SpringBoot proxy endpoints return correct data
-- [ ] 8.4 Verify existing chat SSE flow is unaffected (send a chat message)
+- [x] 8.1 Verify migration applies cleanly and existing seed data is preserved
+- [x] 8.2 Verify Python enable/disable/clone endpoints via curl/HTTP test
+- [x] 8.3 Verify SpringBoot proxy endpoints return correct data
+- [x] 8.4 Verify existing chat SSE flow is unaffected (send a chat message)
