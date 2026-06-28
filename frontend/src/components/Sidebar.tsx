@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Conversation } from '../types/chat';
 
-interface SidebarProps {
+export interface SidebarProps {
   sessions: Conversation[];
   activeSessionId?: string;
   onSelectSession: (id: string) => void;
@@ -10,6 +9,10 @@ interface SidebarProps {
   onDeleteSession: (id: string) => void;
   isMobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
+  // New props for App-level layout
+  activeNav?: 'chat' | 'agents';
+  onNewChat?: () => void;
+  onNavigate?: (path: string) => void;
 }
 
 interface NavItem {
@@ -71,14 +74,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewSession,
   onDeleteSession,
   isMobileOpen,
-  setMobileOpen
+  setMobileOpen,
+  activeNav,
+  onNewChat,
+  onNavigate,
 }) => {
-  const navigate = useNavigate();
+  const nav = onNavigate || (() => {});
+  const newChat = onNewChat || onNewSession;
 
   const navItems: NavItem[] = [
-    { label: 'AI Studio', icon: 'sparkles', action: () => { navigate('/'); setMobileOpen(false); } },
-    { label: 'New Chat', icon: 'plus', action: () => { onNewSession(); setMobileOpen(false); } },
-    { label: 'Agents', icon: 'robot', action: () => { navigate('/agents'); setMobileOpen(false); } },
+    { label: 'AI Studio', icon: 'sparkles', action: () => { nav('/'); setMobileOpen(false); } },
+    { label: 'New Chat', icon: 'plus', action: () => { newChat(); setMobileOpen(false); } },
+    { label: 'Agents', icon: 'robot', action: () => { nav('/agents'); setMobileOpen(false); } },
     { label: 'Tools', icon: 'wrench', locked: true },
     { label: 'Knowledge', icon: 'book', locked: true },
     { label: 'MCP', icon: 'plug', locked: true },
