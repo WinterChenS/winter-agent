@@ -86,13 +86,24 @@ class MockAgentRepository(AgentRepository):
         cloned = _copy.deepcopy(source)
         cloned.id = _uuid.uuid4().hex[:12]
 
+        # Generate a unique name that doesn't collide with existing agents
+        existing_names = {a.name for a in self._agents.values() if a.id != cloned.id}
         match = _re.match(r"^(.*-copy)(\d*)$", cloned.name)
         if match:
             base = match.group(1)
             num = match.group(2)
-            cloned.name = base + (str(int(num) + 1) if num else "2")
+            new_name = base + (str(int(num) + 1) if num else "2")
         else:
-            cloned.name += "-copy"
+            new_name = cloned.name + "-copy"
+        while new_name in existing_names:
+            match = _re.match(r"^(.*-copy)(\d*)$", new_name)
+            if match:
+                base = match.group(1)
+                num = match.group(2)
+                new_name = base + (str(int(num) + 1) if num else "2")
+            else:
+                new_name += "-copy"
+        cloned.name = new_name
 
         cloned.display_name += " (Copy)"
         cloned.version = 1
@@ -251,6 +262,7 @@ class PostgresAgentRepository(AgentRepository):
 
             new_id = _uuid.uuid4().hex[:12]
 
+            # Generate a unique name that doesn't collide with existing agents
             match = _re.match(r"^(.*-copy)(\d*)$", source.name)
             if match:
                 base = match.group(1)
@@ -258,6 +270,19 @@ class PostgresAgentRepository(AgentRepository):
                 new_name = base + (str(int(num) + 1) if num else "2")
             else:
                 new_name = source.name + "-copy"
+            while True:
+                check = await conn.execute(
+                    "SELECT 1 FROM agent_definitions WHERE name = %s", (new_name,)
+                )
+                if await check.fetchone() is None:
+                    break
+                match = _re.match(r"^(.*-copy)(\d*)$", new_name)
+                if match:
+                    base = match.group(1)
+                    num = match.group(2)
+                    new_name = base + (str(int(num) + 1) if num else "2")
+                else:
+                    new_name += "-copy"
 
             new_display_name = source.display_name + " (Copy)"
 
