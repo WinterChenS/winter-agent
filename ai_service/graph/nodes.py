@@ -901,13 +901,15 @@ Available data context (from previous research steps):
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
 2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
-3. Use plt.rcParams to set Chinese fonts: plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']; plt.rcParams['axes.unicode_minus'] = False
-4. Set figure size to (12, 6)
-5. Include title, axis labels, legend if applicable
-6. Output ONLY valid Python code — no markdown wrappers, no explanation
-7. Save using plt.savefig('chart_output.png', dpi=200, bbox_inches='tight')
-8. Do NOT call plt.show()
-9. End with plt.close()
+3. cn_font (FontProperties) and Palette are already available in the execution environment — use cn_font for all Chinese text: ax.set_title("...", fontproperties=cn_font), ax.set_xlabel("...", fontproperties=cn_font), legend with prop=cn_font, etc.
+4. Use Palette colors — Palette.get_series_colors(n) returns n PaletteColor entries with .hex and .name_cn; for single-series use Palette.PRIMARY.hex / Palette.SECONDARY.hex / Palette.ERROR.hex etc.
+5. Set figure size to (12, 6)
+6. Include title, axis labels, legend if applicable
+7. Output ONLY valid Python code — no markdown wrappers, no explanation
+8. Save using plt.savefig('chart_output.png', dpi=200, bbox_inches='tight')
+9. Do NOT call plt.show()
+10. End with plt.close()
+11. (Optional but recommended) Set a __chart_metadata__ dict variable at the end with keys: title (str), chart_type (str), xlabel (str), ylabel (str), series (list of str), source (str describing data source)
 """
 
 
@@ -961,19 +963,20 @@ async def _generate_chart_code(
         title = expected_artifacts[0].get("purpose", step_description) if expected_artifacts else step_description
         return f'''import matplotlib.pyplot as plt
 import numpy as np
+from chart.font_manager import FontManager
+from chart.palette import Palette
 
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']
-plt.rcParams['axes.unicode_minus'] = False
+cn_font = FontManager.get_cn_font()
 
 x = np.arange(10)
 y = np.random.randn(10).cumsum()
 
-plt.figure(figsize=(12, 6))
-plt.plot(x, y, marker='o', linewidth=2)
-plt.title("{title}", fontsize=16, fontweight='bold')
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.grid(True, alpha=0.3)
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(x, y, marker='o', linewidth=2, color=Palette.PRIMARY.hex)
+ax.set_title("{title}", fontsize=16, fontweight='bold', fontproperties=cn_font)
+ax.set_xlabel("X", fontproperties=cn_font)
+ax.set_ylabel("Y", fontproperties=cn_font)
+ax.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig("chart_output.png", dpi=200, bbox_inches='tight')
 plt.close()
@@ -1429,7 +1432,10 @@ def _build_composer_system_prompt(
             content_ref = a.get("content_ref", "")
             if atype == "image" and content_ref:
                 # For images, provide the actual URL and markdown syntax hint
-                lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref})")
+                lines.append(f"- [{aid}] IMAGE for '{purpose}' — URL: {content_ref}")
+                lines.append(f"  Markdown: ![{purpose}]({content_ref})")
+                # Metadata hint: each chart may have a corresponding {file}_metadata.json
+                # with title, chart_type, xlabel, ylabel, series (list), source fields
             else:
                 lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
         return "\n".join(lines)
@@ -1460,6 +1466,12 @@ You are a professional data analyst. Generate a structured report based on the r
 - Reply in the same language as the user's question
 - Structure: title, executive summary, sections per plan step, conclusion
 - If no research data was collected, just answer the user's question directly and conversationally
+- Chart metadata: each chart was generated with a __chart_metadata__ dict containing title, chart_type, xlabel, ylabel, series (list of series names), and source (data provenance). When describing a chart, incorporate this metadata (title, what the chart shows, the data source) into the surrounding text
+
+[Chart Color Rules]
+- Charts use the enterprise Palette with named Chinese color names: 蓝色 (primary), 绿色 (secondary), 深绿 (success), 橙色 (warning), 红色 (error), 紫色 (info), 粉红 (pink), 青色 (cyan), 琥珀 (amber), 青绿 (teal), 靛蓝 (indigo), 棕色 (brown)
+- Palette colors are assigned to series in order: first series = 蓝色, second = 绿色, third = 深绿, etc.
+- When referencing chart elements by color, use these Chinese color names for precision
 
 Current time: {now_str}
 """
