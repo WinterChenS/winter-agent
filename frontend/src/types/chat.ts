@@ -14,6 +14,7 @@ export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  rawContent?: string;  // 原始内容（用户输入 / AI Markdown），用于复制
   reasoning?: string;
   toolCalls?: ToolCall[];
   status: "streaming" | "done" | "error";

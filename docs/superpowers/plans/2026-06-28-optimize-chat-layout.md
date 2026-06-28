@@ -2,6 +2,7 @@
 change: optimize-chat-layout
 design-doc: docs/superpowers/specs/2026-06-28-optimize-chat-layout-design.md
 base-ref: 1d9019ef9276422e9a5312360895eb8a04c5f5ec
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 # 聊天页面布局优化实现计划
@@ -14,6 +15,7 @@ base-ref: 1d9019ef9276422e9a5312360895eb8a04c5f5ec
 
 **Tech Stack:** React 18, TypeScript, Tailwind CSS, Vite, Vitest
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ## File Structure
@@ -34,6 +36,7 @@ base-ref: 1d9019ef9276422e9a5312360895eb8a04c5f5ec
 - SSE 事件处理 / Store / Backend：不变
 - Tailwind 配置：不变（使用 arbitrary value `max-w-[820px]`）
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ## 前提条件
@@ -49,6 +52,7 @@ git status
 
 如有未提交更改，先 stash 或提交后再开始本计划。
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 1: 创建 ChatContainer 纯布局组件
@@ -93,6 +97,7 @@ git add frontend/src/features/ai-chat/components/ChatContainer.tsx
 git commit -m "feat: 创建 ChatContainer 纯布局组件，约束最大宽度 820px"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 2: 将 ChatContainer 集成到 ChatInterface 页面
@@ -173,6 +178,7 @@ git add frontend/src/pages/ChatInterface.tsx
 git commit -m "feat: 在 ChatInterface main 和 footer 区域集成 ChatContainer"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 3: 移除 MessageList 的 px-4
@@ -213,6 +219,7 @@ git add frontend/src/features/ai-chat/components/MessageList.tsx
 git commit -m "refactor: 移除 MessageList 的 px-4，由 ChatContainer 统一提供"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 4: 调整 MessageBubble 最大宽度
@@ -253,6 +260,7 @@ git add frontend/src/features/ai-chat/components/MessageBubble.tsx
 git commit -m "style: MessageBubble max-w 80% -> 85% 适应居中布局"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 5: 清理废弃代码
@@ -334,6 +342,7 @@ git add frontend/src/App.tsx
 git commit -m "chore: 移除已废弃 /chat-legacy 路由和未使用的 ChatContainer 导入"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 6: 运行现有测试套件
@@ -368,6 +377,7 @@ git add -A
 git commit -m "test: 修复测试适配新布局"
 ```
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ### Task 7: 视觉验证
@@ -408,6 +418,7 @@ npm run dev
 
 确认 main 区域（MessageList）和 footer 区域（InputBox）的文本内容在水平方向上对齐。消息文本的起始位置应与输入框文本的起始位置一致。
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ## Self-Review
@@ -445,6 +456,7 @@ npm run dev
 - InputBox 的 `InputBoxProps` 接口不变
 - App.tsx 中移除 `ChatContainer` 导入后，无其他文件引用该导入
 
+archived-with: 2026-06-28-optimize-chat-layout
 ---
 
 ## 执行交接
