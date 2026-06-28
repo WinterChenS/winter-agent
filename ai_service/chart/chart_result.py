@@ -124,7 +124,42 @@ class ChartMetadata:
         range_hint = self.data_facts.to_range_hint()
         if range_hint:
             lines.append(f"数据事实（来源：图表自动提取，请使用此数据而非猜测）: {range_hint}")
+        factual = self.to_factual_description()
+        if factual:
+            lines.append(f"")
+            lines.append(f"【以下为程序自动生成的图表描述，你必须逐字引用，不得修改其中的数据事实】")
+            lines.append(factual)
         return "\n".join(lines)
+
+    def to_factual_description(self) -> str:
+        """Generate a deterministic, programmatic chart description.
+
+        This description is generated entirely from machine-extracted facts
+        (data_facts, series, y_axis affiliations). No LLM is involved.
+        The composer MUST quote this verbatim for chart descriptions.
+        """
+        chart_type_names = {
+            "line": "折线图", "bar": "柱状图", "pie": "饼图",
+            "scatter": "散点图", "area": "面积图", "radar": "雷达图",
+            "hist": "直方图", "box": "箱线图",
+        }
+        type_cn = chart_type_names.get(self.chart_type, self.chart_type)
+
+        parts = [f"该{type_cn}展示了{self.title}。"]
+
+        if self.data_facts.data_points > 0:
+            parts.append(f"共{self.data_facts.data_points}个数据点。")
+
+        for s in self.series:
+            axis_info = "右轴" if s.y_axis == "right" else "左轴"
+            parts.append(f"{s.name}（{axis_info}，{s.color_name}）。")
+
+        if self.data_facts.x_min and self.data_facts.x_max:
+            parts.append(f"X轴范围为{self.data_facts.x_min}至{self.data_facts.x_max}。")
+        if self.data_facts.y_min and self.data_facts.y_max:
+            parts.append(f"Y轴范围为{self.data_facts.y_min}至{self.data_facts.y_max}。")
+
+        return "".join(parts)
 
 
 @dataclass

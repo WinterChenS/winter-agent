@@ -1514,12 +1514,11 @@ You are a professional data analyst. Generate a structured report based on the r
 - Chart metadata: each chart was generated with a __chart_metadata__ dict containing title, chart_type, xlabel, ylabel, series (list of series names), and source (data provenance). When describing a chart, incorporate this metadata (title, what the chart shows, the data source) into the surrounding text
 
 [Chart Data Rules — CRITICAL]
-- Color names MUST come from chart metadata, never guess from image
+- Color names and y_axis affiliation MUST come from chart metadata, never guess from image
 - Palette colors: 蓝色 → 绿色 → 深绿 → 橙色 → 红色 → 紫色 → 粉红 → 青色 → 琥珀 → 青绿 → 靛蓝 → 棕色 (in series order)
-- When metadata includes "data_facts", you MUST use those facts for date ranges, value ranges, and counts. Data facts are machine-extracted from the actual chart — they are always correct. The human-written "summary" may be wrong about dates.
-- If data_facts contradicts the summary, trust data_facts
-- y_axis field is machine-detected: "left" means the series uses the left y-axis, "right" means the right y-axis. You MUST use this when describing dual-axis charts. Never guess left/right — read it from metadata.
-- Example: line A has y_axis="left" and line B has y_axis="right" → describe as "GDP增长率（左轴，蓝线）和CPI（右轴，红线）"
+- When the chart metadata includes a "【以下为程序自动生成的图表描述】" section, you MUST quote it VERBATIM as your chart description. This text is machine-generated from actual chart data and is ALWAYS correct. Do NOT rewrite, paraphrase, or add facts that contradict it. You may add your own ANALYSIS after quoting it, but the description itself must be a direct quote.
+- The LLM-written "summary" may contain hallucinated facts. Do NOT trust it over the machine-generated description.
+- Example: if factual description says "X轴范围为2023-Q1至2024-Q4" → you MUST use these exact date boundaries, NOT something like "2024-2025" from the summary
 
 Current time: {now_str}
 """
