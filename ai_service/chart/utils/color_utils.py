@@ -1,15 +1,19 @@
-"""Enterprise color palette for charts."""
+"""Enterprise color palette for charts — delegates to Palette in palette.py.
 
-PRIMARY = "#2c7fb8"
-SECONDARY = "#7fcdbb"
-ACCENT = "#edf8b1"
-DANGER = "#e34a33"
-WARNING = "#fdbb84"
-SUCCESS = "#31a354"
-INFO = "#a6bddb"
+This module exists for backward compatibility. New code should import from
+chart.palette directly.
+"""
+from chart.palette import Palette
 
-PALETTE = [
-    "#2c7fb8", "#7fcdbb", "#edf8b1", "#e34a33",
-    "#fdbb84", "#31a354", "#a6bddb", "#636363",
-    "#b30000", "#542788", "#35978f", "#80cdc1",
-]
+# Backward-compatible single-color constants (old hex values removed —
+# redirect to new Palette equivalents)
+PRIMARY = Palette.PRIMARY.hex
+SECONDARY = Palette.SECONDARY.hex
+ACCENT = Palette.WARNING.hex       # mapped to closest new color
+DANGER = Palette.ERROR.hex          # mapped
+WARNING = Palette.WARNING.hex
+SUCCESS = Palette.SUCCESS.hex
+INFO = Palette.INFO.hex
+
+# Backward-compatible palette list — use new Palette SERIES hex values
+PALETTE = [pc.hex for pc in Palette.SERIES]
