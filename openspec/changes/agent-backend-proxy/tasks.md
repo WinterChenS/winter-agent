@@ -18,8 +18,8 @@
 
 ## 4. SpringBoot DTOs
 
-- [ ] 4.1 Create `AgentRequest` record (input DTO with validation annotations)
-- [ ] 4.2 Create `AgentResponse` record (output DTO mapping all agent fields)
+- [x] 4.1 Create `AgentRequest` record (input DTO with validation annotations)
+- [x] 4.2 Create `AgentResponse` record (output DTO mapping all agent fields)
 
 ## 5. SpringBoot AgentClient
 
