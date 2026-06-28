@@ -901,15 +901,25 @@ Available data context (from previous research steps):
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
 2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
-3. cn_font (FontProperties) and Palette are already available in the execution environment — use cn_font for all Chinese text: ax.set_title("...", fontproperties=cn_font), ax.set_xlabel("...", fontproperties=cn_font), legend with prop=cn_font, etc.
-4. Use Palette colors — Palette.get_series_colors(n) returns n PaletteColor entries with .hex and .name_cn; for single-series use Palette.PRIMARY.hex / Palette.SECONDARY.hex / Palette.ERROR.hex etc.
-5. Set figure size to (12, 6)
-6. Include title, axis labels, legend if applicable
-7. Output ONLY valid Python code — no markdown wrappers, no explanation
-8. Save using plt.savefig('chart_output.png', dpi=200, bbox_inches='tight')
-9. Do NOT call plt.show()
-10. End with plt.close()
-11. (Optional but recommended) Set a __chart_metadata__ dict variable at the end with keys: title (str), chart_type (str), xlabel (str), ylabel (str), series (list of str), source (str describing data source)
+3. The variables `cn_font` (FontProperties) and `Palette` are already available in the execution context — use them directly, do NOT import them
+4. ALL text elements (title, labels, legend, tick labels, annotations) MUST use `fontproperties=cn_font` — example: ax.set_title("标题", fontproperties=cn_font)
+5. Get colors from Palette: colors = Palette.get_series_colors(N)  — returns list of PaletteColor objects with .hex and .name_cn
+6. Set figure size to (12, 6)
+7. Include title, axis labels, legend if applicable
+8. MUST set __chart_metadata__ with the following structure before saving:
+   __chart_metadata__ = {
+       "chart_type": "bar",  # or "line", "pie", "scatter", etc.
+       "title": "图表标题",
+       "series": [
+           {"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn},
+       ],
+       "summary": "图表摘要 - 一句话描述图表展示的内容",
+   }
+9. Output ONLY valid Python code — no markdown wrappers, no explanation
+10. Save using plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
+11. Do NOT call plt.show()
+12. End with plt.close()
+13. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
@@ -978,7 +988,7 @@ ax.set_xlabel("X", fontproperties=cn_font)
 ax.set_ylabel("Y", fontproperties=cn_font)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig("chart_output.png", dpi=200, bbox_inches='tight')
+plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
 plt.close()
 '''
 
@@ -1432,10 +1442,19 @@ def _build_composer_system_prompt(
             content_ref = a.get("content_ref", "")
             if atype == "image" and content_ref:
                 # For images, provide the actual URL and markdown syntax hint
-                lines.append(f"- [{aid}] IMAGE for '{purpose}' — URL: {content_ref}")
-                lines.append(f"  Markdown: ![{purpose}]({content_ref})")
-                # Metadata hint: each chart may have a corresponding {file}_metadata.json
-                # with title, chart_type, xlabel, ylabel, series (list), source fields
+                meta_hint = ""
+                if "metadata" in a and a["metadata"]:
+                    series_info = a["metadata"].get("series", [])
+                    summary = a.get("summary", "")
+                    if series_info:
+                        colors_str = "; ".join(
+                            f'{s.get("name","")} ({s.get("color_name","")})'
+                            for s in series_info
+                        )
+                        meta_hint = f" [colors: {colors_str}]"
+                    if summary:
+                        meta_hint += f" [summary: {summary}]"
+                lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref}){meta_hint}")
             else:
                 lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
         return "\n".join(lines)
