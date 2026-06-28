@@ -175,21 +175,32 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">图标 (emoji)</label>
-                      <input
-                        value={form.icon || ''}
-                        onChange={e => handleChange('icon', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder={'\u{1F52C}'}
-                      />
+                      <div className="flex flex-wrap gap-1 border border-gray-300 rounded-lg p-2">
+                        {['🤖','📊','🌐','📄','🧠','🔍','💻','🎯','⚡','🔧','📈','🎨','🚀','💡','🛡️','🏆'].map(emoji => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => handleChange('icon', emoji)}
+                            className={`w-8 h-8 flex items-center justify-center rounded text-lg hover:bg-gray-100 ${form.icon === emoji ? 'bg-blue-100 ring-1 ring-blue-500' : ''}`}
+                          >{emoji}</button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Agent 类型</label>
-                      <input
+                      <select
                         value={form.agent_type || ''}
                         onChange={e => handleChange('agent_type', e.target.value)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="assistant"
-                      />
+                      >
+                        <option value="">选择类型</option>
+                        <option value="assistant">助手 (Assistant)</option>
+                        <option value="coder">编码 (Coder)</option>
+                        <option value="analyst">分析 (Analyst)</option>
+                        <option value="researcher">研究 (Researcher)</option>
+                        <option value="writer">写作 (Writer)</option>
+                        <option value="custom">自定义 (Custom)</option>
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
