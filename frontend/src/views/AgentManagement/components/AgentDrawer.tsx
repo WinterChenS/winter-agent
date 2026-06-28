@@ -3,6 +3,7 @@ import { agentApi } from '../../../features/ai-chat/services/agent';
 import type { AgentCreateRequest } from '../../../features/ai-chat/types/agent';
 import { ToolSelector } from './ToolSelector';
 import { TagInput } from './TagInput';
+import { PromptEditor } from './PromptEditor';
 
 const AVAILABLE_TOOLS = ['search', 'browser', 'execute_python', 'time'];
 const COLLABORATION_STRATEGIES = ['sequential', 'parallel', 'supervisor'];
@@ -214,11 +215,10 @@ export function AgentDrawer({ open, agentId, onClose, onSave }: AgentDrawerProps
               {/* System Prompt */}
               <section>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3">System Prompt</h3>
-                <textarea
+                <PromptEditor
                   value={form.system_prompt || ''}
-                  onChange={e => handleChange('system_prompt', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-32 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="You are a helpful assistant..."
+                  onChange={(value) => handleChange('system_prompt', value)}
+                  minHeight="150px"
                 />
               </section>
 
