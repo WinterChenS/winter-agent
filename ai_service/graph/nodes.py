@@ -920,7 +920,7 @@ CRITICAL RULES — follow exactly:
    For pie charts use "slices": [{{"label": "A", "value": 30, "color": colors[0].hex, "color_name": colors[0].name_cn}}]
    For scatter charts use "points": [{{"x": 1, "y": 2, "label": "pt1"}}]
 9. Output ONLY valid Python code — no markdown wrappers, no explanation
-10. Save using plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
+10. Save using plt.savefig('chart_0.png', dpi=200, bbox_inches='tight')
 11. Do NOT call plt.show()
 12. End with plt.close()
 13. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
