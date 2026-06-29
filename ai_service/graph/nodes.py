@@ -900,8 +900,7 @@ Available data context (from previous research steps):
 
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
-2. DO NOT import ANY chart, font, or ai_service modules. The following are ALREADY pre-imported:
-   cn_font, Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer
+2. DO NOT write ANY import statement for: cn_font, Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer, FontManager, or ANYTHING from chart/font/ai_service modules. These names are ALREADY AVAILABLE as variables — just use them directly. cn_font is a FontProperties variable, Palette is a class, etc. Writing "import cn_font" or "from chart.xxx import yyy" will BREAK the code.
 3. ALL text elements MUST use `fontproperties=cn_font`
 4. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
 5. Set figure size to (12, 6)
