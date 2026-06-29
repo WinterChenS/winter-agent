@@ -900,30 +900,29 @@ Available data context (from previous research steps):
 
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
-2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
-3. The variables `cn_font` (FontProperties), `Palette`, `ChartSpec`, and `SeriesSpec` are already available in the execution context — use them directly
+2. The following are pre-imported in the execution context — use them directly:
+   cn_font (FontProperties), Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer
 4. ALL text elements MUST use `fontproperties=cn_font` — example: ax.set_title("标题", fontproperties=cn_font)
 5. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
 6. Set figure size to (12, 6)
 7. Include title, axis labels, legend if applicable
-8. MUST set __chart_spec__ using the ChartSpec dataclass before saving:
-   __chart_spec__ = {{
-       "title": "图表标题",
-       "chart_type": "bar",  # or "line"/"pie"/"scatter"/"histogram"/"heatmap"
-       "xlabel": "X轴标签",
-       "ylabel": "Y轴标签",
-       "figsize": [12, 6],
-       "series": [
-           {{"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn, "values": [10, 20, 30]}},
-       ],
-   }}
-   For pie charts use "slices": [{{"label": "A", "value": 30, "color": colors[0].hex, "color_name": colors[0].name_cn}}]
-   For scatter charts use "points": [{{"x": 1, "y": 2, "label": "pt1"}}]
+8. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
+   colors = Palette.get_series_colors(len(series_data))
+   spec = ChartSpec(
+       title="图表标题",
+       chart_type="bar",  # or "line"/"pie"/"scatter"/"histogram"/"heatmap"
+       xlabel="X轴标签",
+       ylabel="Y轴标签",
+       labels=["2020", "2021", "2022", "2023", "2024"],
+       series=[SeriesSpec(name="系列名", color=colors[i].hex, color_name=colors[i].name_cn, values=[10, 20, 30])],
+   )
+   renderer = MatplotlibRenderer()
+   result = renderer.render_from_spec(spec, "chart_0.png")
+   For pie charts: slices=[SliceSpec(label="A", value=30, color=colors[0].hex, color_name=colors[0].name_cn)]
+   For scatter charts: points=[PointSpec(x=1, y=2, label="pt1")]
 9. Output ONLY valid Python code — no markdown wrappers, no explanation
-10. Save using plt.savefig('chart_0.png', dpi=200, bbox_inches='tight')
-11. Do NOT call plt.show()
-12. End with plt.close()
-13. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
+10. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
+11. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
