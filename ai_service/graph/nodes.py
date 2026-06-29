@@ -900,13 +900,12 @@ Available data context (from previous research steps):
 
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
-2. The following are pre-imported in the execution context — use them directly:
-   cn_font (FontProperties), Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer
-4. ALL text elements MUST use `fontproperties=cn_font` — example: ax.set_title("标题", fontproperties=cn_font)
-5. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
-6. Set figure size to (12, 6)
-7. Include title, axis labels, legend if applicable
-8. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
+2. DO NOT import ANY chart, font, or ai_service modules. The following are ALREADY pre-imported:
+   cn_font, Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer
+3. ALL text elements MUST use `fontproperties=cn_font`
+4. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
+5. Set figure size to (12, 6)
+6. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
    colors = Palette.get_series_colors(len(series_data))
    spec = ChartSpec(
        title="图表标题",
@@ -920,9 +919,9 @@ CRITICAL RULES — follow exactly:
    result = renderer.render_from_spec(spec, "chart_0.png")
    For pie charts: slices=[SliceSpec(label="A", value=30, color=colors[0].hex, color_name=colors[0].name_cn)]
    For scatter charts: points=[PointSpec(x=1, y=2, label="pt1")]
-9. Output ONLY valid Python code — no markdown wrappers, no explanation
-10. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
-11. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
+7. Output ONLY valid Python code — no markdown wrappers, no explanation
+8. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
+9. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
