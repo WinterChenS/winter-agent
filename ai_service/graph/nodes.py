@@ -907,18 +907,18 @@ CRITICAL RULES — follow exactly:
 6. Set figure size to (12, 6)
 7. Include title, axis labels, legend if applicable
 8. MUST set __chart_spec__ using the ChartSpec dataclass before saving:
-   __chart_spec__ = {
+   __chart_spec__ = {{
        "title": "图表标题",
        "chart_type": "bar",  # or "line"/"pie"/"scatter"/"histogram"/"heatmap"
        "xlabel": "X轴标签",
        "ylabel": "Y轴标签",
        "figsize": [12, 6],
        "series": [
-           {"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn, "values": [10, 20, 30]},
+           {{"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn, "values": [10, 20, 30]}},
        ],
-   }
-   For pie charts use "slices": [{"label": "A", "value": 30, "color": colors[0].hex, "color_name": colors[0].name_cn}]
-   For scatter charts use "points": [{"x": 1, "y": 2, "label": "pt1"}]
+   }}
+   For pie charts use "slices": [{{"label": "A", "value": 30, "color": colors[0].hex, "color_name": colors[0].name_cn}}]
+   For scatter charts use "points": [{{"x": 1, "y": 2, "label": "pt1"}}]
 9. Output ONLY valid Python code — no markdown wrappers, no explanation
 10. Save using plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
 11. Do NOT call plt.show()
