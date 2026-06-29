@@ -122,17 +122,18 @@ class MatplotlibRenderer(AbstractChartRenderer):
         fig.tight_layout()
         fig.savefig(output_path, dpi=200, bbox_inches="tight")
 
-        # Metadata
+        # Summary (compute before metadata so sandbox _summary extraction works)
+        summary = ChartResult.compute_summary(spec.all_values(), spec.labels)
+
+        # Metadata (include _summary for sandbox tool backward compatibility)
         metadata = spec.to_metadata()
+        metadata["_summary"] = summary
         meta_path = output_path.replace(".png", "_metadata.json")
         try:
             with open(meta_path, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, ensure_ascii=False, indent=2)
         except Exception as exc:
             logger.warning("Failed to save metadata JSON: %s", exc)
-
-        # Summary
-        summary = ChartResult.compute_summary(spec.all_values(), spec.labels)
 
         plt.close("all")
         return ChartResult(
@@ -188,7 +189,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
             return
         xs = [p.x for p in spec.points]
         ys = [p.y for p in spec.points]
-        ax.scatter(xs, ys, c="#2F80ED", s=60)
+        ax.scatter(xs, ys, c=Palette.PRIMARY.hex, s=60)
         for p in spec.points:
             if p.label:
                 ax.annotate(p.label, (p.x, p.y), fontsize=9, fontproperties=cn_font)

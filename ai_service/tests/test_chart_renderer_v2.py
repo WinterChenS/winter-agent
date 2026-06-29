@@ -95,6 +95,20 @@ class TestRenderFromSpec:
         result = renderer.render_from_spec(spec, output)
         assert "Max" in result.summary
 
+    def test_metadata_json_includes_summary_key(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Meta Summary",
+            chart_type="bar",
+            series=[SeriesSpec("S", "#2F80ED", "蓝色", [10, 20, 30])],
+        )
+        output = os.path.join(temp_dir, "meta_summary.png")
+        renderer.render_from_spec(spec, output)
+        json_path = output.replace(".png", "_metadata.json")
+        with open(json_path) as f:
+            data = json.load(f)
+        assert "_summary" in data, "metadata JSON must include _summary for sandbox tool"
+        assert "Max" in data["_summary"]
+
 
 class TestRenderBackwardCompat:
     CODE_NO_SPEC = """\

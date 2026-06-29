@@ -82,6 +82,12 @@ class CodeSandboxTool(BaseTool):
         lines.append("")
 
         # ── Disable SSL verification for external API calls ──
+        # SECURITY NOTE: This globally disables SSL certificate verification for ALL
+        # HTTPS requests from the sandbox subprocess. Combined with arbitrary-code
+        # execution, this creates a realistic MITM attack surface if the LLM generates
+        # code making external HTTP requests. Future remediation: remove this line or
+        # replace with a targeted fix (e.g., ssl.create_default_context() with custom
+        # cafile). Tracked in review finding I-3.
         lines.append("import ssl; ssl._create_default_https_context = ssl._create_unverified_context")
         lines.append("try:")
         lines.append("    import urllib3; urllib3.disable_warnings()")

@@ -156,3 +156,17 @@ class TestAllValues:
     def test_empty_returns_empty_list(self):
         spec = ChartSpec(title="T", chart_type="bar")
         assert spec.all_values() == []
+
+    def test_histogram_data_values(self):
+        spec = ChartSpec(
+            title="T", chart_type="histogram",
+            data=[[1.0, 2.0], [3.0, 4.0, 5.0]],
+        )
+        assert spec.all_values() == [1.0, 2.0, 3.0, 4.0, 5.0]
+
+    def test_heatmap_data_values(self):
+        spec = ChartSpec(
+            title="T", chart_type="heatmap",
+            data=[[10.0, 20.0], [30.0, 40.0]],
+        )
+        assert spec.all_values() == [10.0, 20.0, 30.0, 40.0]

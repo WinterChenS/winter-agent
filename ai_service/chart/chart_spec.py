@@ -116,4 +116,7 @@ class ChartSpec:
             for p in self.points:
                 values.append(p.x)
                 values.append(p.y)
+        if self.data:
+            for row in self.data:
+                values.extend(row)
         return values
