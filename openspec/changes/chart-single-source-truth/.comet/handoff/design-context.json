@@ -1,0 +1,19 @@
+{
+  "change": "chart-single-source-truth",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "38006da60d63c72c48f49a86fdef31dd1c939fbf8ff80df500dac1979dd98237",
+  "files": [
+    { "path": "openspec/changes/chart-single-source-truth/proposal.md", "sha256": "8140e8bce5e8b1813478073eff7aed02b6d8420daa9fd08ab87e87432f5e5308" },
+    { "path": "openspec/changes/chart-single-source-truth/design.md", "sha256": "23e0f369d7d5edfd0b047fb3ad1b8c36c2fa5c4461b810f3501cdb5710a9caa8" },
+    { "path": "openspec/changes/chart-single-source-truth/tasks.md", "sha256": "b4caad5e085dbd8d97013008f89cda48b6bac75b36f8ee1fe3364c0b9aed2e0c" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-font-management/spec.md", "sha256": "eab30fa11954881d7b9f74daec40b7fa7227290625581b01f7fe1a856ba83139" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-markdown-composition/spec.md", "sha256": "dbe032c1052d5f7ede8fe900807160450286f8717705b64c0aaae7eb2debf8c6" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-palette/spec.md", "sha256": "5b2828a57e09601390f90bd256fb3db2b0ed039b47bd2fbfd8aa7266bcac62bb" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-rendering/spec.md", "sha256": "4e05716f33657337ec85959a4ff23cf0554a931754b8b2ea76a91632f07f3f43" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-result-metadata/spec.md", "sha256": "f76c1b679c41e52959d8c753acecc105f7bd508e2ee04a68ae1a7e49fa241d9f" },
+    { "path": "openspec/changes/chart-single-source-truth/specs/chart-spec/spec.md", "sha256": "7f040540f272fa9320ed1e49b8d5af05ea89cb6e2b8b228e2f1f3237b50ea675" }
+  ]
+}
