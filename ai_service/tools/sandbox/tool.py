@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import platform
 import sys
@@ -90,6 +91,15 @@ class CodeSandboxTool(BaseTool):
         # ── Chart theme (font, DPI, style) ──
         lines.append("from chart.chart_theme import ChartTheme")
         lines.append("ChartTheme.initialize()")
+        lines.append("")
+        lines.append("# ── Inject cn_font and Palette for chart generation ──")
+        lines.append("from chart.font_manager import FontManager")
+        lines.append("cn_font = FontManager.get_cn_font()")
+        lines.append("from chart.palette import Palette")
+        lines.append("")
+        lines.append("# ── Inject ChartSpec and MatplotlibRenderer for spec-driven rendering ──")
+        lines.append("from chart.chart_spec import ChartSpec, SeriesSpec, SliceSpec, PointSpec")
+        lines.append("from chart.renderers.matplotlib_renderer import MatplotlibRenderer")
         lines.append("")
         lines.append("# ── Auto-save matplotlib figures on exit (safety net) ──")
         lines.append("import atexit as _atexit, os as _os_hook, matplotlib.pyplot as _plt_hook")
@@ -224,9 +234,30 @@ class CodeSandboxTool(BaseTool):
             else:
                 logger.info("Sandbox: no images to upload (output=%s, cwd=%s)", output[:100], cwd)
 
+            # ── Scan for _metadata.json files and build charts list ──
+            charts: list[dict[str, Any]] = []
+            for f in _os_module.listdir(cwd):
+                if f.endswith("_metadata.json"):
+                    meta_path = _os_module.path.join(cwd, f)
+                    try:
+                        with open(meta_path, encoding="utf-8") as mf:
+                            metadata = json.load(mf)
+                    except Exception:
+                        continue
+                    image_name = f.replace("_metadata.json", ".png")
+                    url = uploaded.get(image_name, "")
+                    summary = metadata.pop("_summary", "")
+                    charts.append({
+                        "image": image_name,
+                        "url": url,
+                        "metadata": metadata,
+                        "summary": summary,
+                    })
+
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
                 "images": uploaded,
+                "charts": charts,
             })
 
         except asyncio.TimeoutError:
