@@ -71,7 +71,7 @@ base-ref: 5aa813ae6caf5402ecec0d36233b4eda2c601093
 - Consumes: nothing (standalone module)
 - Produces: `PaletteColor(NamedTuple)` with `hex: str`, `name_cn: str`; `Palette` class with `PRIMARY`, `SECONDARY`, `SUCCESS`, `WARNING`, `ERROR`, `INFO`, `NEUTRAL` constants, `SERIES` (list of 12 `PaletteColor`), `get_series_colors(n) -> list[PaletteColor]`, `get_color_name(hex) -> str`
 
-- [ ] **Step 1: Write the failing Palette test**
+- [x] **Step 1: Write the failing Palette test**
 
 Create `ai_service/tests/test_chart_palette.py`:
 
@@ -165,7 +165,7 @@ class TestGetColorName:
         assert Palette.get_color_name("#2f80ed") == "#2f80ed"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 ```bash
@@ -173,7 +173,7 @@ python -m pytest ai_service/tests/test_chart_palette.py -v
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'chart.palette'`
 
-- [ ] **Step 3: Create Palette module**
+- [x] **Step 3: Create Palette module**
 
 Create `ai_service/chart/palette.py`:
 
@@ -284,7 +284,7 @@ def _patch_classmethods():
 _patch_classmethods()
 ```
 
-- [ ] **Step 4: Update color_utils.py for backward compatibility**
+- [x] **Step 4: Update color_utils.py for backward compatibility**
 
 Replace content of `ai_service/chart/utils/color_utils.py`:
 
@@ -307,7 +307,7 @@ INFO = Palette.INFO.hex
 PALETTE = [pc.hex for pc in Palette.SERIES]
 ```
 
-- [ ] **Step 5: Update package exports**
+- [x] **Step 5: Update package exports**
 
 Write to `ai_service/chart/__init__.py`:
 
@@ -320,14 +320,14 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_palette.py -v
 ```
 Expected: PASS (all tests)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/palette.py ai_service/chart/utils/color_utils.py ai_service/chart/__init__.py ai_service/tests/test_chart_palette.py && git commit -m "feat: add Palette with Chinese color names and backward-compatible color_utils"
@@ -346,7 +346,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/palette.py ai
 - Consumes: nothing
 - Produces: `FontManager` class with classmethods `initialize(force=False)`, `get_cn_font() -> FontProperties`, `get_font_name() -> str`, `validate_figure_fonts(fig) -> list[str]`
 
-- [ ] **Step 1: Write the failing FontManager test**
+- [x] **Step 1: Write the failing FontManager test**
 
 Create `ai_service/tests/test_chart_font_manager.py`:
 
@@ -412,14 +412,14 @@ class TestFontDiscovery:
         plt.close(fig)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_font_manager.py -v
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'chart.font_manager'`
 
-- [ ] **Step 3: Create FontManager module**
+- [x] **Step 3: Create FontManager module**
 
 Create `ai_service/chart/font_manager.py`:
 
@@ -523,7 +523,7 @@ class FontManager:
         return warnings
 ```
 
-- [ ] **Step 4: Refactor ChartTheme to delegate font to FontManager**
+- [x] **Step 4: Refactor ChartTheme to delegate font to FontManager**
 
 Replace `ai_service/chart/chart_theme.py`:
 
@@ -567,14 +567,14 @@ class ChartTheme:
         plt.rcParams["savefig.pad_inches"] = 0.2
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_font_manager.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/font_manager.py ai_service/chart/chart_theme.py ai_service/tests/test_chart_font_manager.py && git commit -m "feat: add FontManager for cross-platform font discovery, refactor ChartTheme delegation"
@@ -592,7 +592,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/font_manager.
 - Consumes: `Palette.get_color_name(hex)` from `chart.palette`
 - Produces: `SeriesSpec(name, color, color_name, values)`, `SliceSpec(label, value, color, color_name)`, `PointSpec(x, y, label)`, `ChartSpec(title, chart_type, xlabel, ylabel, figsize, series, slices, points, data, labels)` with `to_metadata() -> dict`, `all_values() -> list[float]`, `__post_init__` auto-fills `color_name`
 
-- [ ] **Step 1: Write the failing ChartSpec test**
+- [x] **Step 1: Write the failing ChartSpec test**
 
 Create `ai_service/tests/test_chart_spec_v2.py`:
 
@@ -757,14 +757,14 @@ class TestAllValues:
         assert spec.all_values() == []
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_spec_v2.py -v
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'chart.chart_spec'`
 
-- [ ] **Step 3: Create ChartSpec module**
+- [x] **Step 3: Create ChartSpec module**
 
 Create `ai_service/chart/chart_spec.py`:
 
@@ -890,14 +890,14 @@ class ChartSpec:
         return values
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_spec_v2.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_spec.py ai_service/tests/test_chart_spec_v2.py && git commit -m "feat: add ChartSpec, SeriesSpec, SliceSpec, PointSpec dataclasses"
@@ -915,7 +915,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_spec.py
 - Consumes: nothing (standalone)
 - Produces: `ChartResult(image_path: str, metadata: dict, summary: str, stdout: str)` with `to_dict() -> dict`, `compute_summary(values, labels) -> str` (static method)
 
-- [ ] **Step 1: Write the failing ChartResult test**
+- [x] **Step 1: Write the failing ChartResult test**
 
 Create `ai_service/tests/test_chart_result.py`:
 
@@ -1002,14 +1002,14 @@ class TestComputeSummary:
         assert "50.0%" in summary
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_result.py -v
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'chart.chart_result'`
 
-- [ ] **Step 3: Create ChartResult module**
+- [x] **Step 3: Create ChartResult module**
 
 Create `ai_service/chart/chart_result.py`:
 
@@ -1101,14 +1101,14 @@ class ChartResult:
         return " | ".join(parts)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_result.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_result.py ai_service/tests/test_chart_result.py && git commit -m "feat: add ChartResult with compute_summary for programmatic text summaries"
@@ -1127,7 +1127,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_result.
 - Consumes: `ChartResult`, `ChartSpec`, `FontManager`, `Palette`
 - Produces: `MatplotlibRenderer.render(code, path) -> ChartResult` (backward compat, empty metadata when no __chart_spec__), `MatplotlibRenderer.render_from_spec(spec, path) -> ChartResult` (full metadata from ChartSpec)
 
-- [ ] **Step 1: Update AbstractChartRenderer**
+- [x] **Step 1: Update AbstractChartRenderer**
 
 Edit `ai_service/chart/chart_renderer.py`:
 
@@ -1155,7 +1155,7 @@ class AbstractChartRenderer(ABC):
         ...
 ```
 
-- [ ] **Step 2: Write the failing MatplotlibRenderer test**
+- [x] **Step 2: Write the failing MatplotlibRenderer test**
 
 Create `ai_service/tests/test_chart_renderer_v2.py`:
 
@@ -1298,14 +1298,14 @@ plt.close(fig)
         assert result.image_path == output
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_renderer_v2.py -v
 ```
 Expected: FAIL (return type mismatch, missing render_from_spec)
 
-- [ ] **Step 4: Implement MatplotlibRenderer with render_from_spec**
+- [x] **Step 4: Implement MatplotlibRenderer with render_from_spec**
 
 Replace `ai_service/chart/renderers/matplotlib_renderer.py`:
 
@@ -1549,14 +1549,14 @@ class MatplotlibRenderer(AbstractChartRenderer):
         )
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_renderer_v2.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_renderer.py ai_service/chart/renderers/matplotlib_renderer.py ai_service/tests/test_chart_renderer_v2.py && git commit -m "feat: add render_from_spec, refactor render() to return ChartResult"
@@ -1573,7 +1573,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_rendere
 - Consumes: `MatplotlibRenderer.render() -> ChartResult`
 - Produces: `ChartService.render(code) -> dict` with additional `metadata`, `summary` keys
 
-- [ ] **Step 1: Refactor ChartService.render()**
+- [x] **Step 1: Refactor ChartService.render()**
 
 Replace `ai_service/chart/chart_service.py`:
 
@@ -1654,14 +1654,14 @@ class ChartService:
         }
 ```
 
-- [ ] **Step 2: Run existing tests**
+- [x] **Step 2: Run existing tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_generator.py -v
 ```
 Expected: PASS (no regressions)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_service.py && git commit -m "refactor: ChartService returns metadata and summary from ChartResult"
@@ -1677,7 +1677,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_service
 **Consumes:** existing `CodeSandboxTool` structure
 **Produces:** `ToolResult.success({"output": ..., "images": ..., "charts": [...]})` where `charts` list contains `{image, url, metadata, summary}`
 
-- [ ] **Step 1: Update _build_preamble() to inject cn_font and Palette**
+- [x] **Step 1: Update _build_preamble() to inject cn_font and Palette**
 
 Edit `ai_service/tools/sandbox/tool.py`. Locate the `_build_preamble()` method (lines 73-124). Replace the chart theme section (lines 90-93):
 
@@ -1700,7 +1700,7 @@ Edit `ai_service/tools/sandbox/tool.py`. Locate the `_build_preamble()` method (
         lines.append("from chart.palette import Palette")
 ```
 
-- [ ] **Step 2: Add _metadata.json scanning in execute()**
+- [x] **Step 2: Add _metadata.json scanning in execute()**
 
 Edit the `execute()` method of `CodeSandboxTool`. After the image upload section (around line 218, after `uploaded` variable is built), add the charts metadata scanning logic. Insert the following code before the `if uploaded:` block (around line 220):
 
@@ -1745,14 +1745,14 @@ New:
             })
 ```
 
-- [ ] **Step 3: Run existing sandbox tests to verify no regression**
+- [x] **Step 3: Run existing sandbox tests to verify no regression**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_code_sandbox.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/tools/sandbox/tool.py && git commit -m "feat: inject cn_font/Palette into sandbox, add _metadata.json scanning for charts"
@@ -1765,7 +1765,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/tools/sandbox/tool.
 **Files:**
 - Modify: `ai_service/graph/nodes.py`
 
-- [ ] **Step 1: Update _CHART_CODE_PROMPT**
+- [x] **Step 1: Update _CHART_CODE_PROMPT**
 
 In `ai_service/graph/nodes.py`, replace the `_CHART_CODE_PROMPT` string (currently lines 892-911) with the following:
 
@@ -1808,7 +1808,7 @@ CRITICAL RULES — follow exactly:
 """
 ```
 
-- [ ] **Step 2: Update _build_composer_system_prompt to include chart metadata**
+- [x] **Step 2: Update _build_composer_system_prompt to include chart metadata**
 
 In `ai_service/graph/nodes.py`, locate the `_format_artifacts` helper inside `_build_composer_system_prompt` (around line 1421). Modify the image artifact block:
 
@@ -1851,14 +1851,14 @@ Then add the Chart Color Rules to the instructions section at the end of `_build
 - Charts WITHOUT metadata (no series/summary) must NOT have color or numeric descriptions — describe only the chart type and title
 ```
 
-- [ ] **Step 3: Run existing tests to verify no regression**
+- [x] **Step 3: Run existing tests to verify no regression**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_generator.py ai_service/tests/test_chart_validators.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/graph/nodes.py && git commit -m "feat: update chart code prompt to use ChartSpec, add chart metadata rules to composer prompt"
@@ -1871,7 +1871,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/graph/nodes.py && g
 **Files:**
 - Modify: `ai_service/db/migrations/002_seed_agents_and_setup.sql`
 
-- [ ] **Step 1: Update Data Analyst system prompt**
+- [x] **Step 1: Update Data Analyst system prompt**
 
 In `ai_service/db/migrations/002_seed_agents_and_setup.sql`, locate the Data Analyst system prompt (after `-- Agent 5: Data Analyst`). Insert the following rules into the prompt, after the `## Chart Guidelines (MANDATORY)` section:
 
@@ -1918,7 +1918,7 @@ The exact SQL INSERT content may need to be updated. The full prompt section bec
 
 The SQL string is a single-quoted string inside the INSERT. Be careful to escape any single quotes in the added text. The text above has no single quotes, so it can be inserted directly.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/db/migrations/002_seed_agents_and_setup.sql && git commit -m "feat: add chart metadata reference rules to Data Analyst prompt"
@@ -1931,28 +1931,28 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/db/migrations/002_s
 **Files:**
 - No file changes — run tests to confirm no regressions.
 
-- [ ] **Step 1: Run all chart-related tests**
+- [x] **Step 1: Run all chart-related tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_palette.py ai_service/tests/test_chart_font_manager.py ai_service/tests/test_chart_spec_v2.py ai_service/tests/test_chart_result.py ai_service/tests/test_chart_renderer_v2.py ai_service/tests/test_chart_generator.py ai_service/tests/test_chart_validators.py ai_service/tests/test_chart_spec.py ai_service/tests/test_chart_registry.py ai_service/tests/test_chart_envelope.py ai_service/tests/test_chart_planner.py -v
 ```
 Expected: ALL PASS
 
-- [ ] **Step 2: Run sandbox test**
+- [x] **Step 2: Run sandbox test**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_code_sandbox.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 3: Run full test suite (optional, may take time)**
+- [x] **Step 3: Run full test suite (optional, may take time)**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/ -v --tb=short
 ```
 Expected: No regressions.
 
-- [ ] **Step 4: If any tests fail, fix before proceeding**
+- [x] **Step 4: If any tests fail, fix before proceeding**
 
 No commit needed for this task. Verification is complete when all tests pass.
 
