@@ -260,6 +260,14 @@ class CodeSandboxTool(BaseTool):
                         "summary": summary,
                     })
 
+            # ── Clean up generated files (already uploaded / scanned) ──
+            for f in _os_module.listdir(cwd):
+                if f.endswith(".png") or f.endswith("_metadata.json"):
+                    try:
+                        _os_module.remove(_os_module.path.join(cwd, f))
+                    except Exception:
+                        pass
+
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
                 "images": uploaded,
