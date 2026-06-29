@@ -108,15 +108,18 @@ class ChartSpec:
         values: list[float] = []
         if self.series:
             for s in self.series:
-                values.extend(s.values)
+                values.extend(v for v in s.values if v is not None)
         if self.slices:
             for s in self.slices:
-                values.append(s.value)
+                if s.value is not None:
+                    values.append(s.value)
         if self.points:
             for p in self.points:
-                values.append(p.x)
-                values.append(p.y)
+                if p.x is not None:
+                    values.append(p.x)
+                if p.y is not None:
+                    values.append(p.y)
         if self.data:
             for row in self.data:
-                values.extend(row)
+                values.extend(v for v in row if v is not None)
         return values

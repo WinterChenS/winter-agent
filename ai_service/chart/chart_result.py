@@ -46,13 +46,15 @@ class ChartResult:
             Text summary suitable for LLM consumption, or empty string if
             values is empty.
         """
-        if not values:
+        # Filter out None and non-numeric values
+        clean = [float(v) for v in values if v is not None]
+        if not clean:
             return ""
 
-        n = len(values)
-        max_val = float(max(values))
-        min_val = float(min(values))
-        avg_val = sum(values) / n
+        n = len(clean)
+        max_val = max(clean)
+        min_val = min(clean)
+        avg_val = sum(clean) / n
 
         parts = [f"Max: {max_val}", f"Min: {min_val}", f"Avg: {avg_val}"]
 
@@ -62,7 +64,7 @@ class ChartResult:
             y_mean = avg_val
             num = 0.0
             den = 0.0
-            for i, v in enumerate(values):
+            for i, v in enumerate(clean):
                 dx = i - x_mean
                 dy = v - y_mean
                 num += dx * dy
@@ -76,8 +78,8 @@ class ChartResult:
                 parts.append("trend: →")
 
             # Growth rate (first to last)
-            first = values[0]
-            last = values[-1]
+            first = clean[0]
+            last = clean[-1]
             if first != 0:
                 growth = ((last - first) / abs(first)) * 100.0
                 parts.append(f"growth: {growth:+.1f}%")
