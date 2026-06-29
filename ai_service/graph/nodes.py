@@ -901,13 +901,29 @@ Available data context (from previous research steps):
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
 2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
-3. Use plt.rcParams to set Chinese fonts: plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']; plt.rcParams['axes.unicode_minus'] = False
-4. Set figure size to (12, 6)
-5. Include title, axis labels, legend if applicable
-6. Output ONLY valid Python code — no markdown wrappers, no explanation
-7. Save using plt.savefig('chart_output.png', dpi=200, bbox_inches='tight')
-8. Do NOT call plt.show()
-9. End with plt.close()
+3. The variables `cn_font` (FontProperties), `Palette`, `ChartSpec`, and `SeriesSpec` are already available in the execution context — use them directly
+4. ALL text elements MUST use `fontproperties=cn_font` — example: ax.set_title("标题", fontproperties=cn_font)
+5. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
+6. Set figure size to (12, 6)
+7. Include title, axis labels, legend if applicable
+8. MUST set __chart_spec__ using the ChartSpec dataclass before saving:
+   __chart_spec__ = {
+       "title": "图表标题",
+       "chart_type": "bar",  # or "line"/"pie"/"scatter"/"histogram"/"heatmap"
+       "xlabel": "X轴标签",
+       "ylabel": "Y轴标签",
+       "figsize": [12, 6],
+       "series": [
+           {"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn, "values": [10, 20, 30]},
+       ],
+   }
+   For pie charts use "slices": [{"label": "A", "value": 30, "color": colors[0].hex, "color_name": colors[0].name_cn}]
+   For scatter charts use "points": [{"x": 1, "y": 2, "label": "pt1"}]
+9. Output ONLY valid Python code — no markdown wrappers, no explanation
+10. Save using plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
+11. Do NOT call plt.show()
+12. End with plt.close()
+13. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
@@ -1429,7 +1445,22 @@ def _build_composer_system_prompt(
             content_ref = a.get("content_ref", "")
             if atype == "image" and content_ref:
                 # For images, provide the actual URL and markdown syntax hint
-                lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref})")
+                meta_hint = ""
+                if "metadata" in a and a["metadata"]:
+                    series_info = a["metadata"].get("series", [])
+                    summary = a.get("summary", "")
+                    if series_info:
+                        colors_str = "; ".join(
+                            f'{s.get("name","")}（{s.get("color_name","")}）'
+                            for s in series_info
+                        )
+                        meta_hint = f" [colors: {colors_str}]"
+                    if summary:
+                        meta_hint += f" [summary: {summary}]"
+                lines.append(
+                    f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: "
+                    f"![{purpose}]({content_ref}){meta_hint}"
+                )
             else:
                 lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
         return "\n".join(lines)
@@ -1460,6 +1491,12 @@ You are a professional data analyst. Generate a structured report based on the r
 - Reply in the same language as the user's question
 - Structure: title, executive summary, sections per plan step, conclusion
 - If no research data was collected, just answer the user's question directly and conversationally
+
+[Chart Color Rules]
+- CRITICAL: All chart color/数值 descriptions MUST come from chart metadata's series color_name and summary, NOT from image inspection
+- When referencing chart series, use format: "系列名（颜色名）" — e.g., "GDP（蓝色）"
+- The chart summary field contains programmatically extracted statistics (max/min/avg/trend) — use these when describing data
+- Charts WITHOUT metadata (no series/summary) must NOT have color or numeric descriptions — describe only the chart type and title
 
 Current time: {now_str}
 """
