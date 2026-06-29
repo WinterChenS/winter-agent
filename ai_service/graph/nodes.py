@@ -1049,7 +1049,8 @@ def _check_artifact_dedup(candidate: dict, existing: list[dict]) -> dict | None:
     return None  # no match
 
 
-def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, content_ref: str) -> str:
+def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, content_ref: str,
+                       metadata: dict | None = None, summary: str = "") -> str:
     """Register a new artifact in state and return its artifact_id."""
     existing = state.get("artifacts", [])
     artifact_id = f"{artifact_type}_{len(existing)}"
@@ -1059,6 +1060,8 @@ def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, co
         "purpose": purpose,
         "source_step_id": step_id,
         "content_ref": content_ref,
+        "metadata": metadata or {},
+        "summary": summary,
     }
     existing.append(entry)
     return artifact_id
@@ -1327,13 +1330,33 @@ async def execution_node(state: State, event_bus=None) -> dict:
                 if isinstance(outer_result, dict):
                     data = outer_result.get("data", {})
                     images = data.get("images", {}) if isinstance(data, dict) else {}
+                    charts_meta = data.get("charts", []) if isinstance(data, dict) else []
                 else:
                     images = {}
+                    charts_meta = []
                 if images:
+                    # Build lookup: filename → metadata/summary
+                    chart_lookup = {}
+                    for c in charts_meta:
+                        img = c.get("image", "")
+                        if img:
+                            chart_lookup[img] = {
+                                "metadata": c.get("metadata", {}),
+                                "summary": c.get("summary", ""),
+                            }
                     for fname, url in images.items():
-                        artifact_id = _register_artifact(state, artifact_type="image", purpose=f"Chart: {step.get('description', '')[:60]}", step_id=step_id, content_ref=url)
+                        cinfo = chart_lookup.get(fname, {})
+                        artifact_id = _register_artifact(
+                            state,
+                            artifact_type="image",
+                            purpose=f"Chart: {step.get('description', '')[:60]}",
+                            step_id=step_id,
+                            content_ref=url,
+                            metadata=cinfo.get("metadata", {}),
+                            summary=cinfo.get("summary", ""),
+                        )
                         artifact_ids.append(artifact_id)
-                        logger.info("[EXECUTION] registered chart artifact: %s -> %s", artifact_id, url)
+                        logger.info("[EXECUTION] registered chart artifact: %s -> %s (metadata=%s)", artifact_id, url, "yes" if cinfo.get("metadata") else "no")
                 else:
                     logger.warning("[EXECUTION] chart generated but no images found in result")
                 if event_bus:
@@ -1494,11 +1517,16 @@ You are a professional data analyst. Generate a structured report based on the r
 - Structure: title, executive summary, sections per plan step, conclusion
 - If no research data was collected, just answer the user's question directly and conversationally
 
-[Chart Color Rules]
-- CRITICAL: All chart color/数值 descriptions MUST come from chart metadata's series color_name and summary, NOT from image inspection
-- When referencing chart series, use format: "系列名（颜色名）" — e.g., "GDP（蓝色）"
-- The chart summary field contains programmatically extracted statistics (max/min/avg/trend) — use these when describing data
-- Charts WITHOUT metadata (no series/summary) must NOT have color or numeric descriptions — describe only the chart type and title
+[Chart Color Rules — THIS IS THE SINGLE SOURCE OF TRUTH]
+The [Available Visual Assets] above includes [colors: ...] and [summary: ...] hints for each chart.
+These hints are derived from the ACTUAL chart data (ChartSpec metadata), NOT from the image.
+The image is only for visual display — the hints are the authoritative data source.
+
+MANDATORY RULES (violating any of these is WRONG):
+- ALL series descriptions MUST use the EXACT color_name from the [colors:] hint. If the hint says CPI is "绿色", you MUST write "CPI（绿色）". NEVER write "CPI（橙色）" or any other color — that would be a factual error.
+- ALL numeric values (max/min/avg/trend/growth) MUST come from the [summary:] hint. NEVER recalculate or estimate from the image.
+- If a chart has NO [colors:] or [summary:] hint, describe only its title and chart type — do NOT mention colors or values at all.
+- Before writing any analysis paragraph, mentally check: "Am I using the EXACT color_name from the [colors:] hint for each series?"
 
 Current time: {now_str}
 """
