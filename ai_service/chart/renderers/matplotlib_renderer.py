@@ -163,13 +163,27 @@ class MatplotlibRenderer(AbstractChartRenderer):
 
     def _render_line(self, ax, spec: ChartSpec, cn_font) -> None:
         import numpy as np
+        import matplotlib.pyplot as plt
+
         x = np.arange(len(spec.series[0].values)) if spec.series else []
+        has_secondary = any(s.secondary_y for s in spec.series) if spec.series else False
+        ax2 = ax.twinx() if has_secondary else None
+
         for s in spec.series:
-            ax.plot(x, s.values, marker="o", label=s.name, color=s.color, linewidth=2)
+            target = ax2 if s.secondary_y and ax2 else ax
+            target.plot(x, s.values, marker="o", label=s.name, color=s.color, linewidth=2)
+
         if spec.labels:
             ax.set_xticks(x)
             ax.set_xticklabels(spec.labels, fontproperties=cn_font)
-        ax.legend(prop=cn_font)
+
+        # Combine legends from both axes
+        lines1, labels1 = ax.get_legend_handles_labels()
+        if ax2:
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines1 + lines2, labels1 + labels2, prop=cn_font)
+        else:
+            ax.legend(prop=cn_font)
 
     def _render_pie(self, ax, spec: ChartSpec, cn_font) -> None:
         if not spec.slices:

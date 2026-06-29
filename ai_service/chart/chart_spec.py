@@ -28,6 +28,7 @@ class SeriesSpec:
     color: str
     color_name: str
     values: list[float]
+    secondary_y: bool = False  # use right y-axis for dual-axis charts
 
 
 @dataclass
