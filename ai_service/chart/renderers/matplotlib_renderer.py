@@ -197,7 +197,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
     def _render_histogram(self, ax, spec: ChartSpec, cn_font) -> None:
         import numpy as np
         if spec.data and spec.data[0]:
-            ax.hist(spec.data[0], bins="auto", color="#2F80ED", edgecolor="white")
+            ax.hist(spec.data[0], bins="auto", color=Palette.PRIMARY.hex, edgecolor="white")
 
     def _render_heatmap(self, ax, spec: ChartSpec, cn_font) -> None:
         import matplotlib.pyplot as plt
