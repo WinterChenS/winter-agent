@@ -1,4 +1,4 @@
-"""Matplotlib chart renderer — returns ChartResult with structured metadata."""
+"""Matplotlib chart renderer — returns ChartResult via render() or render_from_spec()."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,8 @@ import os
 
 from chart.chart_renderer import AbstractChartRenderer
 from chart.font_manager import FontManager
-from chart.chart_result import ChartResult, ChartMetadata, SeriesInfo, DataFacts
+from chart.chart_result import ChartResult
+from chart.chart_spec import ChartSpec
 from chart.palette import Palette
 
 logger = logging.getLogger(__name__)
@@ -16,52 +17,41 @@ logger = logging.getLogger(__name__)
 class MatplotlibRenderer(AbstractChartRenderer):
     """Render charts using matplotlib with enterprise theme.
 
-    Returns a ChartResult containing the image path and structured metadata
-    extracted from either the __chart_metadata__ variable (declared in code)
-    or the matplotlib figure state (fallback).
+    Two rendering paths:
+      - render_from_spec(spec, path): preferred. Renders from ChartSpec.
+      - render(code, path): backward-compatible. Executes raw Python code.
+    Both return ChartResult.
     """
 
     def render(self, code: str, output_path: str) -> ChartResult:
+        """Execute rendering code, saving chart to output_path.
+
+        Injects cn_font, Palette, and __chart_spec__ into the exec context.
+        If __chart_spec__ is declared, routes to render_from_spec internally.
+        Otherwise returns ChartResult with empty metadata (legacy path).
+        """
         FontManager.initialize()
 
         import matplotlib.pyplot as plt
         plt.close("all")
-
-        # Build execution context with injected variables
-        # Intercept plt.close to capture figure references before they're destroyed
-        _saved_figures = []
-        _orig_close = plt.close
-        def _safe_close(fig=None):
-            if fig is not None and hasattr(fig, 'get_axes'):
-                _saved_figures.append(fig)
-            elif fig is None:
-                for n in plt.get_fignums():
-                    _saved_figures.append(plt.figure(n))
-            _orig_close(fig)
-        plt.close = _safe_close
 
         ctx = {
             "__output_path__": output_path,
             "plt": plt,
             "cn_font": FontManager.get_cn_font(),
             "Palette": Palette,
-            "__chart_metadata__": None,
+            "__chart_spec__": None,
         }
 
         exec(code, ctx)
 
-        # Ensure tight_layout for Chinese label overlap prevention
-        figs = [plt.figure(n) for n in plt.get_fignums()] + _saved_figures
-        # Deduplicate by id
-        seen = set()
-        figs = [f for f in figs if id(f) not in seen and not seen.add(id(f))]
+        figs = [plt.figure(n) for n in plt.get_fignums()]
         for fig in figs:
             try:
                 fig.tight_layout()
             except Exception:
                 pass
 
-        # If code didn't savefig, do it now
         if not os.path.exists(output_path):
             if figs:
                 figs[-1].savefig(output_path, dpi=200, bbox_inches="tight")
@@ -72,225 +62,192 @@ class MatplotlibRenderer(AbstractChartRenderer):
                 fig.savefig(output_path, dpi=200, bbox_inches="tight")
                 plt.close(fig)
 
-        # ── Metadata extraction ──
-        metadata = self._extract_metadata(ctx, figs)
+        # Check if __chart_spec__ was declared
+        chart_spec = ctx.get("__chart_spec__")
+        if chart_spec and isinstance(chart_spec, dict):
+            # Reconstruct ChartSpec from dict and use render_from_spec
+            spec = self._spec_from_dict(chart_spec)
+            result = self.render_from_spec(spec, output_path)
+            plt.close("all")
+            return result
 
-        # ── Summary ──
-        summary = ctx.get("__chart_metadata__", {}) or {}
-        summary_text = summary.get("summary", "") if isinstance(summary, dict) else ""
+        # Legacy path: empty metadata
+        plt.close("all")
+        return ChartResult(
+            image_path=output_path,
+            metadata={},
+            summary="",
+            stdout="",
+        )
 
-        # ── Font validation (best-effort, non-blocking) ──
-        for fig in figs:
-            try:
-                warnings = FontManager.validate_figure_fonts(fig)
-                for w in warnings:
-                    logger.warning("Font compliance: %s", w)
-            except Exception:
-                pass
+    def render_from_spec(self, spec: ChartSpec, output_path: str) -> ChartResult:
+        """Render from a ChartSpec directly.
 
-        # ── Save metadata JSON alongside PNG ──
-        self._save_metadata(output_path, metadata)
+        This is the preferred rendering path. It:
+        1. Creates a matplotlib figure from the spec
+        2. Renders the appropriate chart type
+        3. Saves _metadata.json alongside the PNG
+        4. Computes and returns a text summary
+        """
+        FontManager.initialize()
+        cn_font = FontManager.get_cn_font()
 
+        import matplotlib.pyplot as plt
         plt.close("all")
 
+        fig, ax = plt.subplots(figsize=spec.figsize)
+
+        match spec.chart_type:
+            case "bar":
+                self._render_bar(ax, spec, cn_font)
+            case "line":
+                self._render_line(ax, spec, cn_font)
+            case "pie":
+                self._render_pie(ax, spec, cn_font)
+            case "scatter":
+                self._render_scatter(ax, spec, cn_font)
+            case "histogram":
+                self._render_histogram(ax, spec, cn_font)
+            case "heatmap":
+                self._render_heatmap(ax, spec, cn_font)
+            case _:
+                raise ValueError(f"Unknown chart_type: {spec.chart_type}")
+
+        ax.set_title(spec.title, fontproperties=cn_font)
+        if spec.xlabel:
+            ax.set_xlabel(spec.xlabel, fontproperties=cn_font)
+        if spec.ylabel:
+            ax.set_ylabel(spec.ylabel, fontproperties=cn_font)
+
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=200, bbox_inches="tight")
+
+        # Summary (compute before metadata so sandbox _summary extraction works)
+        summary = ChartResult.compute_summary(spec.all_values(), spec.labels)
+
+        # Metadata (include _summary for sandbox tool backward compatibility)
+        metadata = spec.to_metadata()
+        metadata["_summary"] = summary
+        meta_path = output_path.replace(".png", "_metadata.json")
+        try:
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            logger.warning("Failed to save metadata JSON: %s", exc)
+
+        plt.close("all")
         return ChartResult(
             image_path=output_path,
             metadata=metadata,
-            summary=summary_text,
+            summary=summary,
+            stdout="",
         )
 
-    def _extract_metadata(
-        self,
-        ctx: dict,
-        figs: list,
-    ) -> ChartMetadata:
-        """Extract chart metadata, with two-level fallback.
+    def _render_bar(self, ax, spec: ChartSpec, cn_font) -> None:
+        n_series = len(spec.series)
+        n_vals = len(spec.series[0].values) if spec.series else 0
+        import numpy as np
+        x = np.arange(n_vals)
+        width = 0.8 / n_series
+        for i, s in enumerate(spec.series):
+            offset = (i - n_series / 2 + 0.5) * width
+            bars = ax.bar(x + offset, s.values, width, label=s.name, color=s.color)
+            for bar in bars:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                        f"{bar.get_height():.0f}", ha="center", va="bottom",
+                        fontsize=9, fontproperties=cn_font)
+        ax.set_xticks(x)
+        if spec.labels:
+            ax.set_xticklabels(spec.labels, fontproperties=cn_font)
+        ax.legend(prop=cn_font)
 
-        L1: __chart_metadata__ dict from exec context (declared by generated code).
-        L2: matplotlib figure state (axis labels, legend, etc.).
-
-        Returns:
-            Populated ChartMetadata instance.
-        """
-        declared = ctx.get("__chart_metadata__")
-        if declared and isinstance(declared, dict):
-            return self._extract_l1(declared, figs)
-        return self._extract_l2(figs)
-
-    def _extract_l1(self, declared: dict, figs: list) -> ChartMetadata:
-        """Build metadata from __chart_metadata__ dict (L1)."""
-        series_list = []
-        for s in declared.get("series", []):
-            series_list.append(SeriesInfo(
-                name=s.get("name", ""),
-                color=s.get("color", ""),
-                color_name=s.get("color_name", ""),
-                y_axis=s.get("y_axis", "left"),
-            ))
-
-        metadata = ChartMetadata(
-            title=str(declared.get("title", "")),
-            chart_type=str(declared.get("chart_type", "")),
-            series=series_list,
-        )
-
-        # L2 fallback for any L1 gaps
-        if figs:
-            self._l2_fill_gaps(metadata, figs[-1])
-
-        return metadata
-
-    def _extract_l2(self, figs: list) -> ChartMetadata:
-        """Build metadata from matplotlib figure state (L2 fallback)."""
-        metadata = ChartMetadata(
-            title="",
-            chart_type="unknown",
-        )
-        if figs:
-            self._l2_fill_gaps(metadata, figs[-1])
-        return metadata
-
-    def _l2_fill_gaps(self, metadata: ChartMetadata, fig) -> None:
-        """Fill missing metadata fields from figure state."""
+    def _render_line(self, ax, spec: ChartSpec, cn_font) -> None:
+        import numpy as np
         import matplotlib.pyplot as plt
 
-        for ax in fig.get_axes():
-            if not metadata.title:
-                t = ax.get_title()
-                if t:
-                    metadata.title = t
-            if not metadata.xlabel:
-                xl = ax.get_xlabel()
-                if xl:
-                    metadata.xlabel = xl
-            if not metadata.ylabel:
-                yl = ax.get_ylabel()
-                if yl:
-                    metadata.ylabel = yl
+        x = np.arange(len(spec.series[0].values)) if spec.series else []
+        has_secondary = any(s.secondary_y for s in spec.series) if spec.series else False
+        ax2 = ax.twinx() if has_secondary else None
 
-        # Extract series from legend
-        if not metadata.series:
-            # Detect axis layout for y_axis assignment
-            all_axes = fig.get_axes()
-            has_twinx = len(all_axes) > 1
+        for s in spec.series:
+            target = ax2 if s.secondary_y and ax2 else ax
+            target.plot(x, s.values, marker="o", label=s.name, color=s.color, linewidth=2)
 
-            for ax in fig.get_axes():
-                legend = ax.get_legend()
-                if legend is None:
-                    continue
-                is_right = has_twinx and ax is all_axes[-1] and ax is not all_axes[0]
-                for handle, label in zip(legend.legend_handles or [],
-                                          [t.get_text() for t in legend.get_texts()]):
-                    color_hex = "#000000"
-                    try:
-                        if hasattr(handle, "get_color"):
-                            c = handle.get_color()
-                            if isinstance(c, tuple):
-                                from matplotlib.colors import rgb2hex
-                                color_hex = rgb2hex(c)
-                            else:
-                                color_hex = str(c)
-                        elif hasattr(handle, "get_facecolor"):
-                            c = handle.get_facecolor()
-                            if isinstance(c, tuple):
-                                from matplotlib.colors import rgb2hex
-                                color_hex = rgb2hex(c)
-                            else:
-                                color_hex = str(c)
-                    except Exception:
-                        pass
-                    # Determine y_axis: check which axes the handle belongs to
-                    y_axis = "left"
-                    if has_twinx and hasattr(handle, 'axes') and handle.axes is not all_axes[0]:
-                        y_axis = "right"
-                    metadata.series.append(SeriesInfo(
-                        name=label,
-                        color=color_hex,
-                        color_name=Palette.get_color_name(color_hex),
-                        y_axis=y_axis,
-                    ))
+        if spec.labels:
+            ax.set_xticks(x)
+            ax.set_xticklabels(spec.labels, fontproperties=cn_font)
 
-        # Extract data facts from axes
-        metadata.data_facts = self._extract_data_facts(fig)
+        # Combine legends from both axes
+        lines1, labels1 = ax.get_legend_handles_labels()
+        if ax2:
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines1 + lines2, labels1 + labels2, prop=cn_font)
+        else:
+            ax.legend(prop=cn_font)
 
-        # Auto-correct y_axis from figure state (override LLM guess)
-        self._detect_y_axes(metadata, fig)
+    def _render_pie(self, ax, spec: ChartSpec, cn_font) -> None:
+        if not spec.slices:
+            return
+        labels = [s.label for s in spec.slices]
+        sizes = [s.value for s in spec.slices]
+        colors = [s.color for s in spec.slices]
+        wedges, texts, autotexts = ax.pie(
+            sizes, labels=labels, colors=colors, autopct="%1.1f%%",
+            startangle=90, textprops={"fontproperties": cn_font},
+        )
+        for t in texts:
+            t.set_fontproperties(cn_font)
 
-    def _detect_y_axes(self, metadata: ChartMetadata, fig) -> None:
-        """Auto-detect which y-axis each series uses, override LLM-assigned value.
+    def _render_scatter(self, ax, spec: ChartSpec, cn_font) -> None:
+        if not spec.points:
+            return
+        xs = [p.x for p in spec.points]
+        ys = [p.y for p in spec.points]
+        ax.scatter(xs, ys, c=Palette.PRIMARY.hex, s=60)
+        for p in spec.points:
+            if p.label:
+                ax.annotate(p.label, (p.x, p.y), fontsize=9, fontproperties=cn_font)
 
-        Machine-extracted axis affiliation is always correct. The LLM may
-        hallucinate left/right in __chart_metadata__.
-        """
-        axes_list = fig.get_axes()
-        if len(axes_list) < 2:
-            return  # single axis — all series are "left"
+    def _render_histogram(self, ax, spec: ChartSpec, cn_font) -> None:
+        import numpy as np
+        if spec.data and spec.data[0]:
+            ax.hist(spec.data[0], bins="auto", color=Palette.PRIMARY.hex, edgecolor="white")
 
-        # Build a set of labels known to belong to each axes
-        right_labels: set[str] = set()
-        for ax in axes_list:
-            is_right = ax is not axes_list[0]
-            if not is_right:
-                continue
-            # Collect labels from lines on the right axis
-            for line in ax.get_lines():
-                label = line.get_label()
-                if label and not label.startswith('_'):
-                    right_labels.add(label)
-            # Collect labels from containers (bar charts)
-            for container in ax.containers:
-                label = container.get_label()
-                if label and not label.startswith('_'):
-                    right_labels.add(label)
+    def _render_heatmap(self, ax, spec: ChartSpec, cn_font) -> None:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        if not spec.data:
+            return
+        data = np.array(spec.data)
+        im = ax.imshow(data, cmap="Blues", aspect="auto")
+        plt.colorbar(im, ax=ax)
+        if spec.labels:
+            ax.set_xticks(range(len(spec.labels)))
+            ax.set_xticklabels(spec.labels, fontproperties=cn_font, rotation=45)
 
-        for s in metadata.series:
-            if s.name in right_labels:
-                s.y_axis = "right"
+    def _spec_from_dict(self, d: dict) -> ChartSpec:
+        """Reconstruct a ChartSpec from a dict (e.g., from __chart_spec__)."""
+        from chart.chart_spec import SeriesSpec, SliceSpec, PointSpec
 
-    def _extract_data_facts(self, fig) -> DataFacts:
-        """Extract authoritative data range facts from figure axes.
+        series = None
+        if "series" in d:
+            series = [SeriesSpec(**s) for s in d["series"]]
+        slices = None
+        if "slices" in d:
+            slices = [SliceSpec(**s) for s in d["slices"]]
+        points = None
+        if "points" in d:
+            points = [PointSpec(**p) for p in d["points"]]
 
-        These are MACHINE-EXTRACTED facts, not LLM-generated.
-        The composer MUST use these for descriptions instead of guessing.
-        """
-        for ax in fig.get_axes():
-            x_min, x_max = ax.get_xlim()
-            y_min, y_max = ax.get_ylim()
-            data_points = 0
-            for line in ax.get_lines():
-                data_points += len(line.get_xdata())
-            for container in ax.containers:
-                for patch in container.get_children():
-                    data_points += 1
-            for collection in ax.collections:
-                data_points += len(collection.get_offsets()) if hasattr(collection, 'get_offsets') else 0
-
-            return DataFacts(
-                x_min=self._fmt_val(x_min),
-                x_max=self._fmt_val(x_max),
-                y_min=self._fmt_val(y_min),
-                y_max=self._fmt_val(y_max),
-                data_points=data_points,
-            )
-        return DataFacts()
-
-    @staticmethod
-    def _fmt_val(val: float) -> str:
-        """Format a numeric value for display."""
-        if val is None:
-            return ""
-        if isinstance(val, (int, float)):
-            if abs(val) >= 1000 or (abs(val) < 0.01 and val != 0):
-                return f"{val:.2f}"
-            return f"{val:.4g}".rstrip("0").rstrip(".")
-        return str(val)
-
-    def _save_metadata(self, output_path: str, metadata: ChartMetadata) -> None:
-        """Save ChartMetadata as a JSON file alongside the PNG output."""
-        json_path = output_path.replace(".png", "_metadata.json")
-        try:
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(metadata.to_dict(), f, ensure_ascii=False, indent=2)
-            logger.info("Saved chart metadata to %s", json_path)
-        except Exception as exc:
-            logger.warning("Failed to save metadata JSON: %s", exc)
+        return ChartSpec(
+            title=d.get("title", ""),
+            chart_type=d.get("chart_type", "bar"),
+            xlabel=d.get("xlabel"),
+            ylabel=d.get("ylabel"),
+            figsize=tuple(d.get("figsize", (12, 6))),
+            series=series,
+            slices=slices,
+            points=points,
+            data=d.get("data"),
+            labels=d.get("labels"),
+        )

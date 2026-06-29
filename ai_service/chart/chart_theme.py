@@ -1,8 +1,11 @@
-"""Enterprise chart theme — unified font, color, DPI, and layout configuration."""
+"""Enterprise chart theme — unified font, color, DPI, and layout configuration.
+
+Font management is delegated to FontManager. This module only handles
+non-font style configuration (DPI, figure size, grid, colors).
+"""
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-
 from chart.font_manager import FontManager
 
 
@@ -12,6 +15,7 @@ class ChartTheme:
     @staticmethod
     def initialize() -> None:
         FontManager.initialize()
+
         plt.rcParams["axes.unicode_minus"] = False
         plt.rcParams["figure.dpi"] = 200
         plt.rcParams["figure.figsize"] = (16, 9)

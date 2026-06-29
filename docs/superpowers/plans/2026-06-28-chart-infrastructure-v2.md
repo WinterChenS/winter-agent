@@ -65,7 +65,7 @@ base-ref: 2c1ada3398615c22e69f8c1afb498e82677eae8a
 - Consumes: nothing (standalone module)
 - Produces: `FontManager` class with classmethods: `initialize(force=False)`, `get_cn_font() -> FontProperties`, `get_font_name() -> str`, `validate_figure_fonts(fig) -> list[str]`
 
-- [x] **Step 1: Write FontManager failing tests**
+- [ ] **Step 1: Write FontManager failing tests**
 
 Create `ai_service/tests/test_chart_font_manager.py`:
 
@@ -152,7 +152,7 @@ class TestFontDiscovery:
         plt.close(fig)
 ```
 
-- [x] **Step 2: Run tests to verify they fail**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -160,7 +160,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: FAIL with "ModuleNotFoundError: No module named 'chart.font_manager'" (or import errors)
 
-- [x] **Step 3: Create FontManager module**
+- [ ] **Step 3: Create FontManager module**
 
 Create `ai_service/chart/font_manager.py`:
 
@@ -321,7 +321,7 @@ class FontManager:
         return warnings
 ```
 
-- [x] **Step 4: Run tests to verify they pass**
+- [ ] **Step 4: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -329,7 +329,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: PASS (4-5 tests depending on mock behavior)
 
-- [x] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/font_manager.py ai_service/tests/test_chart_font_manager.py && git commit -m "feat: add FontManager for cross-platform Chinese font discovery and caching"
@@ -348,7 +348,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/font_manager.
 - Consumes: nothing
 - Produces: `PaletteColor(NamedTuple)` with `hex: str`, `name_cn: str`; `Palette` class with class-level color constants, `SERIES` list (12 colors), `get_series_colors(n) -> list[PaletteColor]`, `get_color_name(hex) -> str`
 
-- [x] **Step 1: Write Palette failing tests**
+- [ ] **Step 1: Write Palette failing tests**
 
 Create `ai_service/tests/test_chart_palette.py`:
 
@@ -453,7 +453,7 @@ class TestGetColorName:
         assert Palette.get_color_name("#2f80ed") == "#2f80ed"  # lowercase != uppercase
 ```
 
-- [x] **Step 2: Run tests to verify they fail**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -461,7 +461,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: FAIL with import errors
 
-- [x] **Step 3: Create Palette module**
+- [ ] **Step 3: Create Palette module**
 
 Create `ai_service/chart/palette.py`:
 
@@ -577,7 +577,7 @@ class Palette:
         return cls._NAME_MAP.get(hex_color, hex_color)
 ```
 
-- [x] **Step 4: Update color_utils.py for backward compatibility**
+- [ ] **Step 4: Update color_utils.py for backward compatibility**
 
 Edit `ai_service/chart/utils/color_utils.py`:
 
@@ -623,7 +623,7 @@ INFO = Palette.INFO.hex
 PALETTE = [pc.hex for pc in Palette.SERIES]
 ```
 
-- [x] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -631,7 +631,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: PASS (all tests)
 
-- [x] **Step 6: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/palette.py ai_service/chart/utils/color_utils.py ai_service/tests/test_chart_palette.py && git commit -m "feat: add Palette with Chinese color names, backward-compat color_utils"
@@ -649,7 +649,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/palette.py ai
 - Consumes: `PaletteColor` from `chart.palette` (used in `to_markdown_hint()`)
 - Produces: `SeriesInfo(name: str, color: str, color_name: str)`, `ChartMetadata(title, chart_type, xlabel, ylabel, series, summary)`, `ChartResult(image_path: str, metadata: ChartMetadata, summary: str)`
 
-- [x] **Step 1: Create chart_result.py**
+- [ ] **Step 1: Create chart_result.py**
 
 Create `ai_service/chart/chart_result.py`:
 
@@ -749,7 +749,7 @@ class ChartResult:
         }
 ```
 
-- [x] **Step 2: Update chart/__init__.py exports**
+- [ ] **Step 2: Update chart/__init__.py exports**
 
 Write to `ai_service/chart/__init__.py`:
 ```python
@@ -767,7 +767,7 @@ __all__ = [
 ]
 ```
 
-- [x] **Step 3: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_result.py ai_service/chart/__init__.py && git commit -m "feat: add ChartResult, ChartMetadata, SeriesInfo data classes"
@@ -784,9 +784,9 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_result.
 - Consumes: `FontManager` from `chart.font_manager`
 - Produces: `ChartTheme.initialize()` with same signature, but delegates font to FontManager and drops rcParams font keys; `_find_chinese_font()` is removed
 
-- [x] **Step 1: Read current ChartTheme to confirm the exact content** (already read above)
+- [ ] **Step 1: Read current ChartTheme to confirm the exact content** (already read above)
 
-- [x] **Step 2: Refactor ChartTheme**
+- [ ] **Step 2: Refactor ChartTheme**
 
 Edit `ai_service/chart/chart_theme.py`. Replace the entire file content:
 
@@ -837,7 +837,7 @@ class ChartTheme:
 
 Note: The old `_find_chinese_font()` function is removed entirely since FontManager handles that responsibility. The `fm._load_fontmanager(try_read_cache=False)` call is also removed — FontManager handles cache clearing if needed.
 
-- [x] **Step 3: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_theme.py && git commit -m "refactor: ChartTheme delegates font to FontManager, removes _find_chinese_font"
@@ -856,7 +856,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_theme.p
 - Consumes: `FontManager`, `ChartResult`, `ChartMetadata`, `SeriesInfo` from chart package; `Palette` for color name lookup
 - Produces: `MatplotlibRenderer.render(code, output_path) -> ChartResult` (was `-> str`)
 
-- [x] **Step 1: Update AbstractChartRenderer return type**
+- [ ] **Step 1: Update AbstractChartRenderer return type**
 
 Edit `ai_service/chart/chart_renderer.py` line 11. Change:
 ```python
@@ -872,7 +872,7 @@ Add import at top:
 from chart.chart_result import ChartResult
 ```
 
-- [x] **Step 2: Write MatplotlibRenderer v2 failing tests**
+- [ ] **Step 2: Write MatplotlibRenderer v2 failing tests**
 
 Create `ai_service/tests/test_chart_renderer_v2.py`:
 
@@ -1015,7 +1015,7 @@ plt.close(fig)
         assert result.image_path == output_path
 ```
 
-- [x] **Step 3: Run tests to verify they fail**
+- [ ] **Step 3: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -1023,7 +1023,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: FAIL (return type mismatch, missing metadata extraction, etc.)
 
-- [x] **Step 4: Refactor MatplotlibRenderer**
+- [ ] **Step 4: Refactor MatplotlibRenderer**
 
 Replace the entire content of `ai_service/chart/renderers/matplotlib_renderer.py`:
 
@@ -1224,7 +1224,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
             logger.warning("Failed to save metadata JSON: %s", exc)
 ```
 
-- [x] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -1232,7 +1232,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: PASS
 
-- [x] **Step 6: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/renderers/matplotlib_renderer.py ai_service/chart/chart_renderer.py ai_service/tests/test_chart_renderer_v2.py && git commit -m "refactor: MatplotlibRenderer returns ChartResult, injects cn_font, extracts metadata"
@@ -1249,7 +1249,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/renderers/mat
 - Consumes: `ChartResult` from renderer
 - Produces: `ChartService.render()` returns dict with `type`, `url`, `metadata`, `metadata_url`, `summary`
 
-- [x] **Step 1: Refactor ChartService.render()**
+- [ ] **Step 1: Refactor ChartService.render()**
 
 Edit `ai_service/chart/chart_service.py`. Replace the entire file content:
 
@@ -1327,7 +1327,7 @@ class ChartService:
         }
 ```
 
-- [x] **Step 2: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_service.py && git commit -m "refactor: ChartService returns ChartResult metadata, uploads metadata.json"
@@ -1340,7 +1340,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/chart/chart_service
 **Files:**
 - Modify: `ai_service/tools/sandbox/tool.py`
 
-- [x] **Step 1: Update `_build_preamble()` to inject new imports**
+- [ ] **Step 1: Update `_build_preamble()` to inject new imports**
 
 Edit `ai_service/tools/sandbox/tool.py`. Locate the `_build_preamble()` method (lines 73-124). Replace the chart theme section (lines 90-93):
 
@@ -1363,7 +1363,7 @@ New:
         lines.append("from chart.palette import Palette")
 ```
 
-- [x] **Step 2: Run existing sandbox tests to verify no regression**
+- [ ] **Step 2: Run existing sandbox tests to verify no regression**
 
 Run:
 ```bash
@@ -1371,7 +1371,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: PASS
 
-- [x] **Step 3: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/tools/sandbox/tool.py && git commit -m "feat: inject cn_font and Palette into sandbox preamble"
@@ -1384,7 +1384,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/tools/sandbox/tool.
 **Files:**
 - Modify: `ai_service/graph/nodes.py`
 
-- [x] **Step 1: Update _CHART_CODE_PROMPT**
+- [ ] **Step 1: Update _CHART_CODE_PROMPT**
 
 Edit `ai_service/graph/nodes.py`. Replace lines 892-911 (the `_CHART_CODE_PROMPT` string):
 
@@ -1448,7 +1448,7 @@ CRITICAL RULES — follow exactly:
 """
 ```
 
-- [x] **Step 2: Update _build_composer_system_prompt to include chart metadata awareness**
+- [ ] **Step 2: Update _build_composer_system_prompt to include chart metadata awareness**
 
 Edit `ai_service/graph/nodes.py`. In the `_build_composer_system_prompt` function (starting at line 1406), find the `_format_artifacts` helper (lines 1421-1434). Modify the image artifact formatting to include chart metadata:
 
@@ -1488,7 +1488,7 @@ Also add chart metadata rules to the instructions section at the end of `_build_
 	- Use the summary field from chart metadata when describing chart content
 ```
 
-- [x] **Step 3: Run existing tests to verify no regression**
+- [ ] **Step 3: Run existing tests to verify no regression**
 
 Run:
 ```bash
@@ -1496,7 +1496,7 @@ cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test
 ```
 Expected: PASS
 
-- [x] **Step 4: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add ai_service/graph/nodes.py && git commit -m "feat: update chart code prompt to use cn_font/Palette, add chart metadata to composer prompt"
@@ -1509,7 +1509,7 @@ cd /Volumes/work/projects/winter-agent && git add ai_service/graph/nodes.py && g
 **Files:**
 - No database seed file was found in the codebase. The Data Analyst agent rules from the design doc (section 3.3) need to be applied wherever the Data Analyst system prompt is defined.
 
-- [x] **Step 1: Locate the Data Analyst Agent system prompt**
+- [ ] **Step 1: Locate the Data Analyst Agent system prompt**
 
 Search for the Data Analyst agent's system prompt definition:
 
@@ -1524,7 +1524,7 @@ If found, add the three rules from design doc section 3.3:
 
 If no DB seed file is found (the search above returned no results), skip this task with a note.
 
-- [x] **Step 2: Commit (if changes were made)**
+- [ ] **Step 2: Commit (if changes were made)**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && git add <modified-file> && git commit -m "feat: update Data Analyst prompt with chart metadata rules"
@@ -1537,21 +1537,21 @@ cd /Volumes/work/projects/winter-agent && git add <modified-file> && git commit 
 **Files:**
 - No file changes — run existing tests to confirm no regressions
 
-- [x] **Step 1: Run all chart-related tests**
+- [ ] **Step 1: Run all chart-related tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_chart_font_manager.py ai_service/tests/test_chart_palette.py ai_service/tests/test_chart_renderer_v2.py ai_service/tests/test_chart_generator.py ai_service/tests/test_chart_validators.py ai_service/tests/test_chart_spec.py ai_service/tests/test_chart_registry.py ai_service/tests/test_chart_envelope.py -v
 ```
 Expected: ALL PASS
 
-- [x] **Step 2: Run sandbox test**
+- [ ] **Step 2: Run sandbox test**
 
 ```bash
 cd /Volumes/work/projects/winter-agent && python -m pytest ai_service/tests/test_code_sandbox.py -v
 ```
 Expected: PASS
 
-- [x] **Step 3: Commit the test results verification**
+- [ ] **Step 3: Commit the test results verification**
 
 No code changes in this task. Verification is complete when all tests pass.
 
@@ -1562,7 +1562,7 @@ No code changes in this task. Verification is complete when all tests pass.
 **Files:**
 - No file changes — manual verification
 
-- [x] **Step 1: Write and run E2E verification script**
+- [ ] **Step 1: Write and run E2E verification script**
 
 Create a temporary script `_e2e_verify.py` (DO NOT COMMIT — delete after use):
 
@@ -1649,13 +1649,13 @@ cd /Volumes/work/projects/winter-agent && python _e2e_verify.py
 ```
 Expected: "All E2E checks passed!" — no errors
 
-- [x] **Step 2: Delete the temporary verification script**
+- [ ] **Step 2: Delete the temporary verification script**
 
 ```bash
 rm /Volumes/work/projects/winter-agent/_e2e_verify.py
 ```
 
-- [x] **Step 3: Commit (empty — E2E is verification only, no code changes)**
+- [ ] **Step 3: Commit (empty — E2E is verification only, no code changes)**
 
 E2E verification is complete. No commit needed for this task.
 

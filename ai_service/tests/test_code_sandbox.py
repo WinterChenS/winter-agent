@@ -57,3 +57,25 @@ print(df.shape)
         assert result.ok is False
         assert result.error is not None
         assert "ZeroDivisionError" in result.error.message or "division by zero" in result.error.message.lower()
+
+    # ──────────────────────────────────────────────
+    # Task 7 tests: preamble + charts in result
+    # ──────────────────────────────────────────────
+
+    def test_preamble_includes_chart_imports(self, sandbox: CodeSandboxTool) -> None:
+        """_build_preamble() 应注入 FontManager/Palette/ChartSpec/MatplotlibRenderer 导入。"""
+        preamble = sandbox._build_preamble()
+        assert "from chart.font_manager import FontManager" in preamble
+        assert "cn_font = FontManager.get_cn_font()" in preamble
+        assert "from chart.palette import Palette" in preamble
+        assert "from chart.chart_spec import ChartSpec, SeriesSpec, SliceSpec, PointSpec" in preamble
+        assert "from chart.renderers.matplotlib_renderer import MatplotlibRenderer" in preamble
+
+    @pytest.mark.asyncio
+    async def test_execute_returns_charts_key(self, sandbox: CodeSandboxTool) -> None:
+        """execute() 返回的 data 应包含 charts 键。"""
+        result: ToolResult = await sandbox.execute({"code": 'print("no charts")'})
+        assert result.ok is True
+        assert "charts" in result.data
+        assert isinstance(result.data["charts"], list)
+        assert len(result.data["charts"]) == 0

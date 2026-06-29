@@ -1,4 +1,4 @@
-"""Tests for MatplotlibRenderer v2 — ChartResult return, metadata extraction, font validation."""
+"""Tests for MatplotlibRenderer -- render_from_spec, backward-compatible render, metadata."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,8 @@ import tempfile
 
 import pytest
 
-from chart.chart_result import ChartResult, ChartMetadata, SeriesInfo
+from chart.chart_result import ChartResult
+from chart.chart_spec import ChartSpec, SeriesSpec, SliceSpec, PointSpec
 from chart.renderers.matplotlib_renderer import MatplotlibRenderer
 
 
@@ -22,112 +23,127 @@ def temp_dir():
         yield d
 
 
-SIMPLE_CHART_CODE = """\
-import matplotlib.pyplot as plt
-import numpy as np
-
-x = np.arange(1, 6)
-y = np.array([10, 20, 15, 25, 30])
-
-__chart_metadata__ = {
-    "chart_type": "line",
-    "title": "Test Chart",
-    "series": [
-        {"name": "Series A", "color": "#2F80ED", "color_name": "蓝色"},
-    ],
-    "summary": "Test chart summary",
-}
-
-fig, ax = plt.subplots()
-ax.plot(x, y, color="#2F80ED", label="Series A")
-ax.set_title("Test Chart")
-ax.set_xlabel("X")
-ax.set_ylabel("Y")
-ax.legend()
-fig.savefig(__output_path__, dpi=200, bbox_inches="tight")
-"""
-
-
-class TestRenderReturnsChartResult:
-    def test_render_returns_chart_result(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(SIMPLE_CHART_CODE, output_path)
+class TestRenderFromSpec:
+    def test_render_bar(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Bar",
+            chart_type="bar",
+            xlabel="X",
+            ylabel="Y",
+            series=[SeriesSpec(name="S1", color="#2F80ED", color_name="蓝色", values=[10, 20, 30])],
+        )
+        output = os.path.join(temp_dir, "bar.png")
+        result = renderer.render_from_spec(spec, output)
         assert isinstance(result, ChartResult)
-        assert result.image_path == output_path
+        assert result.image_path == output
+        assert os.path.isfile(output)
 
-    def test_render_metadata_from_chart_metadata(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(SIMPLE_CHART_CODE, output_path)
-        assert result.metadata.title == "Test Chart"
-        assert result.metadata.chart_type == "line"
-        assert result.metadata.xlabel == "X"
-        assert result.metadata.ylabel == "Y"
-        assert len(result.metadata.series) == 1
-        assert result.metadata.series[0].name == "Series A"
-        assert result.metadata.series[0].color == "#2F80ED"
-        assert result.metadata.series[0].color_name == "蓝色"
+    def test_render_line(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Line",
+            chart_type="line",
+            series=[SeriesSpec(name="S1", color="#27AE60", color_name="绿色", values=[1, 2, 3])],
+        )
+        output = os.path.join(temp_dir, "line.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+        assert result.metadata["title"] == "Test Line"
+        assert result.metadata["chart_type"] == "line"
 
-    def test_render_summary(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(SIMPLE_CHART_CODE, output_path)
-        assert result.summary == "Test chart summary"
+    def test_render_pie(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Pie",
+            chart_type="pie",
+            slices=[SliceSpec("A", 30, "#EB5757", "红色"), SliceSpec("B", 70, "#2F80ED", "蓝色")],
+        )
+        output = os.path.join(temp_dir, "pie.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
 
-    def test_render_metadata_json_file_created(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        renderer.render(SIMPLE_CHART_CODE, output_path)
-        json_path = output_path.replace(".png", "_metadata.json")
+    def test_render_scatter(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Scatter",
+            chart_type="scatter",
+            points=[PointSpec(1, 2), PointSpec(3, 4), PointSpec(5, 6)],
+        )
+        output = os.path.join(temp_dir, "scatter.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+
+    def test_metadata_json_created(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Meta",
+            chart_type="bar",
+            series=[SeriesSpec("S", "#2F80ED", "蓝色", [1])],
+        )
+        output = os.path.join(temp_dir, "meta.png")
+        renderer.render_from_spec(spec, output)
+        json_path = output.replace(".png", "_metadata.json")
         assert os.path.isfile(json_path)
         with open(json_path) as f:
             data = json.load(f)
-        assert data["title"] == "Test Chart"
-        assert data["chart_type"] == "line"
+        assert data["title"] == "Meta"
+        assert data["chart_type"] == "bar"
+
+    def test_metadata_contains_summary(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Summary Test",
+            chart_type="bar",
+            series=[SeriesSpec("S", "#2F80ED", "蓝色", [10, 20, 30])],
+        )
+        output = os.path.join(temp_dir, "summary.png")
+        result = renderer.render_from_spec(spec, output)
+        assert "Max" in result.summary
+
+    def test_metadata_json_includes_summary_key(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Meta Summary",
+            chart_type="bar",
+            series=[SeriesSpec("S", "#2F80ED", "蓝色", [10, 20, 30])],
+        )
+        output = os.path.join(temp_dir, "meta_summary.png")
+        renderer.render_from_spec(spec, output)
+        json_path = output.replace(".png", "_metadata.json")
+        with open(json_path) as f:
+            data = json.load(f)
+        assert "_summary" in data, "metadata JSON must include _summary for sandbox tool"
+        assert "Max" in data["_summary"]
 
 
-class TestRenderWithoutMetadataDecl:
-    """When __chart_metadata__ is not set, fall back to figure state (L2)."""
-
-    CODE_NO_METADATA = """\
+class TestRenderBackwardCompat:
+    CODE_NO_SPEC = """\
 import matplotlib.pyplot as plt
-import numpy as np
-
 fig, ax = plt.subplots()
 ax.plot([1,2,3], [4,5,6], label="My Series")
-ax.set_title("Fallback Title")
-ax.set_xlabel("X Axis")
-ax.set_ylabel("Y Axis")
-ax.legend()
+ax.set_title("Legacy")
 fig.savefig(__output_path__, dpi=200, bbox_inches="tight")
+plt.close(fig)
 """
 
-    def test_l2_fallback_extracts_title_from_axes(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(self.CODE_NO_METADATA, output_path)
-        assert result.metadata.title == "Fallback Title"
-        assert result.metadata.xlabel == "X Axis"
-        assert result.metadata.ylabel == "Y Axis"
+    def test_render_returns_chart_result(self, renderer, temp_dir):
+        output = os.path.join(temp_dir, "legacy.png")
+        result = renderer.render(self.CODE_NO_SPEC, output)
+        assert isinstance(result, ChartResult)
+        assert result.image_path == output
 
-    def test_l2_fallback_chart_type_is_unknown(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(self.CODE_NO_METADATA, output_path)
-        assert result.metadata.chart_type == "unknown"
+    def test_legacy_metadata_is_empty_dict(self, renderer, temp_dir):
+        output = os.path.join(temp_dir, "legacy.png")
+        result = renderer.render(self.CODE_NO_SPEC, output)
+        assert result.metadata == {}
 
-    def test_l2_fallback_series_from_legend(self, renderer, temp_dir):
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(self.CODE_NO_METADATA, output_path)
-        # Series should be extracted from legend handles
-        if result.metadata.series:
-            assert result.metadata.series[0].name == "My Series"
+    def test_legacy_summary_is_empty(self, renderer, temp_dir):
+        output = os.path.join(temp_dir, "legacy.png")
+        result = renderer.render(self.CODE_NO_SPEC, output)
+        assert result.summary == ""
 
-
-class TestFontInjection:
-    def test_cn_font_injected_into_context(self, renderer, temp_dir):
-        """cn_font should be available in exec context."""
+    def test_cn_font_injected(self, renderer, temp_dir):
         code = """\
 import matplotlib.pyplot as plt
 fig, ax = plt.subplots()
 ax.set_title("Test", fontproperties=cn_font)
 fig.savefig(__output_path__, dpi=200, bbox_inches="tight")
+plt.close(fig)
 """
-        output_path = os.path.join(temp_dir, "test.png")
-        result = renderer.render(code, output_path)
-        assert result.image_path == output_path
+        output = os.path.join(temp_dir, "font_test.png")
+        result = renderer.render(code, output)
+        assert result.image_path == output

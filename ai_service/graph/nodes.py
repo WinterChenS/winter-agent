@@ -900,26 +900,27 @@ Available data context (from previous research steps):
 
 CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
-2. DO NOT import ChartTheme or any ai_service modules (they break in sandbox)
-3. The variables `cn_font` (FontProperties) and `Palette` are already available in the execution context — use them directly, do NOT import them
-4. ALL text elements (title, labels, legend, tick labels, annotations) MUST use `fontproperties=cn_font` — example: ax.set_title("标题", fontproperties=cn_font)
-5. Get colors from Palette: colors = Palette.get_series_colors(N)  — returns list of PaletteColor objects with .hex and .name_cn
-6. Set figure size to (12, 6)
-7. Include title, axis labels, legend if applicable
-8. MUST set __chart_metadata__ with the following structure before saving:
-   __chart_metadata__ = {
-       "chart_type": "bar",  # or "line", "pie", "scatter", etc.
-       "title": "图表标题",
-       "series": [
-           {"name": "系列名", "color": colors[0].hex, "color_name": colors[0].name_cn},
-       ],
-       "summary": "图表摘要 - 一句话描述图表展示的内容",
-   }
-9. Output ONLY valid Python code — no markdown wrappers, no explanation
-10. Save using plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
-11. Do NOT call plt.show()
-12. End with plt.close()
-13. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
+2. DO NOT write ANY import statement for: cn_font, Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer, FontManager, or ANYTHING from chart/font/ai_service modules. These names are ALREADY AVAILABLE as variables — just use them directly. cn_font is a FontProperties variable, Palette is a class, etc. Writing "import cn_font" or "from chart.xxx import yyy" will BREAK the code.
+3. ALL text elements MUST use `fontproperties=cn_font`
+4. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
+5. Set figure size to (12, 6)
+6. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
+   colors = Palette.get_series_colors(len(series_data))
+   spec = ChartSpec(
+       title="图表标题",
+       chart_type="bar",  # or "line"/"pie"/"scatter"/"histogram"/"heatmap"
+       xlabel="X轴标签",
+       ylabel="Y轴标签",
+       labels=["2020", "2021", "2022", "2023", "2024"],
+       series=[SeriesSpec(name="系列名", color=colors[i].hex, color_name=colors[i].name_cn, values=[10, 20, 30])],
+   )
+   renderer = MatplotlibRenderer()
+   result = renderer.render_from_spec(spec, "chart_0.png")
+   For pie charts: slices=[SliceSpec(label="A", value=30, color=colors[0].hex, color_name=colors[0].name_cn)]
+   For scatter charts: points=[PointSpec(x=1, y=2, label="pt1")]
+7. Output ONLY valid Python code — no markdown wrappers, no explanation
+8. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
+9. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
@@ -972,25 +973,27 @@ async def _generate_chart_code(
         chart_type = expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"
         title = expected_artifacts[0].get("purpose", step_description) if expected_artifacts else step_description
         return f'''import matplotlib.pyplot as plt
-import numpy as np
-from chart.font_manager import FontManager
-from chart.palette import Palette
+        import numpy as np
+        from chart.font_manager import FontManager
+        from chart.palette import Palette
+        from chart.chart_spec import ChartSpec, SeriesSpec
+        from chart.renderers.matplotlib_renderer import MatplotlibRenderer
 
-cn_font = FontManager.get_cn_font()
+        cn_font = FontManager.get_cn_font()
+        x = np.arange(10)
+        y = np.random.randn(10).cumsum()
 
-x = np.arange(10)
-y = np.random.randn(10).cumsum()
-
-fig, ax = plt.subplots(figsize=(12, 6))
-ax.plot(x, y, marker='o', linewidth=2, color=Palette.PRIMARY.hex)
-ax.set_title("{title}", fontsize=16, fontweight='bold', fontproperties=cn_font)
-ax.set_xlabel("X", fontproperties=cn_font)
-ax.set_ylabel("Y", fontproperties=cn_font)
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig(__output_path__, dpi=200, bbox_inches='tight')
-plt.close()
-'''
+        spec = ChartSpec(
+            title="{title}",
+            chart_type="{chart_type}",
+            xlabel="X",
+            ylabel="Y",
+            series=[SeriesSpec(name="Data", color=Palette.PRIMARY.hex, color_name=Palette.PRIMARY.name_cn, values=y.tolist())],
+        )
+        renderer = MatplotlibRenderer()
+        result = renderer.render_from_spec(spec, "chart_0.png")
+        print(f"Chart saved: {{result.image_path}}")
+        print(f"Summary: {{result.summary}}")'''
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1044,10 +1047,8 @@ def _check_artifact_dedup(candidate: dict, existing: list[dict]) -> dict | None:
     return None  # no match
 
 
-def _register_artifact(
-    state, artifact_type: str, purpose: str, step_id: int, content_ref: str,
-    metadata: dict | None = None, summary: str | None = None,
-) -> str:
+def _register_artifact(state, artifact_type: str, purpose: str, step_id: int, content_ref: str,
+                       metadata: dict | None = None, summary: str = "") -> str:
     """Register a new artifact in state and return its artifact_id."""
     existing = state.get("artifacts", [])
     artifact_id = f"{artifact_type}_{len(existing)}"
@@ -1057,6 +1058,8 @@ def _register_artifact(
         "purpose": purpose,
         "source_step_id": step_id,
         "content_ref": content_ref,
+        "metadata": metadata or {},
+        "summary": summary,
     }
     if metadata is not None:
         entry["metadata"] = metadata
@@ -1329,23 +1332,33 @@ async def execution_node(state: State, event_bus=None) -> dict:
                 if isinstance(outer_result, dict):
                     data = outer_result.get("data", {})
                     images = data.get("images", {}) if isinstance(data, dict) else {}
+                    charts_meta = data.get("charts", []) if isinstance(data, dict) else []
                 else:
                     images = {}
+                    charts_meta = []
                 if images:
-                    # Derive chart metadata from step context
-                    chart_type = expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"
+                    # Build lookup: filename → metadata/summary
+                    chart_lookup = {}
+                    for c in charts_meta:
+                        img = c.get("image", "")
+                        if img:
+                            chart_lookup[img] = {
+                                "metadata": c.get("metadata", {}),
+                                "summary": c.get("summary", ""),
+                            }
                     for fname, url in images.items():
+                        cinfo = chart_lookup.get(fname, {})
                         artifact_id = _register_artifact(
                             state,
                             artifact_type="image",
                             purpose=f"Chart: {step.get('description', '')[:60]}",
                             step_id=step_id,
                             content_ref=url,
-                            metadata={"chart_type": chart_type, "filename": fname},
-                            summary=step.get("description", "")[:200],
+                            metadata=cinfo.get("metadata", {}),
+                            summary=cinfo.get("summary", ""),
                         )
                         artifact_ids.append(artifact_id)
-                        logger.info("[EXECUTION] registered chart artifact: %s -> %s", artifact_id, url)
+                        logger.info("[EXECUTION] registered chart artifact: %s -> %s (metadata=%s)", artifact_id, url, "yes" if cinfo.get("metadata") else "no")
                 else:
                     logger.warning("[EXECUTION] chart generated but no images found in result")
                 if event_bus:
@@ -1465,22 +1478,16 @@ def _build_composer_system_prompt(
                     summary = a.get("summary", "")
                     if series_info:
                         colors_str = "; ".join(
-                            f'{s.get("name","")} ({s.get("color_name","")})'
+                            f'{s.get("name","")}（{s.get("color_name","")}）'
                             for s in series_info
                         )
                         meta_hint = f" [colors: {colors_str}]"
-                    else:
-                        # Show general metadata (chart_type, filename, etc.)
-                        other_meta = {k: v for k, v in a["metadata"].items() if k != "series"}
-                        if other_meta:
-                            meta_str = "; ".join(
-                                f"{k}={v}" for k, v in other_meta.items() if v is not None
-                            )
-                            if meta_str:
-                                meta_hint = f" [{meta_str}]"
                     if summary:
                         meta_hint += f" [summary: {summary}]"
-                lines.append(f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: ![{purpose}]({content_ref}){meta_hint}")
+                lines.append(
+                    f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: "
+                    f"![{purpose}]({content_ref}){meta_hint}"
+                )
             else:
                 lines.append(f"- [{aid}] type={atype}, purpose='{purpose}', ref={content_ref}")
         return "\n".join(lines)
@@ -1519,6 +1526,17 @@ You are a professional data analyst. Generate a structured report based on the r
 - When the chart metadata includes a "【以下为程序自动生成的图表描述】" section, you MUST quote it VERBATIM as your chart description. This text is machine-generated from actual chart data and is ALWAYS correct. Do NOT rewrite, paraphrase, or add facts that contradict it. You may add your own ANALYSIS after quoting it, but the description itself must be a direct quote.
 - The LLM-written "summary" may contain hallucinated facts. Do NOT trust it over the machine-generated description.
 - Example: if factual description says "X轴范围为2023-Q1至2024-Q4" → you MUST use these exact date boundaries, NOT something like "2024-2025" from the summary
+
+[Chart Color Rules — THIS IS THE SINGLE SOURCE OF TRUTH]
+The [Available Visual Assets] above includes [colors: ...] and [summary: ...] hints for each chart.
+These hints are derived from the ACTUAL chart data (ChartSpec metadata), NOT from the image.
+The image is only for visual display — the hints are the authoritative data source.
+
+MANDATORY RULES (violating any of these is WRONG):
+- ALL series descriptions MUST use the EXACT color_name from the [colors:] hint. If the hint says CPI is "绿色", you MUST write "CPI（绿色）". NEVER write "CPI（橙色）" or any other color — that would be a factual error.
+- ALL numeric values (max/min/avg/trend/growth) MUST come from the [summary:] hint. NEVER recalculate or estimate from the image.
+- If a chart has NO [colors:] or [summary:] hint, describe only its title and chart type — do NOT mention colors or values at all.
+- Before writing any analysis paragraph, mentally check: "Am I using the EXACT color_name from the [colors:] hint for each series?"
 
 Current time: {now_str}
 """

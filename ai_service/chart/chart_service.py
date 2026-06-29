@@ -21,7 +21,7 @@ OUTPUT_DIR = Path("/tmp")
 
 
 class ChartService:
-    """Generate charts from Python code, upload to MinIO, return image URL dict."""
+    """Generate charts from Python code, upload to MinIO, return structured dict."""
 
     def __init__(self):
         self._renderer = MatplotlibRenderer()
@@ -29,6 +29,10 @@ class ChartService:
 
     def render(self, code: str) -> dict:
         """Execute matplotlib code and return structured dict with metadata.
+
+        The code is executed with FontManager + cn_font + Palette injected.
+        If __chart_spec__ is declared, the renderer uses render_from_spec
+        internally and returns full metadata.
 
         Returns:
             On success::
@@ -56,7 +60,7 @@ class ChartService:
         if not url:
             url = f"file://{output_path}"
 
-        # Upload metadata.json
+        # Upload metadata.json if present
         metadata_url = None
         json_path = output_path.replace(".png", "_metadata.json")
         if os.path.isfile(json_path):
@@ -65,7 +69,7 @@ class ChartService:
         return {
             "type": "image",
             "url": url,
-            "metadata": result.metadata.to_dict(),
+            "metadata": result.metadata,
             "metadata_url": metadata_url,
             "summary": result.summary,
         }

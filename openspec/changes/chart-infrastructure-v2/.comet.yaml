@@ -1,5 +1,5 @@
 workflow: full
-phase: archive
+phase: build
 context_compression: off
 build_mode: subagent-driven-development
 build_pause: null
@@ -7,17 +7,16 @@ subagent_dispatch: confirmed
 tdd_mode: tdd
 review_mode: standard
 isolation: worktree
-verify_mode: full
+verify_mode: null
 auto_transition: true
 base_ref: 2c1ada3398615c22e69f8c1afb498e82677eae8a
 design_doc: docs/superpowers/specs/2026-06-28-chart-infrastructure-v2-design.md
 plan: docs/superpowers/plans/2026-06-28-chart-infrastructure-v2.md
-verify_result: pass
-verification_report: docs/superpowers/reports/2026-06-28-chart-infrastructure-v2-verify.md
-branch_status: handled
+verify_result: pending
+verification_report: null
+branch_status: pending
 created_at: 2026-06-28
-verified_at: 2026-06-28
+verified_at: null
 archived: false
 handoff_context: openspec/changes/chart-infrastructure-v2/.comet/handoff/design-context.json
 handoff_hash: debddf4219f55d3493198f4f126a9aaff1159c7387ed5da2e80940cae371ad17
-build_command: bash scripts/build-chart-tests.sh

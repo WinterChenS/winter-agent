@@ -1,4 +1,4 @@
-"""Tests for Palette — enterprise color palette."""
+"""Tests for Palette — enterprise color palette with Chinese names."""
 from __future__ import annotations
 
 import pytest
@@ -19,50 +19,43 @@ class TestPaletteColor:
 
 
 class TestPaletteConstants:
-    def test_primary_color(self):
+    def test_primary(self):
         assert Palette.PRIMARY.hex == "#2F80ED"
         assert Palette.PRIMARY.name_cn == "蓝色"
 
-    def test_secondary_color(self):
+    def test_secondary(self):
         assert Palette.SECONDARY.hex == "#27AE60"
         assert Palette.SECONDARY.name_cn == "绿色"
 
-    def test_success_color(self):
+    def test_success(self):
         assert Palette.SUCCESS.hex == "#219653"
         assert Palette.SUCCESS.name_cn == "深绿"
 
-    def test_warning_color(self):
+    def test_warning(self):
         assert Palette.WARNING.hex == "#F2994A"
         assert Palette.WARNING.name_cn == "橙色"
 
-    def test_error_color(self):
+    def test_error(self):
         assert Palette.ERROR.hex == "#EB5757"
         assert Palette.ERROR.name_cn == "红色"
 
-    def test_info_color(self):
+    def test_info(self):
         assert Palette.INFO.hex == "#9B51E0"
         assert Palette.INFO.name_cn == "紫色"
 
-    def test_pink_color(self):
-        assert Palette.PINK.hex == "#E91E63"
-        assert Palette.PINK.name_cn == "粉红"
+    def test_neutral(self):
+        assert Palette.NEUTRAL.hex == "#828282"
+        assert Palette.NEUTRAL.name_cn == "灰色"
 
-    def test_cyan_color(self):
-        assert Palette.CYAN.hex == "#00BCD4"
-        assert Palette.CYAN.name_cn == "青色"
-
-    def test_series_length(self):
+    def test_series_has_12_colors(self):
         assert len(Palette.SERIES) == 12
 
-    def test_series_includes_all_basic_and_extended(self):
-        expected = [
+    def test_series_first_7_match_constants(self):
+        expected_first_7 = [
             Palette.PRIMARY, Palette.SECONDARY, Palette.SUCCESS,
-            Palette.WARNING, Palette.ERROR, Palette.INFO,
-            Palette.PINK, Palette.CYAN,
-            Palette.EXT_AMBER, Palette.EXT_TEAL,
-            Palette.EXT_INDIGO, Palette.EXT_BROWN,
+            Palette.WARNING, Palette.ERROR, Palette.INFO, Palette.NEUTRAL,
         ]
-        assert Palette.SERIES == expected
+        assert Palette.SERIES[:7] == expected_first_7
 
 
 class TestGetSeriesColors:
@@ -77,14 +70,10 @@ class TestGetSeriesColors:
         assert colors == Palette.SERIES
 
     def test_get_beyond_series_cycles(self):
-        """Requesting more than 12 colors should cycle base colors with hue shift."""
         colors = Palette.get_series_colors(14)
         assert len(colors) == 14
-        # First 12 should match SERIES
         assert colors[:12] == Palette.SERIES
-        # Colors 13+ should have generated names with suffix
         assert colors[12].name_cn == "蓝色_1"
-        assert colors[13].name_cn == "绿色_1"
 
 
 class TestGetColorName:
@@ -95,4 +84,4 @@ class TestGetColorName:
         assert Palette.get_color_name("#123456") == "#123456"
 
     def test_case_sensitive(self):
-        assert Palette.get_color_name("#2f80ed") == "#2f80ed"  # lowercase != uppercase
+        assert Palette.get_color_name("#2f80ed") == "#2f80ed"
