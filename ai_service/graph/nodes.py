@@ -975,24 +975,27 @@ async def _generate_chart_code(
         chart_type = expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"
         title = expected_artifacts[0].get("purpose", step_description) if expected_artifacts else step_description
         return f'''import matplotlib.pyplot as plt
-import numpy as np
+        import numpy as np
+        from chart.font_manager import FontManager
+        from chart.palette import Palette
+        from chart.chart_spec import ChartSpec, SeriesSpec
+        from chart.renderers.matplotlib_renderer import MatplotlibRenderer
 
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'SimHei']
-plt.rcParams['axes.unicode_minus'] = False
+        cn_font = FontManager.get_cn_font()
+        x = np.arange(10)
+        y = np.random.randn(10).cumsum()
 
-x = np.arange(10)
-y = np.random.randn(10).cumsum()
-
-plt.figure(figsize=(12, 6))
-plt.plot(x, y, marker='o', linewidth=2)
-plt.title("{title}", fontsize=16, fontweight='bold')
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig("chart_output.png", dpi=200, bbox_inches='tight')
-plt.close()
-'''
+        spec = ChartSpec(
+            title="{title}",
+            chart_type="{chart_type}",
+            xlabel="X",
+            ylabel="Y",
+            series=[SeriesSpec(name="Data", color=Palette.PRIMARY.hex, color_name=Palette.PRIMARY.name_cn, values=y.tolist())],
+        )
+        renderer = MatplotlibRenderer()
+        result = renderer.render_from_spec(spec, "chart_0.png")
+        print(f"Chart saved: {{result.image_path}}")
+        print(f"Summary: {{result.summary}}")'''
 
 
 # ────────────────────────────────────────────────────────────────────────────
