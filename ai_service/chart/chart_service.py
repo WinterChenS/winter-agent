@@ -20,42 +20,55 @@ OUTPUT_DIR = Path("/tmp")
 
 
 class ChartService:
-    """Generate charts from Python code, upload to MinIO, return image URL dict."""
+    """Generate charts from Python code, upload to MinIO, return structured dict."""
 
     def __init__(self):
         self._renderer = MatplotlibRenderer()
         self._storage = MinioStorage()
 
     def render(self, code: str) -> dict:
-        """Execute matplotlib code and return {"type": "image", "url": "...", ...}.
+        """Execute matplotlib code and return structured dict with metadata.
 
-        The code is executed with ChartTheme applied. If the code calls
-        plt.savefig(), that file is used; otherwise a figure is auto-saved.
+        The code is executed with FontManager + cn_font + Palette injected.
+        If __chart_spec__ is declared, the renderer uses render_from_spec
+        internally and returns full metadata.
+
+        Returns:
+            On success::
+                {
+                    "type": "image",
+                    "url": "https://minio/chart_abc.png",
+                    "metadata": {"title": "...", "chart_type": "...", ...},
+                    "metadata_url": "https://minio/chart_abc_metadata.json",
+                    "summary": "...",
+                }
+            On error::
+                {"type": "error", "error": "Chart rendering failed: ..."}
         """
         filename = f"chart_{uuid.uuid4().hex[:8]}.png"
         output_path = str(OUTPUT_DIR / filename)
 
         try:
-            self._renderer.render(code, output_path)
+            result = self._renderer.render(code, output_path)
         except Exception as e:
             logger.exception("Chart rendering failed")
             return {"type": "error", "error": f"Chart rendering failed: {e}"}
 
+        # Upload PNG
         url = self._storage.upload(output_path)
         if not url:
-            # Fallback: return local path info
-            return {
-                "type": "image",
-                "url": f"file://{output_path}",
-                "width": 1600,
-                "height": 900,
-                "title": filename,
-            }
+            url = f"file://{output_path}"
+
+        # Upload metadata.json if present
+        metadata_url = None
+        json_path = output_path.replace(".png", "_metadata.json")
+        if os.path.isfile(json_path):
+            metadata_url = self._storage.upload(json_path)
 
         return {
             "type": "image",
             "url": url,
-            "width": 1600,
-            "height": 900,
-            "title": filename,
+            "metadata": result.metadata,
+            "metadata_url": metadata_url,
+            "summary": result.summary,
         }
