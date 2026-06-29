@@ -232,6 +232,14 @@ class CodeSandboxTool(BaseTool):
             else:
                 logger.info("Sandbox: no images to upload (output=%s, cwd=%s)", output[:100], cwd)
 
+            # Clean up generated files (already uploaded to MinIO)
+            for f in _os_module.listdir(cwd):
+                if f.endswith(".png") or f.endswith("_metadata.json"):
+                    try:
+                        _os_module.remove(_os_module.path.join(cwd, f))
+                    except Exception:
+                        pass
+
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
                 "images": uploaded,
