@@ -6,6 +6,7 @@ import os
 import tempfile
 
 import pytest
+import matplotlib.pyplot as plt
 
 from chart.chart_result import ChartResult
 from chart.chart_spec import ChartSpec, SeriesSpec, SliceSpec, PointSpec
@@ -37,6 +38,30 @@ class TestRenderFromSpec:
         assert isinstance(result, ChartResult)
         assert result.image_path == output
         assert os.path.isfile(output)
+
+    def test_value_label_preserves_meaningful_decimals(self, renderer):
+        assert renderer._format_value_label(8.5) == "8.5"
+        assert renderer._format_value_label(6.25) == "6.25"
+        assert renderer._format_value_label(4.0) == "4"
+
+    def test_dense_date_labels_are_thinned_and_rotated(self, renderer):
+        fig, ax = plt.subplots()
+        labels = [f"2025-02-{day:02d}" for day in range(1, 21)]
+        ax.set_xticks(range(len(labels)))
+        renderer._apply_x_axis_label_policy(ax, labels, None)
+        assert len(ax.get_xticks()) < len(labels)
+        assert ax.get_xticklabels()[0].get_rotation() == 35
+        assert ax.get_xticklabels()[0].get_ha() == "right"
+        plt.close(fig)
+
+    def test_short_sparse_labels_stay_horizontal(self, renderer):
+        fig, ax = plt.subplots()
+        labels = ["科技", "消费", "金融"]
+        ax.set_xticks(range(len(labels)))
+        renderer._apply_x_axis_label_policy(ax, labels, None)
+        assert len(ax.get_xticks()) == len(labels)
+        assert ax.get_xticklabels()[0].get_rotation() == 0
+        plt.close(fig)
 
     def test_render_line(self, renderer, temp_dir):
         spec = ChartSpec(

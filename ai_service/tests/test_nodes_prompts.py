@@ -10,7 +10,9 @@ import pytest
 
 from graph.nodes import (
     _CHART_CODE_PROMPT,
+    _chart_result_has_metadata,
     _build_composer_system_prompt,
+    _validate_chart_code_uses_spec_renderer,
 )
 
 
@@ -24,6 +26,13 @@ class TestChartCodePrompt:
     def test_uses_cn_font_for_all_text(self):
         """Must use fontproperties=cn_font for ALL text elements."""
         assert "fontproperties=cn_font" in _CHART_CODE_PROMPT
+
+    def test_visible_chart_text_follows_user_language(self):
+        """Must keep chart title, axes, legends, and labels in the user's language."""
+        assert "ALL visible chart text" in _CHART_CODE_PROMPT
+        assert "same language as the specification/data context" in _CHART_CODE_PROMPT
+        assert "If the specification or user context is Chinese, use Simplified Chinese" in _CHART_CODE_PROMPT
+        assert "do NOT translate labels into English" in _CHART_CODE_PROMPT
 
     def test_uses_render_from_spec_via_chart_spec(self):
         """Must instruct LLM to render from ChartSpec."""
@@ -63,6 +72,61 @@ class TestChartCodePrompt:
     def test_no_no_plt_show(self):
         """Must have a rule that says Do NOT call plt.show()."""
         assert "Do NOT call plt.savefig() or plt.show() directly" in _CHART_CODE_PROMPT
+
+
+class TestChartCodeValidation:
+    """Verify generated chart code cannot bypass ChartSpec metadata."""
+
+    def test_accepts_chart_spec_render_from_spec(self):
+        code = """
+colors = Palette.get_series_colors(1)
+spec = ChartSpec(title="T", chart_type="bar", series=[])
+result = MatplotlibRenderer().render_from_spec(spec, "chart_0.png")
+"""
+        assert _validate_chart_code_uses_spec_renderer(code) is None
+
+    def test_rejects_raw_subplots(self):
+        code = """
+fig, axes = plt.subplots(3, 1)
+spec = ChartSpec(title="T", chart_type="bar", series=[])
+result = MatplotlibRenderer().render_from_spec(spec, "chart_0.png")
+"""
+        assert "subplots" in _validate_chart_code_uses_spec_renderer(code)
+
+    def test_rejects_manual_savefig(self):
+        code = """
+spec = ChartSpec(title="T", chart_type="bar", series=[])
+plt.savefig("chart_0.png")
+"""
+        assert "render_from_spec" in _validate_chart_code_uses_spec_renderer(code)
+
+
+class TestChartResultMetadataGate:
+    """Verify uploaded chart images must have matching metadata."""
+
+    def test_accepts_images_with_metadata(self):
+        result = {
+            "result": {
+                "data": {
+                    "images": {"chart_0.png": "https://cdn/chart.png"},
+                    "charts": [{"image": "chart_0.png", "metadata": {"title": "T"}}],
+                }
+            }
+        }
+        assert _chart_result_has_metadata(result) == (True, "")
+
+    def test_rejects_images_without_metadata(self):
+        result = {
+            "result": {
+                "data": {
+                    "images": {"chart_0.png": "https://cdn/chart.png"},
+                    "charts": [],
+                }
+            }
+        }
+        ok, reason = _chart_result_has_metadata(result)
+        assert ok is False
+        assert "missing ChartSpec metadata" in reason
 
 
 class TestComposerArtifactFormatting:

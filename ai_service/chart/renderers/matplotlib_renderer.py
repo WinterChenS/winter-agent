@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import math
+import re
 
 from chart.chart_renderer import AbstractChartRenderer
 from chart.font_manager import FontManager
@@ -154,12 +156,18 @@ class MatplotlibRenderer(AbstractChartRenderer):
             bars = ax.bar(x + offset, s.values, width, label=s.name, color=s.color)
             for bar in bars:
                 ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                        f"{bar.get_height():.0f}", ha="center", va="bottom",
+                        self._format_value_label(bar.get_height()), ha="center", va="bottom",
                         fontsize=9, fontproperties=cn_font)
         ax.set_xticks(x)
         if spec.labels:
-            ax.set_xticklabels(spec.labels, fontproperties=cn_font)
+            self._apply_x_axis_label_policy(ax, spec.labels, cn_font)
         ax.legend(prop=cn_font)
+
+    def _format_value_label(self, value: float) -> str:
+        """Format chart value labels without dropping meaningful decimals."""
+        if float(value).is_integer():
+            return f"{value:.0f}"
+        return f"{value:.2f}".rstrip("0").rstrip(".")
 
     def _render_line(self, ax, spec: ChartSpec, cn_font) -> None:
         import numpy as np
@@ -175,7 +183,7 @@ class MatplotlibRenderer(AbstractChartRenderer):
 
         if spec.labels:
             ax.set_xticks(x)
-            ax.set_xticklabels(spec.labels, fontproperties=cn_font)
+            self._apply_x_axis_label_policy(ax, spec.labels, cn_font)
 
         # Combine legends from both axes
         lines1, labels1 = ax.get_legend_handles_labels()
@@ -223,7 +231,30 @@ class MatplotlibRenderer(AbstractChartRenderer):
         plt.colorbar(im, ax=ax)
         if spec.labels:
             ax.set_xticks(range(len(spec.labels)))
-            ax.set_xticklabels(spec.labels, fontproperties=cn_font, rotation=45)
+            self._apply_x_axis_label_policy(ax, spec.labels, cn_font)
+
+    def _apply_x_axis_label_policy(self, ax, labels: list[str], cn_font) -> None:
+        """Avoid overlapping dense/long x-axis labels by thinning and rotating them."""
+        if not labels:
+            return
+
+        labels = [str(label) for label in labels]
+        count = len(labels)
+        has_long_label = any(len(label) >= 8 for label in labels)
+        looks_like_date = any(re.search(r"\d{4}[-/年]\d{1,2}", label) for label in labels)
+        dense = count > 10 or (count > 6 and (has_long_label or looks_like_date))
+
+        if dense:
+            max_ticks = 8
+            step = max(1, math.ceil(count / max_ticks))
+            tick_positions = list(range(0, count, step))
+            if tick_positions[-1] != count - 1:
+                tick_positions.append(count - 1)
+            ax.set_xticks(tick_positions)
+            tick_labels = [labels[i] for i in tick_positions]
+            ax.set_xticklabels(tick_labels, fontproperties=cn_font, rotation=35, ha="right")
+        else:
+            ax.set_xticklabels(labels, fontproperties=cn_font)
 
     def _spec_from_dict(self, d: dict) -> ChartSpec:
         """Reconstruct a ChartSpec from a dict (e.g., from __chart_spec__)."""

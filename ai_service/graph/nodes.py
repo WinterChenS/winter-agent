@@ -902,9 +902,10 @@ CRITICAL RULES — follow exactly:
 1. Start with: import matplotlib.pyplot as plt; import numpy as np
 2. DO NOT write ANY import statement for: cn_font, Palette, ChartSpec, SeriesSpec, SliceSpec, PointSpec, MatplotlibRenderer, FontManager, or ANYTHING from chart/font/ai_service modules. These names are ALREADY AVAILABLE as variables — just use them directly. cn_font is a FontProperties variable, Palette is a class, etc. Writing "import cn_font" or "from chart.xxx import yyy" will BREAK the code.
 3. ALL text elements MUST use `fontproperties=cn_font`
-4. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
-5. Set figure size to (12, 6)
-6. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
+4. ALL visible chart text (title, axis labels, tick labels, legends, annotations, slice labels) MUST stay in the same language as the specification/data context. If the specification or user context is Chinese, use Simplified Chinese; do NOT translate labels into English.
+5. Get colors from Palette: Palette.get_series_colors(N) — returns PaletteColor objects with .hex and .name_cn
+6. Set figure size to (12, 6)
+7. Build a ChartSpec and call MatplotlibRenderer().render_from_spec() to render:
    colors = Palette.get_series_colors(len(series_data))
    spec = ChartSpec(
        title="图表标题",
@@ -918,9 +919,9 @@ CRITICAL RULES — follow exactly:
    result = renderer.render_from_spec(spec, "chart_0.png")
    For pie charts: slices=[SliceSpec(label="A", value=30, color=colors[0].hex, color_name=colors[0].name_cn)]
    For scatter charts: points=[PointSpec(x=1, y=2, label="pt1")]
-7. Output ONLY valid Python code — no markdown wrappers, no explanation
-8. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
-9. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
+8. Output ONLY valid Python code — no markdown wrappers, no explanation
+9. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
+10. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
 """
 
 
@@ -928,6 +929,7 @@ async def _generate_chart_code(
     step_description: str,
     expected_artifacts: list[dict],
     previous_results: list[dict],
+    retry_reason: str | None = None,
 ) -> str:
     """Generate matplotlib Python code for a chart step using a small LLM call."""
     # Build data context from previous results
@@ -953,6 +955,14 @@ async def _generate_chart_code(
     spec = "\n".join(spec_lines)
 
     prompt = _CHART_CODE_PROMPT.format(spec=spec, data_context=data_context)
+    if retry_reason:
+        prompt += (
+            "\n\nPrevious attempt was rejected: "
+            f"{retry_reason}\n"
+            "Rewrite the code as a single ChartSpec-rendered chart. "
+            "Do not use subplots, plt.savefig, fig.savefig, or plt.show. "
+            "Keep all visible chart text in the same language as the original specification."
+        )
 
     llm = _build_llm(streaming=False, json_mode=False)
     llm.temperature = 0.1
@@ -994,6 +1004,44 @@ async def _generate_chart_code(
         result = renderer.render_from_spec(spec, "chart_0.png")
         print(f"Chart saved: {{result.image_path}}")
         print(f"Summary: {{result.summary}}")'''
+
+
+def _validate_chart_code_uses_spec_renderer(code: str) -> str | None:
+    """Return a rejection reason when generated chart code bypasses ChartSpec."""
+    if "ChartSpec(" not in code or "render_from_spec" not in code:
+        return "chart code must build ChartSpec and call MatplotlibRenderer().render_from_spec()"
+    banned_patterns = [
+        (r"\bplt\.subplots?\s*\(", "subplots/raw matplotlib figures are not allowed"),
+        (r"\.savefig\s*\(", "manual savefig is not allowed"),
+        (r"\bplt\.show\s*\(", "plt.show is not allowed"),
+    ]
+    for pattern, reason in banned_patterns:
+        if re.search(pattern, code):
+            return reason
+    return None
+
+
+def _chart_result_has_metadata(result: dict) -> tuple[bool, str]:
+    """Check execute_python result has metadata for every uploaded chart image."""
+    outer_result = result.get("result", {})
+    if not isinstance(outer_result, dict):
+        return False, "tool result missing data"
+    data = outer_result.get("data", {})
+    if not isinstance(data, dict):
+        return False, "tool result data is not a dict"
+    images = data.get("images", {})
+    charts_meta = data.get("charts", [])
+    if not images:
+        return False, "no uploaded chart images"
+    chart_lookup = {
+        c.get("image"): c
+        for c in charts_meta
+        if isinstance(c, dict) and c.get("image") and c.get("metadata")
+    }
+    missing = [fname for fname in images if fname not in chart_lookup]
+    if missing:
+        return False, f"uploaded chart images missing ChartSpec metadata: {', '.join(missing)}"
+    return True, ""
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1312,13 +1360,36 @@ async def execution_node(state: State, event_bus=None) -> dict:
                 event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name,
                                arguments={"chart_type": expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"})
             try:
-                chart_code = await _generate_chart_code(
-                    step.get("description", ""),
-                    expected_artifacts,
-                    previous_results,
-                )
-                logger.info("[EXECUTION] chart code generated (%d chars)", len(chart_code))
-                result = await _execute_single_tool(tool_name, {"code": chart_code}, gate, context)
+                retry_reason = None
+                result = None
+                for attempt in range(2):
+                    chart_code = await _generate_chart_code(
+                        step.get("description", ""),
+                        expected_artifacts,
+                        previous_results,
+                        retry_reason=retry_reason,
+                    )
+                    logger.info("[EXECUTION] chart code generated (%d chars, attempt=%d)", len(chart_code), attempt + 1)
+                    retry_reason = _validate_chart_code_uses_spec_renderer(chart_code)
+                    if retry_reason:
+                        logger.warning("[EXECUTION] rejecting chart code attempt %d: %s", attempt + 1, retry_reason)
+                        continue
+
+                    result = await _execute_single_tool(tool_name, {"code": chart_code}, gate, context)
+                    if result.get("status") != "completed":
+                        break
+                    ok_metadata, retry_reason = _chart_result_has_metadata(result)
+                    if ok_metadata:
+                        break
+                    logger.warning("[EXECUTION] rejecting chart result attempt %d: %s", attempt + 1, retry_reason)
+                if result is None:
+                    result = {
+                        "ok": False,
+                        "error": {"code": "CHART_METADATA_MISSING", "message": retry_reason or "Chart code did not use ChartSpec metadata", "retryable": True},
+                        "elapsed_ms": 0,
+                        "status": "error",
+                        "error_msg": retry_reason or "Chart code did not use ChartSpec metadata",
+                    }
             except Exception as exc:
                 logger.exception("[EXECUTION] chart generation failed for step %d", step_id)
                 result = {"ok": False, "error": {"code": "CHART_GENERATION_FAILED", "message": str(exc)[:200], "retryable": False}, "elapsed_ms": 0, "status": "error", "error_msg": str(exc)[:200]}
@@ -1348,6 +1419,9 @@ async def execution_node(state: State, event_bus=None) -> dict:
                             }
                     for fname, url in images.items():
                         cinfo = chart_lookup.get(fname, {})
+                        if not cinfo.get("metadata"):
+                            logger.warning("[EXECUTION] skipping chart artifact without metadata: %s", fname)
+                            continue
                         artifact_id = _register_artifact(
                             state,
                             artifact_type="image",
