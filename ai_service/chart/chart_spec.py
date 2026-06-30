@@ -92,7 +92,13 @@ class ChartSpec:
         }
         if self.series:
             meta["series"] = [
-                {"name": s.name, "color": s.color, "color_name": s.color_name}
+                {
+                    "name": s.name,
+                    "color": s.color,
+                    "color_name": s.color_name,
+                    "values": s.values,
+                    "secondary_y": s.secondary_y,
+                }
                 for s in self.series
             ]
         if self.slices:

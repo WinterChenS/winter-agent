@@ -26,12 +26,12 @@ class TestChartCodePrompt:
         assert "fontproperties=cn_font" in _CHART_CODE_PROMPT
 
     def test_uses_render_from_spec_via_chart_spec(self):
-        """Must instruct LLM to set __chart_spec__ to trigger render_from_spec flow."""
-        assert "__chart_spec__" in _CHART_CODE_PROMPT
+        """Must instruct LLM to render from ChartSpec."""
+        assert "render_from_spec(spec" in _CHART_CODE_PROMPT
 
     def test_sets_chart_spec(self):
-        """Must set __chart_spec__ as a dictionary."""
-        assert "__chart_spec__" in _CHART_CODE_PROMPT
+        """Must build a ChartSpec object."""
+        assert "spec = ChartSpec(" in _CHART_CODE_PROMPT
 
     def test_no_rcParams_usage(self):
         """Must prohibit using plt.rcParams to set font (prohibition can mention it)."""
@@ -58,11 +58,11 @@ class TestChartCodePrompt:
 
     def test_has_figsize(self):
         """Should reference figsize."""
-        assert "figsize" in _CHART_CODE_PROMPT
+        assert "figure size to (12, 6)" in _CHART_CODE_PROMPT
 
     def test_no_no_plt_show(self):
         """Must have a rule that says Do NOT call plt.show()."""
-        assert "Do NOT call plt.show()" in _CHART_CODE_PROMPT
+        assert "Do NOT call plt.savefig() or plt.show() directly" in _CHART_CODE_PROMPT
 
 
 class TestComposerArtifactFormatting:
@@ -98,6 +98,9 @@ class TestComposerArtifactFormatting:
         assert "CPI（绿色）" in prompt
         # Should include summary
         assert "GDP shows upward trend" in prompt
+        # Should include full metadata as authoritative chart data.
+        assert "chart_metadata_json" in prompt
+        assert '"series": [{"color": "#2F80ED", "color_name": "蓝色", "name": "GDP"}' in prompt
 
     def test_with_metadata_summary_only(self):
         """Artifact with summary but no series should still include summary."""
@@ -135,9 +138,11 @@ class TestComposerArtifactFormatting:
             artifacts=artifacts,
             now_str="2026-06-29 12:00",
         )
+        artifact_line = next(line for line in prompt.splitlines() if "[img_0]" in line)
         # Should NOT contain "colors:" or "summary:" hints when no metadata
-        assert "[colors:" not in prompt
-        assert "[summary:" not in prompt
+        assert "[colors:" not in artifact_line
+        assert "[summary:" not in artifact_line
+        assert "[chart_metadata_json:" not in artifact_line
 
     def test_multiple_artifacts_mixed_metadata(self):
         """Mix of artifacts with and without metadata should handle both."""
@@ -171,6 +176,42 @@ class TestComposerArtifactFormatting:
         assert "[colors:" in prompt  # First artifact has it
         assert "No Meta" in prompt  # Second artifact should still be listed
 
+    def test_with_metadata_series_values_includes_chart_metadata_json(self):
+        """Full ChartSpec metadata should reach composer, including labels and values."""
+        artifacts = [
+            {
+                "artifact_id": "img_0",
+                "type": "image",
+                "purpose": "GDP Chart",
+                "content_ref": "https://cdn.example.com/chart_0.png",
+                "metadata": {
+                    "title": "GDP Growth",
+                    "chart_type": "line",
+                    "labels": ["2024", "2025"],
+                    "series": [
+                        {
+                            "name": "GDP",
+                            "color": "#2F80ED",
+                            "color_name": "蓝色",
+                            "values": [100, 120],
+                            "secondary_y": False,
+                        }
+                    ],
+                },
+                "summary": "Max: 120 | Min: 100 | Avg: 110 | trend: ↑ | growth: +20.0%",
+            }
+        ]
+        prompt = _build_composer_system_prompt(
+            plan=None,
+            results=[],
+            artifacts=artifacts,
+            now_str="2026-06-29 12:00",
+        )
+        assert "[chart_metadata_json:" in prompt
+        assert '"labels": ["2024", "2025"]' in prompt
+        assert '"values": [100, 120]' in prompt
+        assert "ALL chart values, labels, series names, and axis affiliation MUST come from [chart_metadata_json:]" in prompt
+
 
 class TestComposerChartColorRules:
     """Verify Chart Color Rules section in _build_composer_system_prompt."""
@@ -183,7 +224,7 @@ class TestComposerChartColorRules:
             artifacts=[],
             now_str="2026-06-29 12:00",
         )
-        assert "[Chart Color Rules]" in prompt
+        assert "[Chart Color Rules — THIS IS THE SINGLE SOURCE OF TRUTH]" in prompt
 
     def test_color_desc_must_come_from_metadata(self):
         """Must have rule about colors coming from chart metadata's series color_name and summary."""
@@ -203,7 +244,7 @@ class TestComposerChartColorRules:
             artifacts=[],
             now_str="2026-06-29 12:00",
         )
-        assert "系列名（颜色名）" in prompt
+        assert "CPI（绿色）" in prompt
 
     def test_no_numeric_from_image(self):
         """Must not guess numeric/trend from image inspection."""
@@ -213,7 +254,8 @@ class TestComposerChartColorRules:
             artifacts=[],
             now_str="2026-06-29 12:00",
         )
-        assert "NOT from image inspection" in prompt
+        assert "NEVER infer them from the image" in prompt
+        assert "NEVER recalculate or estimate from the image" in prompt
 
     def test_charts_without_metadata_rule(self):
         """Must have rule for charts without metadata."""
@@ -223,4 +265,4 @@ class TestComposerChartColorRules:
             artifacts=[],
             now_str="2026-06-29 12:00",
         )
-        assert "WITHOUT metadata" in prompt
+        assert "If a chart has NO [colors:] or [summary:] hint" in prompt

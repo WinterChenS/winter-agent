@@ -1474,7 +1474,9 @@ def _build_composer_system_prompt(
                 # For images, provide the actual URL and markdown syntax hint
                 meta_hint = ""
                 if "metadata" in a and a["metadata"]:
+                    metadata_json = json.dumps(a["metadata"], ensure_ascii=False, sort_keys=True)
                     series_info = a["metadata"].get("series", [])
+                    slices_info = a["metadata"].get("slices", [])
                     summary = a.get("summary", "")
                     if series_info:
                         colors_str = "; ".join(
@@ -1482,8 +1484,15 @@ def _build_composer_system_prompt(
                             for s in series_info
                         )
                         meta_hint = f" [colors: {colors_str}]"
+                    elif slices_info:
+                        colors_str = "; ".join(
+                            f'{s.get("label","")}（{s.get("color_name","")}）'
+                            for s in slices_info
+                        )
+                        meta_hint = f" [colors: {colors_str}]"
                     if summary:
                         meta_hint += f" [summary: {summary}]"
+                    meta_hint += f" [chart_metadata_json: {metadata_json}]"
                 lines.append(
                     f"- [{aid}] IMAGE for '{purpose}' — use this Markdown: "
                     f"![{purpose}]({content_ref}){meta_hint}"
@@ -1529,12 +1538,14 @@ You are a professional data analyst. Generate a structured report based on the r
 
 [Chart Color Rules — THIS IS THE SINGLE SOURCE OF TRUTH]
 The [Available Visual Assets] above includes [colors: ...] and [summary: ...] hints for each chart.
+It also includes [chart_metadata_json: ...] for each chart when metadata is available.
 These hints are derived from the ACTUAL chart data (ChartSpec metadata), NOT from the image.
 The image is only for visual display — the hints are the authoritative data source.
 
 MANDATORY RULES (violating any of these is WRONG):
 - ALL series descriptions MUST use the EXACT color_name from the [colors:] hint. If the hint says CPI is "绿色", you MUST write "CPI（绿色）". NEVER write "CPI（橙色）" or any other color — that would be a factual error.
-- ALL numeric values (max/min/avg/trend/growth) MUST come from the [summary:] hint. NEVER recalculate or estimate from the image.
+- ALL chart values, labels, series names, and axis affiliation MUST come from [chart_metadata_json:]. NEVER infer them from the image.
+- ALL aggregate numeric values (max/min/avg/trend/growth) MUST come from the [summary:] hint. NEVER recalculate or estimate from the image.
 - If a chart has NO [colors:] or [summary:] hint, describe only its title and chart type — do NOT mention colors or values at all.
 - Before writing any analysis paragraph, mentally check: "Am I using the EXACT color_name from the [colors:] hint for each series?"
 

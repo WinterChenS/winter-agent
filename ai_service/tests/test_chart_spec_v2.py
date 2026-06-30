@@ -109,6 +109,8 @@ class TestToMetadata:
         assert meta["series"][0]["name"] == "Q1"
         assert meta["series"][0]["color"] == "#2F80ED"
         assert meta["series"][0]["color_name"] == "蓝色"
+        assert meta["series"][0]["values"] == [100, 200]
+        assert meta["series"][0]["secondary_y"] is False
 
     def test_pie_metadata(self):
         spec = ChartSpec(
