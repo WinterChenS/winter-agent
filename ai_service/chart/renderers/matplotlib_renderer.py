@@ -104,10 +104,14 @@ class MatplotlibRenderer(AbstractChartRenderer):
                 self._render_bar(ax, spec, cn_font)
             case "line":
                 self._render_line(ax, spec, cn_font)
+            case "area":
+                self._render_area(ax, spec, cn_font)
             case "pie":
                 self._render_pie(ax, spec, cn_font)
             case "scatter":
                 self._render_scatter(ax, spec, cn_font)
+            case "radar":
+                ax = self._render_radar(fig, ax, spec, cn_font)
             case "histogram":
                 self._render_histogram(ax, spec, cn_font)
             case "heatmap":
@@ -218,8 +222,15 @@ class MatplotlibRenderer(AbstractChartRenderer):
 
     def _render_histogram(self, ax, spec: ChartSpec, cn_font) -> None:
         import numpy as np
+        raw_values = None
         if spec.data and spec.data[0]:
-            ax.hist(spec.data[0], bins="auto", color=Palette.PRIMARY.hex, edgecolor="white")
+            raw_values = spec.data[0]
+        elif spec.series:
+            raw_values = []
+            for s in spec.series:
+                raw_values.extend(s.values)
+        if raw_values:
+            ax.hist(raw_values, bins="auto", color=Palette.PRIMARY.hex, edgecolor="white")
 
     def _render_heatmap(self, ax, spec: ChartSpec, cn_font) -> None:
         import matplotlib.pyplot as plt
@@ -232,6 +243,45 @@ class MatplotlibRenderer(AbstractChartRenderer):
         if spec.labels:
             ax.set_xticks(range(len(spec.labels)))
             self._apply_x_axis_label_policy(ax, spec.labels, cn_font)
+
+    def _render_area(self, ax, spec: ChartSpec, cn_font) -> None:
+        """Stacked area chart — each series is a layer stacked cumulatively."""
+        import numpy as np
+
+        if not spec.series:
+            return
+        x = np.arange(len(spec.series[0].values))
+        y = np.row_stack([s.values for s in spec.series])
+        colors = [s.color for s in spec.series]
+        labels = [s.name for s in spec.series]
+        ax.stackplot(x, y, labels=labels, colors=colors, alpha=0.8)
+        if spec.labels:
+            ax.set_xticks(x)
+            self._apply_x_axis_label_policy(ax, spec.labels, cn_font)
+        ax.legend(prop=cn_font)
+
+    def _render_radar(self, fig, ax, spec: ChartSpec, cn_font):
+        """Radar/spider chart — each series is a polygon on polar axes."""
+        import numpy as np
+
+        if not spec.series:
+            return ax
+        ax.remove()
+        ax = fig.add_subplot(111, polar=True)
+        angles = np.linspace(0, 2 * np.pi, len(spec.series[0].values), endpoint=False).tolist()
+        angles += angles[:1]  # close the polygon
+
+        for s in spec.series:
+            values = list(s.values) + [s.values[0]]
+            ax.fill(angles, values, alpha=0.25, color=s.color)
+            ax.plot(angles, values, "o-", linewidth=2, label=s.name, color=s.color)
+
+        if spec.labels:
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(spec.labels, fontproperties=cn_font)
+            ax.tick_params(axis="x", labelsize=9)
+        ax.legend(prop=cn_font, loc="upper right", bbox_to_anchor=(1.3, 1.1))
+        return ax
 
     def _apply_x_axis_label_policy(self, ax, labels: list[str], cn_font) -> None:
         """Avoid overlapping dense/long x-axis labels by thinning and rotating them."""

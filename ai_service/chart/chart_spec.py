@@ -23,12 +23,29 @@ from chart.palette import Palette
 
 @dataclass
 class SeriesSpec:
-    """A single data series in a bar or line chart."""
+    """A single data series in a bar or line chart.
+
+    Args:
+        name: Series display name (legend label).
+        color: Hex color string (e.g. "#2F80ED").
+        color_name: Human-readable color name; auto-resolved if empty.
+        values: Numeric data points for this series.
+        axis: Target y-axis — "left" (default) or "right" for dual-axis charts.
+        secondary_y: Deprecated. Use axis="right" instead.
+    """
     name: str
     color: str
     color_name: str
     values: list[float]
-    secondary_y: bool = False  # use right y-axis for dual-axis charts
+    axis: str = "left"        # "left" | "right"
+    secondary_y: bool = False  # kept for backward compatibility; derived from axis
+
+    def __post_init__(self):
+        if not self.color_name:
+            from chart.palette import Palette
+            self.color_name = Palette.get_color_name(self.color)
+        if self.axis == "right":
+            self.secondary_y = True
 
 
 @dataclass
@@ -97,7 +114,7 @@ class ChartSpec:
                     "color": s.color,
                     "color_name": s.color_name,
                     "values": s.values,
-                    "secondary_y": s.secondary_y,
+                    "axis": s.axis,
                 }
                 for s in self.series
             ]

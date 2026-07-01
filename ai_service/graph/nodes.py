@@ -112,7 +112,7 @@ def _build_llm(streaming: bool = True, json_mode: bool = False) -> ChatOpenAI:
         "base_url": settings.base_url,
     }
     if json_mode:
-        kwargs["response_format"] = {"type": "json_object"}
+        kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
     return ChatOpenAI(**kwargs)
 
 
@@ -681,7 +681,7 @@ Output a single valid JSON object. No markdown wrapping.
 }
 
 Rules:
-- chart_type: line | bar | pie | scatter | area | radar
+- chart_type: line | bar | pie | scatter | area | radar | histogram | heatmap
 - id: sequential integer starting from 0
 - data: maximum 20 data points
 - pie chart: do NOT set x_axis_label or y_axis_label
@@ -832,7 +832,7 @@ Rules:
 - required_tools for SEARCH/data steps: ["search"] or ["browser"]
 - required_tools for CHART steps: ["execute_python"] — system will auto-generate matplotlib code
 - Chart step description MUST include: what chart to make (line/bar/pie/...), what data to visualize, axis labels
-- expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar"
+- expected_artifacts.chart_type: null | "line" | "bar" | "pie" | "scatter" | "area" | "radar" | "histogram" | "heatmap"
 - Only use "chart_type" when required_tools includes "execute_python"
 - Limit to 7 steps maximum
 - For simple questions (1 search is enough), output a single step
@@ -922,6 +922,7 @@ CRITICAL RULES — follow exactly:
 8. Output ONLY valid Python code — no markdown wrappers, no explanation
 9. Do NOT call plt.savefig() or plt.show() directly — render_from_spec() handles saving
 10. PROHIBITED: Do NOT use plt.rcParams['font.sans-serif'] — font is handled via fontproperties=cn_font
+11. PROHIBITED: Do NOT pass `fontproperties` to ChartSpec, SeriesSpec, SliceSpec, or PointSpec constructors — these are plain dataclasses, not matplotlib objects
 """
 
 
