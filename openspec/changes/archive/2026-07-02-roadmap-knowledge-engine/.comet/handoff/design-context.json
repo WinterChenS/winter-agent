@@ -1,0 +1,14 @@
+{
+  "change": "roadmap-knowledge-engine",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "89cb52bb994b22bf788755af4abdd1d6c78b233ec2259d290bdc6a9a21b3edc2",
+  "files": [
+    { "path": "openspec/changes/roadmap-knowledge-engine/proposal.md", "sha256": "3711eeb4780447ff49235aadfb75364f01084c3127babfaf4bb9e612b675802a" },
+    { "path": "openspec/changes/roadmap-knowledge-engine/design.md", "sha256": "06d0c21c8a839477f7045db0588d5dbec4a83f714342e70c703b9e0d84052003" },
+    { "path": "openspec/changes/roadmap-knowledge-engine/tasks.md", "sha256": "ce4231e7040cb5941e868f846e1288c14bbe762ad3c35058b11cb5d2b46c5391" },
+    { "path": "openspec/changes/roadmap-knowledge-engine/specs/roadmap-knowledge-engine-docs/spec.md", "sha256": "e9995e17ebf1541e6da8170eb2d3d81b7e6558dcb9630eddba99af98c6f43c3c" }
+  ]
+}

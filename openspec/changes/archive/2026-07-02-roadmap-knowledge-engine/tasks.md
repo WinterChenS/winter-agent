@@ -1,0 +1,5 @@
+- [x] 1.1 V1.6 规划：文档上传、解析（PDF/Word/Excel/PPT/Markdown）
+- [x] 2.1 V1.7 规划：OCR、图片理解、表格解析、多模态知识抽取
+- [x] 3.1 V1.8 规划：Hybrid Search（全文+向量+Metadata）
+- [x] 4.1 V1.9 规划：ReRank、Citation、Knowledge Cache
+- [x] 5.1 V2.0 规划：长期 Memory + 企业知识库 + Workspace 隔离
