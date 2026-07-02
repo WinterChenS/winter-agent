@@ -1,0 +1,5 @@
+- [x] 1.1 V2.1 Skill Runtime
+- [x] 2.1 V2.2 Skill Registry
+- [x] 3.1 V2.3 Skill Marketplace
+- [x] 4.1 V2.4 Skill Builder
+- [x] 5.1 V2.5 Import/Export
