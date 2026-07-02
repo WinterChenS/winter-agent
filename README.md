@@ -170,49 +170,182 @@ winter-agent/
 
 ## 路线图
 
-### 第一阶段：核心 Agent 能力（V0.1 ~ V0.5）
+### 第一阶段：Agent Runtime（V0.1 ~ V1.0）
+
+> 目标：打造稳定、可扩展的 Agent Runtime，为所有 Agent 提供统一运行时能力。
 
 | 版本 | 状态 | 描述 |
 |------|------|------|
-| V0.1 | ✅ 完成 | 基础对话 + SSE 流式框架 |
-| V0.2 | ✅ 完成 | 多轮会话历史 + LangSmith 可观测性 |
-| V0.3 | ✅ 完成 | 工具调用运行时 (ReAct · 工具注册表 · 策略门控) |
-| V0.4 | ✅ 完成 | 多智能体路由 + 三种协作策略 (顺序/并行/监督) |
-| V0.5 | ✅ 完成 | 计划-执行-合成流水线 + ChartSpec 图表系统 |
+| V0.1 | ✅ 完成 | 基础对话 + SSE 全链路流式响应 |
+| V0.2 | ✅ 完成 | 多轮会话 + LangGraph Checkpoint + LangSmith 可观测性 |
+| V0.3 | ✅ 完成 | Tool Runtime（ReAct + Tool Registry + Strategy Guard） |
+| V0.4 | ✅ 完成 | 多 Agent 路由 + 顺序 / 并行 / Supervisor 协作模式 |
+| V0.5 | ✅ 完成 | Planner → Execute → Synthesize 执行流水线 + ChartSpec 图表生成 |
+| V0.6 | 🚧 进行中 | 原生 Function Calling Runtime（替代文本解析） |
+| V0.7 | 📋 规划中 | Context Builder（会话、文件、Memory、Knowledge 上下文自动构建） |
+| V0.8 | 📋 规划中 | Event Bus（Tool、LLM、Workflow 全事件流） |
+| V0.9 | 📋 规划中 | Runtime Stability（Retry、Timeout、Cancellation、Checkpoint、Recovery） |
+| V1.0 | 📋 规划中 | Runtime SDK（统一 Agent Runtime API，所有 Agent 共用） |
 
-### 第二阶段：稳定性与架构（V0.6 ~ V0.7）
+---
 
-| 版本 | 状态 | 描述 |
-|------|------|------|
-| V0.6 | 🚧 进行中 | 文本解析 → 原生 Function Calling（消除核心不稳定源）|
-| V0.7 | 📋 规划中 | 安全与韧性 — Secret 管理、Prompt 注入防御、LLM 重试/超时、深度健康检查 |
+### 第二阶段：Workflow Engine（V1.1 ~ V1.5）
 
-### 第三阶段：企业基础（V0.8 ~ V0.9）
-
-| 版本 | 状态 | 描述 |
-|------|------|------|
-| V0.8 | 📋 规划中 | 可观测性平台 — Prometheus Metrics · Grafana Dashboard · OpenTelemetry 分布式追踪 · 审计日志 |
-| V0.9 | 📋 规划中 | 多租户架构 — 租户数据隔离 · RBAC 角色体系 · 工作空间 · API 限流配额 |
-
-### 第四阶段：知识引擎（V1.0）
+> 目标：从 Agent 演进为 Workflow，实现复杂任务编排。
 
 | 版本 | 状态 | 描述 |
 |------|------|------|
-| V1.0 | 📋 规划中 | RAG 知识库 — 文档上传/解析 · pgvector 向量检索 · 跨会话长期记忆 · 内容安全过滤 |
+| V1.1 | 📋 规划中 | DAG Workflow Engine（节点 + 边） |
+| V1.2 | 📋 规划中 | 条件、循环、并行、子流程、动态节点 |
+| V1.3 | 📋 规划中 | Human-in-the-loop（人工审批、人工确认、等待输入） |
+| V1.4 | 📋 规划中 | Checkpoint & Resume（流程恢复、失败重试、补偿机制） |
+| V1.5 | 📋 规划中 | Workflow Designer（可视化拖拽流程设计器） |
 
-### 第五阶段：平台生态（V1.1 ~ V1.2）
+---
+
+### 第三阶段：Knowledge Engine（V1.6 ~ V2.0）
+
+> 目标：构建企业级知识引擎，而不仅仅是 RAG。
 
 | 版本 | 状态 | 描述 |
 |------|------|------|
-| V1.1 | 📋 规划中 | MCP 协议支持 (Client + Server) · Python SDK · TypeScript SDK · API 文档完善 |
-| V1.2 | 📋 规划中 | Agent 模板市场 · 可视化工具注册 · A2A 协议 · Webhook 回调 |
+| V1.6 | 📋 规划中 | 文档上传、解析（PDF、Word、Excel、PPT、Markdown） |
+| V1.7 | 📋 规划中 | OCR、图片理解、表格解析、多模态知识抽取 |
+| V1.8 | 📋 规划中 | Hybrid Search（全文 + 向量 + Metadata） |
+| V1.9 | 📋 规划中 | ReRank、Citation、Knowledge Cache |
+| V2.0 | 📋 规划中 | 长期 Memory + 企业知识库 + Workspace 隔离 |
 
-### 第六阶段：规模化（V2.0）
+---
+
+### 第四阶段：Skill Engine（V2.1 ~ V2.5）
+
+> 目标：建立 Tool → Skill → Workflow → Agent 四层能力体系。
 
 | 版本 | 状态 | 描述 |
 |------|------|------|
-| V2.0 | 📋 规划中 | 水平扩展 · 熔断降级 · 消息队列削峰 · 多区域部署 · PII 检测脱敏 |
+| V2.1 | 📋 规划中 | Skill Runtime（多个 Tool 封装为 Skill） |
+| V2.2 | 📋 规划中 | Skill Registry（版本管理、权限、配置） |
+| V2.3 | 📋 规划中 | Skill Marketplace（技能市场） |
+| V2.4 | 📋 规划中 | 可视化 Skill Builder |
+| V2.5 | 📋 规划中 | Skill Sharing & Import/Export |
 
+---
+
+### 第五阶段：Expert Team（V2.6 ~ V3.0）
+
+> 目标：打造 AI 专家团队，让多个 Agent 像真实团队一样协作。
+
+| 版本 | 状态 | 描述 |
+|------|------|------|
+| V2.6 | 📋 规划中 | Team Runtime（团队执行框架） |
+| V2.7 | 📋 规划中 | Team Leader（任务拆解、调度、协调） |
+| V2.8 | 📋 规划中 | Expert Roles（架构、Java、Python、DBA、测试、安全等专家） |
+| V2.9 | 📋 规划中 | Reviewer / Judge（自动 Review、评分、纠错） |
+| V3.0 | 📋 规划中 | Team Builder（自定义专家团队、组织管理） |
+
+---
+
+### 第六阶段：Platform（V3.1 ~ V3.8）
+
+> 目标：打造真正的企业级 Agent Platform。
+
+| 版本 | 状态 | 描述 |
+|------|------|------|
+| V3.1 | 📋 规划中 | Agent Builder（Agent 可视化配置） |
+| V3.2 | 📋 规划中 | Workflow Builder |
+| V3.3 | 📋 规划中 | Prompt Builder（Prompt 模板管理） |
+| V3.4 | 📋 规划中 | Knowledge Builder |
+| V3.5 | 📋 规划中 | Tool Builder |
+| V3.6 | 📋 规划中 | Model Router（多模型路由、Fallback、成本优化） |
+| V3.7 | 📋 规划中 | Multi Tenant（租户、Workspace、RBAC） |
+| V3.8 | 📋 规划中 | 企业控制台（Dashboard、监控、日志、审计） |
+
+---
+
+### 第七阶段：Enterprise（V4.0 ~ V4.5）
+
+> 目标：满足企业生产环境需求。
+
+| 版本 | 状态 | 描述 |
+|------|------|------|
+| V4.0 | 📋 规划中 | OpenTelemetry + Prometheus + Grafana |
+| V4.1 | 📋 规划中 | 审计日志、成本统计、Token Usage |
+| V4.2 | 📋 规划中 | Secret Manager、Prompt Security、防 Prompt Injection |
+| V4.3 | 📋 规划中 | Rate Limit、Quota、API Key 管理 |
+| V4.4 | 📋 规划中 | 熔断、降级、缓存、消息队列 |
+| V4.5 | 📋 规划中 | Kubernetes、Horizontal Scaling、多区域部署 |
+
+---
+
+### 第八阶段：AI Ecosystem（V5.0）
+
+> 目标：打造开放生态，支持第三方扩展。
+
+| 版本 | 状态 | 描述 |
+|------|------|------|
+| V5.0 | 📋 规划中 | MCP Client + MCP Server + A2A Protocol + Plugin SDK + Python SDK + Java SDK + TypeScript SDK + Agent Marketplace + Skill Marketplace + Workflow Marketplace |
+
+---
+
+## 最终平台能力（Vision）
+
+```
+Winter Agent Platform
+
+├── Runtime Engine
+│   ├── Planner
+│   ├── Context Builder
+│   ├── Event Bus
+│   ├── Executor
+│   ├── Memory
+│   └── Checkpoint
+│
+├── Workflow Engine
+│   ├── DAG
+│   ├── Parallel
+│   ├── Loop
+│   ├── Condition
+│   ├── Human Approval
+│   └── Resume
+│
+├── Knowledge Engine
+│   ├── Document Parsing
+│   ├── Hybrid Search
+│   ├── Multi Modal
+│   ├── Long Memory
+│   └── Citation
+│
+├── Skill Engine
+│   ├── Tool Registry
+│   ├── Skill Registry
+│   ├── Skill Builder
+│   └── Skill Marketplace
+│
+├── Expert Team
+│   ├── Team Builder
+│   ├── Leader
+│   ├── Experts
+│   ├── Reviewer
+│   └── Judge
+│
+├── Platform
+│   ├── Agent Builder
+│   ├── Workflow Builder
+│   ├── Prompt Builder
+│   ├── Knowledge Builder
+│   ├── Tool Builder
+│   └── Model Router
+│
+└── Enterprise
+    ├── Multi Tenant
+    ├── Observability
+    ├── Security
+    ├── Audit
+    ├── Scaling
+    └── Open Ecosystem (MCP / A2A / SDK)
+```
+
+> **最终目标：Winter Agent 不仅是一个 AI Agent 项目，而是一个面向企业的 AI Agent Platform（AI Agent Operating System），支持 Agent、Workflow、Skill、Knowledge、Expert Team、MCP、A2A、开放生态的完整平台。**
 > 详细差距分析参见 [docs/enterprise-gap-analysis.md](docs/enterprise-gap-analysis.md)
 
 ## License
