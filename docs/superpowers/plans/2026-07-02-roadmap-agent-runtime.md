@@ -2,6 +2,7 @@
 change: roadmap-agent-runtime
 design-doc: docs/superpowers/specs/2026-07-02-roadmap-agent-runtime-design.md
 base-ref: f65c67f88046cf58a4d632976967b31d8b32120d
+archived-with: 2026-07-02-roadmap-agent-runtime
 ---
 
 # Implementation Plan: Agent Runtime Phase Planning
