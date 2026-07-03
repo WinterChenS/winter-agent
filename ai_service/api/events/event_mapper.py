@@ -228,8 +228,19 @@ def map_streaming_bus_event_to_envelope(
     ctx: EventMapContext,
     message_id: str,
 ) -> dict[str, Any] | None:
-    """Map a StreamingEventBus event to SSE envelope format."""
-    if event.type == "tool.progress":
+    """Map a StreamingEventBus event to SSE envelope format.
+
+    Translates internal bus event types to frontend-compatible SSE event types:
+    ``tool.started`` → ``tool_start``, ``tool.completed`` → ``tool_result``.
+    """
+    if event.type == "tool.started":
+        return envelope_tool_start(
+            ctx.trace_ctx,
+            tool_name=event.data.get("toolName", "unknown"),
+            content=event.data.get("toolName", "unknown"),
+            input_payload=event.data.get("arguments", {}),
+        )
+    elif event.type == "tool.progress":
         return envelope_tool_progress(
             ctx.trace_ctx,
             tool_name=event.data.get("toolName", "unknown"),
@@ -244,10 +255,19 @@ def map_streaming_bus_event_to_envelope(
             chunk_index=event.data.get("chunkIndex", 0),
         )
     elif event.type == "tool.completed":
-        return envelope_tool_completed(
+        result_data = event.data.get("result", {})
+        if isinstance(result_data, dict) and result_data.get("ok"):
+            summary = summarize_tool_result(
+                event.data.get("toolName", "unknown"),
+                result_data,
+            )
+        else:
+            summary = str(result_data.get("error", {}).get("message", "")) if isinstance(result_data, dict) else ""
+        return envelope_tool_result(
             ctx.trace_ctx,
             tool_name=event.data.get("toolName", "unknown"),
-            result=event.data.get("result", {}),
+            content=summary,
+            status="completed",
             elapsed_ms=event.data.get("elapsed_ms", 0),
         )
     return None
