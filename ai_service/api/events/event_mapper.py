@@ -228,17 +228,18 @@ def map_streaming_bus_event_to_envelope(
     ctx: EventMapContext,
     message_id: str,
 ) -> dict[str, Any] | None:
-    """Map a StreamingEventBus event to SSE envelope format.
-
-    Translates internal bus event types to frontend-compatible SSE event types:
-    ``tool.started`` → ``tool_start``, ``tool.completed`` → ``tool_result``.
-    """
     if event.type == "tool.started":
-        return envelope_tool_start(
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = event.data.get("tool_call_id") or f"{tool_name}_{event.timestamp}"
+        return build_envelope(
+            "tool.started",
             ctx.trace_ctx,
-            tool_name=event.data.get("toolName", "unknown"),
-            content=event.data.get("toolName", "unknown"),
-            input_payload=event.data.get("arguments", {}),
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "arguments": event.data.get("arguments", {}),
+                "status": "running",
+            },
         )
     elif event.type == "tool.progress":
         return envelope_tool_progress(
@@ -248,27 +249,34 @@ def map_streaming_bus_event_to_envelope(
             message=event.data.get("message", ""),
         )
     elif event.type == "tool.output":
-        return envelope_tool_output(
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = f"{tool_name}_{event.timestamp}"
+        return build_envelope(
+            "tool.output",
             ctx.trace_ctx,
-            tool_name=event.data.get("toolName", "unknown"),
-            output=event.data.get("output", ""),
-            chunk_index=event.data.get("chunkIndex", 0),
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "output": event.data.get("output", ""),
+                "chunkIndex": event.data.get("chunkIndex", 0),
+            },
         )
     elif event.type == "tool.completed":
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = event.data.get("tool_call_id") or f"{tool_name}_{event.timestamp}"
         result_data = event.data.get("result", {})
         if isinstance(result_data, dict) and result_data.get("ok"):
-            summary = summarize_tool_result(
-                event.data.get("toolName", "unknown"),
-                result_data,
-            )
+            summary = summarize_tool_result(tool_name, result_data)
         else:
             summary = str(result_data.get("error", {}).get("message", "")) if isinstance(result_data, dict) else ""
-        return envelope_tool_result(
+        return build_envelope(
+            "tool.finished",
             ctx.trace_ctx,
-            tool_name=event.data.get("toolName", "unknown"),
-            content=summary,
-            status="completed",
-            elapsed_ms=event.data.get("elapsed_ms", 0),
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "result": {"status": "completed", "summary": summary, "elapsed_ms": event.data.get("elapsed_ms", 0)},
+            },
         )
     return None
 

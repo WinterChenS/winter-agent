@@ -617,7 +617,8 @@ async def _execute_single_tool(
                     result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                     await registry._run_post_hooks(tool_name, prepped, result)
             else:
-                bus.emit("tool.started", toolName=tool_name, arguments=call.input_payload)
+                _tc_id = f"{tool_name}_{int(step_start * 1000)}"
+                bus.emit("tool.started", tool_call_id=_tc_id, toolName=tool_name, arguments=call.input_payload)
                 await asyncio.sleep(0)
                 if effective_timeout_ms and effective_timeout_ms > 0:
                     result_obj = await asyncio.wait_for(
@@ -628,7 +629,7 @@ async def _execute_single_tool(
                     result_obj = await tool.execute(call.input_payload)
                 result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                 _elapsed_ms = int((time.time() - step_start) * 1000)
-                bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_elapsed_ms)
+                bus.emit("tool.completed", tool_call_id=_tc_id, toolName=tool_name, result=result, elapsed_ms=_elapsed_ms)
                 await asyncio.sleep(0)
         else:
             if effective_timeout_ms and effective_timeout_ms > 0:
@@ -911,7 +912,8 @@ async def tool_node(state: State) -> dict:
                             result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                             await registry._run_post_hooks(tool_name, _prepped, result)
                     else:
-                        bus.emit("tool.started", toolName=tool_name, arguments=tool_input)
+                        _legacy_tc_id = f"{tool_name}_{int(start_time * 1000)}"
+                        bus.emit("tool.started", tool_call_id=_legacy_tc_id, toolName=tool_name, arguments=tool_input)
                         await asyncio.sleep(0)
                         if _effective_timeout_ms and _effective_timeout_ms > 0:
                             result_obj = await asyncio.wait_for(
@@ -922,7 +924,7 @@ async def tool_node(state: State) -> dict:
                             result_obj = await tool.execute(tool_input)
                         result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                         _legacy_elapsed = int((time.time() - start_time) * 1000)
-                        bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_legacy_elapsed)
+                        bus.emit("tool.completed", tool_call_id=_legacy_tc_id, toolName=tool_name, result=result, elapsed_ms=_legacy_elapsed)
                         await asyncio.sleep(0)
                 else:
                     if _effective_timeout_ms and _effective_timeout_ms > 0:
