@@ -202,86 +202,11 @@ class CodeSandboxTool(BaseTool):
             if stderr_str:
                 output += "\n[stderr]\n" + stderr_str
 
-            # Scan for generated image files and upload to MinIO
-            import re as _re
-            import os as _os_module
-            try:
-                from services.minio_client import upload_image as _upload
-                logger.info("MinIO upload available for sandbox tool")
-            except ImportError as e:
-                logger.warning("MinIO upload not available: %s", e)
-                _upload = None
-            png_patterns = [
-                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\\'\"\}\,\)]+)',
-                r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))',
-            ]
-            uploaded: dict[str, str] = {}
-            cwd = _os_module.getcwd()
-            for pat in png_patterns:
-                for m in _re.finditer(pat, output):
-                    fname = m.group(1)
-                    fpath = _os_module.path.join(cwd, fname)
-                    if _os_module.path.isfile(fpath) and fname not in uploaded and _upload:
-                        try:
-                            url = _upload(fpath)
-                            if url:
-                                uploaded[fname] = url
-                        except Exception:
-                            pass
-
-            # Also scan CWD for any new PNGs created during execution
-            import time as _time
-            now = _time.time()
-            for f in _os_module.listdir(cwd):
-                if f.endswith('.png') and f not in uploaded and _upload:
-                    fpath = _os_module.path.join(cwd, f)
-                    try:
-                        if _os_module.path.getmtime(fpath) > now - 120:
-                            url = _upload(fpath)
-                            if url:
-                                uploaded[f] = url
-                    except Exception:
-                        pass
-
-            if uploaded:
-                urls_text = "\n".join(f"{fn} → {url}" for fn, url in uploaded.items())
-                output = f"{output}\n\n[图片已上传]\n{urls_text}"
-                logger.info("Sandbox uploaded %d images: %s", len(uploaded), list(uploaded.keys()))
-            else:
-                logger.info("Sandbox: no images to upload (output=%s, cwd=%s)", output[:100], cwd)
-
-            # ── Scan for _metadata.json files and build charts list ──
-            charts: list[dict[str, Any]] = []
-            for f in _os_module.listdir(cwd):
-                if f.endswith("_metadata.json"):
-                    meta_path = _os_module.path.join(cwd, f)
-                    try:
-                        with open(meta_path, encoding="utf-8") as mf:
-                            metadata = json.load(mf)
-                    except Exception:
-                        continue
-                    image_name = f.replace("_metadata.json", ".png")
-                    url = uploaded.get(image_name, "")
-                    summary = metadata.pop("_summary", "")
-                    charts.append({
-                        "image": image_name,
-                        "url": url,
-                        "metadata": metadata,
-                        "summary": summary,
-                    })
-
-            # ── Clean up generated files (already uploaded / scanned) ──
-            for f in _os_module.listdir(cwd):
-                if f.endswith(".png") or f.endswith("_metadata.json"):
-                    try:
-                        _os_module.remove(_os_module.path.join(cwd, f))
-                    except Exception:
-                        pass
-
+            output, processed_data = self._process_generated_images(output)
             return ToolResult.success({
                 "output": output.strip() or "(no output)",
-                "images": uploaded,
-                "charts": charts,
+                "images": processed_data["images"],
+                "charts": processed_data["charts"],
             })
 
         except asyncio.TimeoutError:
@@ -301,6 +226,83 @@ class CodeSandboxTool(BaseTool):
                 message=str(exc)[:200],
                 retryable=False,
             )
+
+    def _process_generated_images(self, output: str) -> tuple[str, dict[str, Any]]:
+        """Scan for generated images in CWD, upload to MinIO, return updated output + data.
+
+        Returns (output_with_urls, {"images": dict, "charts": list}).
+        """
+        import re as _re
+        import os as _os_module
+        import time as _time
+        import json as _json
+
+        try:
+            from services.minio_client import upload_image as _upload
+        except ImportError:
+            _upload = None
+
+        png_patterns = [
+            r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))\s*[→>]\s*(https?://[^\s\\\'\"\}\,\)]+)',
+            r'([\w.-]+\.(?:png|jpg|jpeg|gif|svg))',
+        ]
+        uploaded: dict[str, str] = {}
+        cwd = _os_module.getcwd()
+        for pat in png_patterns:
+            for m in _re.finditer(pat, output):
+                fname = m.group(1)
+                fpath = _os_module.path.join(cwd, fname)
+                if _os_module.path.isfile(fpath) and fname not in uploaded and _upload:
+                    try:
+                        url = _upload(fpath)
+                        if url:
+                            uploaded[fname] = url
+                    except Exception:
+                        pass
+
+        now = _time.time()
+        for f in _os_module.listdir(cwd):
+            if f.endswith(".png") and f not in uploaded and _upload:
+                fpath = _os_module.path.join(cwd, f)
+                try:
+                    if _os_module.path.getmtime(fpath) > now - 120:
+                        url = _upload(fpath)
+                        if url:
+                            uploaded[f] = url
+                except Exception:
+                    pass
+
+        if uploaded:
+            urls_text = "\n".join(f"{fn} → {url}" for fn, url in uploaded.items())
+            output = f"{output}\n\n[图片已上传]\n{urls_text}"
+
+        charts: list[dict[str, Any]] = []
+        for f in _os_module.listdir(cwd):
+            if f.endswith("_metadata.json"):
+                meta_path = _os_module.path.join(cwd, f)
+                try:
+                    with open(meta_path, encoding="utf-8") as mf:
+                        metadata = _json.load(mf)
+                except Exception:
+                    continue
+                image_name = f.replace("_metadata.json", ".png")
+                url = uploaded.get(image_name, "")
+                summary = metadata.pop("_summary", "")
+                charts.append({
+                    "image": image_name,
+                    "url": url,
+                    "metadata": metadata,
+                    "summary": summary,
+                })
+
+        for f in _os_module.listdir(cwd):
+            if f.endswith(".png") or f.endswith("_metadata.json"):
+                try:
+                    _os_module.remove(_os_module.path.join(cwd, f))
+                except Exception:
+                    pass
+
+        return output, {"images": uploaded, "charts": charts}
 
     async def execute_stream(
         self,
@@ -364,11 +366,18 @@ class CodeSandboxTool(BaseTool):
 
         if proc.returncode != 0:
             result = ToolResult.failure(code="EXECUTION_ERROR", message=(stderr_str.strip() or stdout_str.strip() or f"Exit code {proc.returncode}")[:500], retryable=False)
-        else:
-            output = stdout_str
-            if stderr_str:
-                output += "\n[stderr]\n" + stderr_str
-            result = ToolResult.success({"output": output.strip() or "(no output)"})
+            bus.emit("tool.completed", toolName=self.name, result=result.to_dict(), elapsed_ms=0)
+            return result
 
+        output = stdout_str
+        if stderr_str:
+            output += "\n[stderr]\n" + stderr_str
+
+        output, processed_data = self._process_generated_images(output)
+        result = ToolResult.success({
+            "output": output.strip() or "(no output)",
+            "images": processed_data["images"],
+            "charts": processed_data["charts"],
+        })
         bus.emit("tool.completed", toolName=self.name, result=result.to_dict(), elapsed_ms=0)
         return result
