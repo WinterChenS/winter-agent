@@ -595,20 +595,40 @@ async def _execute_single_tool(
         bus = get_streaming_bus()
         tool = registry.get(tool_name) if registry else None
 
+        # Determine effective timeout: gate override > tool timeout > None
+        effective_timeout_ms = gate.timeout_override_ms or getattr(tool, "timeout_ms", None)
+
         # Check if tool supports execute_stream with a bus
         if bus and tool and hasattr(tool, "execute_stream"):
             stream_method = tool.execute_stream
-            if stream_method is not BaseTool.execute_stream:
-                result_obj = await stream_method(call.input_payload, bus)
-                result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+            if type(tool).execute_stream is not BaseTool.execute_stream:
+                # Run pre-hooks
+                prepped = await registry._run_pre_hooks(tool_name, dict(call.input_payload))
+                if prepped is None:
+                    result = {"ok": False, "error": {"code": "HOOK_REJECTED", "message": "Tool invocation rejected by pre-hook", "retryable": False}}
+                else:
+                    if effective_timeout_ms and effective_timeout_ms > 0:
+                        result_obj = await asyncio.wait_for(
+                            stream_method(prepped, bus),
+                            timeout=effective_timeout_ms / 1000,
+                        )
+                    else:
+                        result_obj = await stream_method(prepped, bus)
+                    result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                    await registry._run_post_hooks(tool_name, prepped, result)
             else:
                 bus.emit("tool.started", toolName=tool_name, arguments=call.input_payload)
-                result_obj = await tool.execute(call.input_payload)
+                if effective_timeout_ms and effective_timeout_ms > 0:
+                    result_obj = await asyncio.wait_for(
+                        tool.execute(call.input_payload),
+                        timeout=effective_timeout_ms / 1000,
+                    )
+                else:
+                    result_obj = await tool.execute(call.input_payload)
                 result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
-                bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=0)
+                _elapsed_ms = int((time.time() - step_start) * 1000)
+                bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_elapsed_ms)
         else:
-            # Determine effective timeout: gate override > tool timeout > None
-            effective_timeout_ms = gate.timeout_override_ms or getattr(tool, "timeout_ms", None)
             if effective_timeout_ms and effective_timeout_ms > 0:
                 result = await asyncio.wait_for(
                     registry.invoke_capability(call),
@@ -867,23 +887,44 @@ async def tool_node(state: State) -> dict:
                 bus = get_streaming_bus()
                 tool = registry.get(tool_name) if registry else None
 
+                # Determine effective timeout: gate override > tool timeout > None
+                _effective_timeout_ms = gate.timeout_override_ms or getattr(tool, "timeout_ms", None)
+
                 # Check if tool supports execute_stream with a bus
                 if bus and tool and hasattr(tool, "execute_stream"):
                     stream_method = tool.execute_stream
-                    if stream_method is not BaseTool.execute_stream:
-                        result_obj = await stream_method(tool_input, bus)
-                        result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                    if type(tool).execute_stream is not BaseTool.execute_stream:
+                        # Run pre-hooks
+                        _prepped = await registry._run_pre_hooks(tool_name, dict(tool_input))
+                        if _prepped is None:
+                            result = {"ok": False, "error": {"code": "HOOK_REJECTED", "message": "Tool invocation rejected by pre-hook", "retryable": False}}
+                        else:
+                            if _effective_timeout_ms and _effective_timeout_ms > 0:
+                                result_obj = await asyncio.wait_for(
+                                    stream_method(_prepped, bus),
+                                    timeout=_effective_timeout_ms / 1000,
+                                )
+                            else:
+                                result_obj = await stream_method(_prepped, bus)
+                            result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                            await registry._run_post_hooks(tool_name, _prepped, result)
                     else:
                         bus.emit("tool.started", toolName=tool_name, arguments=tool_input)
-                        result_obj = await tool.execute(tool_input)
+                        if _effective_timeout_ms and _effective_timeout_ms > 0:
+                            result_obj = await asyncio.wait_for(
+                                tool.execute(tool_input),
+                                timeout=_effective_timeout_ms / 1000,
+                            )
+                        else:
+                            result_obj = await tool.execute(tool_input)
                         result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
-                        bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=0)
+                        _legacy_elapsed = int((time.time() - start_time) * 1000)
+                        bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_legacy_elapsed)
                 else:
-                    timeout_ms = gate.timeout_override_ms
-                    if timeout_ms and timeout_ms > 0:
+                    if _effective_timeout_ms and _effective_timeout_ms > 0:
                         result = await asyncio.wait_for(
                             registry.invoke_capability(call),
-                            timeout=timeout_ms / 1000,
+                            timeout=_effective_timeout_ms / 1000,
                         )
                     else:
                         result = await registry.invoke_capability(call)
@@ -911,6 +952,12 @@ async def tool_node(state: State) -> dict:
             ok = bool(result.get("ok", False))
             status = "completed" if ok else "error"
             error_msg = _error_text(result.get("error")) if not ok else None
+
+            # Record metrics for legacy single-tool path
+            _legacy_elapsed_ms = int((time.time() - start_time) * 1000)
+            if hasattr(registry, "record_metric"):
+                registry.record_metric(tool_name, _legacy_elapsed_ms, status)
+
             step = (
                 f"[tool_node] Tool '{tool_name}' executed successfully."
                 if ok

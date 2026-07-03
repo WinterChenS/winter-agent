@@ -91,3 +91,46 @@ print(scipy.__version__)
         assert "charts" in result.data
         assert isinstance(result.data["charts"], list)
         assert len(result.data["charts"]) == 0
+
+    # ── execute_stream tests ─────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_execute_stream_basic(self, sandbox: CodeSandboxTool) -> None:
+        """execute_stream 应产生与 execute 相同的结果。"""
+        from core.streaming_event_bus import StreamingEventBus
+
+        bus = StreamingEventBus()
+        result = await sandbox.execute_stream({"code": 'print("hello stream")'}, bus)
+        assert result.ok is True
+        assert "hello stream" in result.data.get("output", "")
+
+    @pytest.mark.asyncio
+    async def test_execute_stream_emits_start_and_completed(self, sandbox: CodeSandboxTool) -> None:
+        """execute_stream 应发出 tool.started 和 tool.completed 事件。"""
+        from core.streaming_event_bus import StreamingEventBus
+
+        bus = StreamingEventBus()
+        events: list[tuple[str, dict]] = []
+
+        original_emit = bus.emit
+        def capture_emit(event_type: str, **data: object) -> None:
+            events.append((event_type, data))
+            original_emit(event_type, **data)
+        bus.emit = capture_emit
+
+        result = await sandbox.execute_stream({"code": 'print("done")'}, bus)
+        assert result.ok is True
+
+        event_types = [e[0] for e in events]
+        assert "tool.started" in event_types
+        assert "tool.completed" in event_types
+
+    @pytest.mark.asyncio
+    async def test_execute_stream_error(self, sandbox: CodeSandboxTool) -> None:
+        """execute_stream 应正确处理执行错误。"""
+        from core.streaming_event_bus import StreamingEventBus
+
+        bus = StreamingEventBus()
+        result = await sandbox.execute_stream({"code": "1/0"}, bus)
+        assert result.ok is False
+        assert result.error is not None

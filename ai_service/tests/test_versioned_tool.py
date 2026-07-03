@@ -81,11 +81,27 @@ class TestVersionedTool:
         assert schema.version == "1.0.0"
         assert "format" not in schema.parameters["properties"]
 
-    def test_get_schema_unknown_version_raises(self):
-        """请求不存在的版本应抛出 StopIteration。"""
+    def test_get_schema_unknown_version_raises_value_error(self):
+        """请求不存在的版本应抛出 ValueError。"""
         tool = _VersionedTimeTool()
-        with pytest.raises(StopIteration):
+        with pytest.raises(ValueError, match="not found"):
             tool.get_schema("9.9.9")
+
+    def test_get_schema_empty_versions_raises(self):
+        """没有 schema_versions 时应抛出 ValueError。"""
+        class _EmptyVersionedTool(VersionedTool):
+            name: str = "empty"
+            description: str = "Empty tool"
+            input_schema: dict = {}
+            schema: ToolSchema = ToolSchema(parameters={})
+            schema_versions: list[ToolSchemaVersion] = []
+
+            async def execute(self, input_payload):
+                return ToolResult.success(data={})
+
+        tool = _EmptyVersionedTool()
+        with pytest.raises(ValueError, match="No schema versions available"):
+            tool.get_schema()
 
     def test_deprecated_params_listed(self):
         """deprecated_params 应列出已弃用的参数。"""

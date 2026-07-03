@@ -42,8 +42,18 @@ class VersionedTool(BaseTool):
     def get_schema(self, version: str | None = None) -> ToolSchemaVersion:
         """Return the requested schema version, or the latest if ``version`` is ``None``.
 
-        Raises ``StopIteration`` if the requested version does not exist.
+        Raises ``ValueError`` if no schema versions are available or if the requested
+        version does not exist.
         """
+        if not self.schema_versions:
+            raise ValueError(f"No schema versions available for tool '{self.name}'")
         if version is None:
             return self.schema_versions[-1]
-        return next(sv for sv in self.schema_versions if sv.version == version)
+        for sv in self.schema_versions:
+            if sv.version == version:
+                return sv
+        available = [sv.version for sv in self.schema_versions]
+        raise ValueError(
+            f"Schema version '{version}' not found for tool '{self.name}'. "
+            f"Available versions: {available}"
+        )

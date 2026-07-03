@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import logging
 import platform
@@ -329,18 +330,16 @@ class CodeSandboxTool(BaseTool):
 
         stdout_chunks = []
         stderr_chunks = []
-        chunk_idx = 0
+        chunk_counter = itertools.count()
 
         async def read_stream(stream, label, chunks):
-            nonlocal chunk_idx
             while True:
                 line = await stream.readline()
                 if not line:
                     break
                 decoded = line.decode("utf-8", errors="replace")
                 chunks.append(decoded)
-                bus.emit("tool.output", toolName=self.name, output=decoded, chunkIndex=chunk_idx)
-                chunk_idx += 1
+                bus.emit("tool.output", toolName=self.name, output=decoded, chunkIndex=next(chunk_counter))
 
         try:
             await asyncio.wait_for(
