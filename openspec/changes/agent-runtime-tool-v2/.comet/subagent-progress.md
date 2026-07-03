@@ -6,7 +6,8 @@
 - tdd_mode: tdd
 - isolation: branch
 - review_mode: standard
-- status: task-6-dispatching
+- status: final-review
+- review_mode: standard
 
 ## Task Ledger
 
@@ -15,3 +16,4 @@
 - Task 3: complete (commit 401b0cb)
 - Task 4: complete (commit 71ed5c9)
 - Task 5: complete (commit 3e22d32)
+- Task 6: complete (commit d176dc5; 319 passed, 3 pre-existing failures)

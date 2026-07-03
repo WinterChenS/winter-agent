@@ -37,7 +37,7 @@
 
 ## 6. Migration, Compatibility, and Final Verification
 
-- [ ] 6.1 确保现有所有工具（search/browser/time/sandbox）在 bind_tools 模式下正常执行
-- [ ] 6.2 运行全部现有测试套件确认无回归
-- [ ] 6.3 新增集成测试：bind_tools 路径 + JSON fallback 路径 + 流式工具事件路径
-- [ ] 6.4 更新 roadmap V0.6 文档状态为已完成
+- [x] 6.1 确保现有所有工具（search/browser/time/sandbox）在 bind_tools 模式下正常执行
+- [x] 6.2 运行全部现有测试套件确认无回归
+- [x] 6.3 新增集成测试：bind_tools 路径 + JSON fallback 路径 + 流式工具事件路径
+- [x] 6.4 更新 roadmap V0.6 文档状态为已完成

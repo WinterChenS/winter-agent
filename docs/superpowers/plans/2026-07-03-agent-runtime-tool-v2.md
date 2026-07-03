@@ -1715,7 +1715,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 ---
 
-- [ ] **Step 6.1: Verify all existing tools are compatible**
+- [x] **Step 6.1: Verify all existing tools are compatible**
 
 Run the full test suite:
 
@@ -1726,7 +1726,7 @@ python -m pytest tests/ -v --timeout=60 2>&1 | tail -40
 
 Expected: ALL PASS (any failures are regressions to be fixed)
 
-- [ ] **Step 6.2: Write integration tests for provider fallback**
+- [x] **Step 6.2: Write integration tests for provider fallback**
 
 Add to `ai_service/tests/test_bind_tools_integration.py`:
 
@@ -1769,7 +1769,7 @@ async def test_fallback_to_json_mode_when_provider_unsupported(self, mock_build_
         nodes.settings.provider_supports_tool_calls = original
 ```
 
-- [ ] **Step 6.3: Run all tests including new integration tests**
+- [x] **Step 6.3: Run all tests including new integration tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -1777,7 +1777,7 @@ python -m pytest tests/ -v --timeout=60
 ```
 Expected: ALL PASS
 
-- [ ] **Step 6.4: Update __init__.py to export everything**
+- [x] **Step 6.4: Update __init__.py to export everything**
 
 Ensure `ai_service/tools/__init__.py` has:
 
@@ -1805,7 +1805,7 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 6.5: Update roadmap status**
+- [x] **Step 6.5: Update roadmap status**
 
 Edit `docs/roadmap-phase-plans/V0.6-agent-runtime-tool-v2.md` to mark all items as completed:
 
@@ -1817,7 +1817,7 @@ streaming tool results, per-tool timeout, tool metrics, migration
 verification) are implemented and tested.
 ```
 
-- [ ] **Step 6.6: Final commit**
+- [x] **Step 6.6: Final commit**
 
 ```bash
 git add ai_service/tools/__init__.py \
