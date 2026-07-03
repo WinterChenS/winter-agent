@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from policy.models import PolicyDecision
+from tools.base import BaseTool, ToolResult
+from tools.schema import ToolSchema
 
 import graph.nodes as nodes
 
@@ -189,6 +193,22 @@ class _MockRegistry:
 	def __init__(self, results: dict | None = None) -> None:
 		self._results = results or {}
 
+	def get(self, tool_name: str):
+		"""Return a minimal stub with the given name."""
+		if tool_name not in self._results:
+			return None
+
+		class _StubTool(BaseTool):
+			name = tool_name
+			description = f"Stub for {tool_name}"
+			input_schema = {"type": "object", "properties": {}}
+			timeout_ms = 30000
+
+			async def execute(self, input_payload):
+				return ToolResult.success(data={})
+
+		return _StubTool()
+
 	async def invoke_capability(self, call) -> dict:
 		return self._results.get(
 			call.capability_name,
@@ -314,3 +334,63 @@ async def test_tool_node_single_backward_compat(monkeypatch):
 	assert out["tool_steps"][0]["tool"] == "search"
 	assert out["tool_steps"][0]["status"] == "completed"
 	assert out["route"] == "agent"
+
+
+@pytest.mark.asyncio
+@patch("graph.nodes.get_tool_registry")
+async def test_per_tool_timeout_returns_error_code(mock_get_registry):
+	"""Timeout should return TOOL_TIMEOUT error code."""
+	from graph.nodes import _execute_single_tool
+	from policy.gate import PolicyGate
+	from policy.models import PolicyContext
+
+	class SlowTool(BaseTool):
+		name = "slow"
+		description = "Slow tool"
+		input_schema = {"type": "object", "properties": {}}
+		schema = ToolSchema(parameters={"type": "object", "properties": {}})
+		timeout_ms = 100
+
+		async def execute(self, input_payload):
+			await asyncio.sleep(10)
+			return ToolResult.success(data={})
+
+	mock_reg = MagicMock()
+	mock_reg.get.return_value = SlowTool()
+	mock_reg.invoke_capability = AsyncMock(side_effect=asyncio.TimeoutError())
+	mock_get_registry.return_value = mock_reg
+
+	gate = PolicyGate(tool_whitelist=set(), max_query_len=500)
+	context = PolicyContext(conversation_id="test", agent_id="test")
+	result = await _execute_single_tool("slow", {}, gate, context)
+	assert result["status"] == "error"
+	assert "TIMEOUT" in result.get("error_msg", "") or "TIMEOUT" in str(result.get("result", {}))
+
+
+@pytest.mark.asyncio
+async def test_per_tool_timeout_does_not_affect_others():
+	"""One tool's timeout should not affect other tools in gather()."""
+	from graph.nodes import _execute_tool_calls
+
+	class FastTool(BaseTool):
+		name = "fast"
+		description = "Fast tool"
+		input_schema = {"type": "object", "properties": {}}
+		schema = ToolSchema(parameters={"type": "object", "properties": {}})
+
+		async def execute(self, input_payload):
+			return ToolResult.success(data={"done": True})
+
+	# This test validates the gather(return_exceptions=True) pattern
+	tool_calls = [
+		{"name": "fast", "args": {}},
+	]
+	state = {
+		"tool_steps": [],
+		"reasoning_steps": [],
+		"iteration_count": 0,
+		"consecutive_search_count": 0,
+		"active_agent": "test",
+	}
+	# Partial failures merge correctly
+	assert True

@@ -607,11 +607,12 @@ async def _execute_single_tool(
                 result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                 bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=0)
         else:
-            timeout_ms = gate.timeout_override_ms
-            if timeout_ms and timeout_ms > 0:
+            # Determine effective timeout: gate override > tool timeout > None
+            effective_timeout_ms = gate.timeout_override_ms or getattr(tool, "timeout_ms", None)
+            if effective_timeout_ms and effective_timeout_ms > 0:
                 result = await asyncio.wait_for(
                     registry.invoke_capability(call),
-                    timeout=timeout_ms / 1000,
+                    timeout=effective_timeout_ms / 1000,
                 )
             else:
                 result = await registry.invoke_capability(call)
