@@ -1392,7 +1392,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 ---
 
-- [ ] **Step 4.1: Write failing tests for per-tool timeout**
+- [x] **Step 4.1: Write failing tests for per-tool timeout**
 
 In `ai_service/tests/test_parallel_protocol.py`, add:
 
@@ -1454,7 +1454,7 @@ class TestPerToolTimeout:
         assert True
 ```
 
-- [ ] **Step 4.2: Ensure _execute_single_tool uses BaseTool.timeout_ms**
+- [x] **Step 4.2: Ensure _execute_single_tool uses BaseTool.timeout_ms**
 
 In `ai_service/graph/nodes.py`, the existing code already uses `asyncio.wait_for` when `gate.timeout_override_ms` is set. Enhance it to also respect `BaseTool.timeout_ms`:
 
@@ -1485,7 +1485,7 @@ except Exception as exc:
     ...  # existing
 ```
 
-- [ ] **Step 4.3: Run tests**
+- [x] **Step 4.3: Run tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -1493,7 +1493,7 @@ python -m pytest tests/test_parallel_protocol.py -v
 ```
 Expected: ALL PASS
 
-- [ ] **Step 4.4: Commit**
+- [x] **Step 4.4: Commit**
 
 ```bash
 git add ai_service/graph/nodes.py ai_service/tests/test_parallel_protocol.py

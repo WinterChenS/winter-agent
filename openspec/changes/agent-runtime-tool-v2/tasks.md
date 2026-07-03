@@ -24,9 +24,9 @@
 
 ## 4. Parallel Execution — Per-tool Timeout
 
-- [ ] 4.1 在 `_execute_single_tool` 中激活 `BaseTool.timeout_ms` 超时控制（asyncio.wait_for）
-- [ ] 4.2 超时结果 SHALL 包含 `TOOL_TIMEOUT` 错误码且不影响其他并行工具结果
-- [ ] 4.3 确保 `_parallel_tool_execution` 的 asyncio.gather 在部分超时场景下正确合并
+- [x] 4.1 在 `_execute_single_tool` 中激活 `BaseTool.timeout_ms` 超时控制（asyncio.wait_for）
+- [x] 4.2 超时结果 SHALL 包含 `TOOL_TIMEOUT` 错误码且不影响其他并行工具结果
+- [x] 4.3 确保 `_parallel_tool_execution` 的 asyncio.gather 在部分超时场景下正确合并
 
 ## 5. Tool Metrics
 

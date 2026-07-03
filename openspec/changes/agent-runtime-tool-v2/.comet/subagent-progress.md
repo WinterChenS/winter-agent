@@ -6,10 +6,11 @@
 - tdd_mode: tdd
 - isolation: branch
 - review_mode: standard
-- status: task-4-dispatching
+- status: task-5-dispatching
 
 ## Task Ledger
 
-- Task 1: complete (commit a2c52db, review clean; 6/6 new tests, 300/301 existing)
-- Task 2: complete (commit 28352e2, review clean; 6/6 new tests)
-- Task 3: complete (commit 401b0cb, review clean; 41/41 pass)
+- Task 1: complete (commit a2c52db)
+- Task 2: complete (commit 28352e2)
+- Task 3: complete (commit 401b0cb)
+- Task 4: complete (commit 71ed5c9)
