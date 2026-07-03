@@ -346,8 +346,8 @@ async def stream_generate(request: GenerateRequest):
                                     "payload": bus_event.data,
                                 }
                                 await merge_queue.put(("bus", envelope))
-                    except Exception:
-                        pass
+                    except Exception as _bus_err:
+                        logging.warning("[CHAT] bus_runner crashed: %s", _bus_err, exc_info=True)
                     finally:
                         await merge_queue.put(("bus_done", None))
 
