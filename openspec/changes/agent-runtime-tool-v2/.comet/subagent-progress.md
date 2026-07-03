@@ -6,7 +6,7 @@
 - tdd_mode: tdd
 - isolation: branch
 - review_mode: standard
-- status: final-review
+- status: final-review-done
 - review_mode: standard
 
 ## Task Ledger
@@ -16,4 +16,5 @@
 - Task 3: complete (commit 401b0cb)
 - Task 4: complete (commit 71ed5c9)
 - Task 5: complete (commit 3e22d32)
-- Task 6: complete (commit d176dc5; 319 passed, 3 pre-existing failures)
+- Task 6: complete (commit d176dc5)
+- Fix round 1 (review findings): complete (commit 5640403)
