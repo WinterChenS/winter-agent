@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-07-03-agent-runtime-context-b
 branch_status: handled
 created_at: 2026-07-03
 verified_at: 2026-07-03
-archived: false
+archived: true
 handoff_context: openspec/changes/agent-runtime-context-builder/.comet/handoff/design-context.json
 handoff_hash: 85e40d6b6ef4185f89ea2e7562e5d3462ae556b9c24e963e9261cb90352905bf

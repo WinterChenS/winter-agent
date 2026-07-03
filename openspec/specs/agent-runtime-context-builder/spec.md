@@ -1,5 +1,8 @@
-## NEW Requirements
+# agent-runtime-context-builder Specification
 
+## Purpose
+TBD - created by archiving change agent-runtime-context-builder. Update Purpose after archive.
+## Requirements
 ### Requirement: Agent Runtime SHALL build context through a unified Context Builder
 Agent Runtime SHALL collect runtime context through a single builder pipeline instead of assembling prompt context independently inside routes, nodes, or factories.
 
@@ -39,3 +42,4 @@ Files, Memory, and Knowledge sources SHALL integrate through the same provider i
 #### Scenario: disabled provider
 - **WHEN** a provider is configured but has no runtime source yet
 - **THEN** it SHALL return an empty fragment list without breaking the builder pipeline
+

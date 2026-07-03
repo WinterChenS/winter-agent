@@ -19,4 +19,5 @@ lxml>=5.0.0
 # Code sandbox — required by CodeSandboxTool for data analysis workloads
 pandas>=2.0.0
 numpy>=1.24.0
+scipy>=1.11.0
 matplotlib>=3.7.0

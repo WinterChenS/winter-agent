@@ -3,6 +3,8 @@ comet_change: agent-runtime-context-builder
 role: technical-design
 canonical_spec: openspec
 status: draft
+archived-with: 2026-07-03-agent-runtime-context-builder
+status: final
 ---
 
 # Agent Runtime Context Builder — Technical Design
