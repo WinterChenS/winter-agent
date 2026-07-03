@@ -6,8 +6,8 @@
 - tdd_mode: tdd
 - isolation: branch
 - review_mode: standard
-- status: task-2-dispatching
+- status: task-3-dispatching
 
 ## Task Ledger
 
-- Task 1: complete (base 2e19de0, commit a2c52db, review clean; 6/6 new tests pass, 300/301 existing pass)
+- Task 2: complete (commit 28352e2, review clean; 6/6 new tests pass; concern: discover() subclass walk fix was unanticipated but necessary)

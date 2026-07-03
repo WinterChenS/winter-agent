@@ -764,7 +764,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 ---
 
-- [ ] **Step 2.1: Write failing tests for VersionedTool**
+- [x] **Step 2.1: Write failing tests for VersionedTool**
 
 Create `ai_service/tests/test_versioned_tool.py`:
 
@@ -865,7 +865,7 @@ class TestVersionedTool:
         assert "timezone" in schema.deprecated_params
 ```
 
-- [ ] **Step 2.2: Run tests to verify they fail**
+- [x] **Step 2.2: Run tests to verify they fail**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -873,7 +873,7 @@ python -m pytest tests/test_versioned_tool.py -v
 ```
 Expected: FAIL — `ModuleNotFoundError: no module named 'tools.versioned_tool'`
 
-- [ ] **Step 2.3: Implement ToolSchemaVersion + VersionedTool**
+- [x] **Step 2.3: Implement ToolSchemaVersion + VersionedTool**
 
 Create `ai_service/tools/versioned_tool.py`:
 
@@ -929,7 +929,7 @@ class VersionedTool(BaseTool):
         return next(sv for sv in self.schema_versions if sv.version == version)
 ```
 
-- [ ] **Step 2.4: Update TimeTool with versioned schema example**
+- [x] **Step 2.4: Update TimeTool with versioned schema example**
 
 In `ai_service/tools/time/tool.py`, change `class TimeTool(BaseTool)` to `class TimeTool(VersionedTool)` and add `schema_versions`:
 
@@ -969,7 +969,7 @@ class TimeTool(VersionedTool):
     ]
 ```
 
-- [ ] **Step 2.5: Export new symbols from tools/__init__.py**
+- [x] **Step 2.5: Export new symbols from tools/__init__.py**
 
 In `ai_service/tools/__init__.py`, add:
 
@@ -979,7 +979,7 @@ from tools.versioned_tool import ToolSchemaVersion, VersionedTool
 
 Update `__all__` to include `"ToolSchemaVersion"`, `"VersionedTool"`, `"ToolSchemaAdapter"`.
 
-- [ ] **Step 2.6: Run tests to verify pass**
+- [x] **Step 2.6: Run tests to verify pass**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -987,7 +987,7 @@ python -m pytest tests/test_versioned_tool.py -v
 ```
 Expected: ALL PASS
 
-- [ ] **Step 2.7: Commit**
+- [x] **Step 2.7: Commit**
 
 ```bash
 git add ai_service/tools/versioned_tool.py \

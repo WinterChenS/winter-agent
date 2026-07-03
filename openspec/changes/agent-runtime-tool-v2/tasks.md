@@ -8,11 +8,11 @@
 
 ## 2. Schema Version Management
 
-- [ ] 2.1 新增 `ToolSchemaVersion` 数据模型（version、parameters、deprecated_params、migration_note）
-- [ ] 2.2 新增 `VersionedTool` mixin/基类，支持多版本 schema 注册和查询
-- [ ] 2.3 实现兼容性校验：检查调用参数是否与目标 schema 版本兼容
-- [ ] 2.4 为 `TimeTool` 添加多版本 schema 示例（验证版本管理流程）
-- [ ] 2.5 写入版本化工具调用的事件追踪（记录 schema_version 到 tool_steps）
+- [x] 2.1 新增 `ToolSchemaVersion` 数据模型（version、parameters、deprecated_params、migration_note）
+- [x] 2.2 新增 `VersionedTool` mixin/基类，支持多版本 schema 注册和查询
+- [x] 2.3 实现兼容性校验：检查调用参数是否与目标 schema 版本兼容
+- [x] 2.4 为 `TimeTool` 添加多版本 schema 示例（验证版本管理流程）
+- [x] 2.5 写入版本化工具调用的事件追踪（记录 schema_version 到 tool_steps）
 
 ## 3. Streaming Tool Results
 
