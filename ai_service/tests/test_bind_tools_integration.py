@@ -24,6 +24,43 @@ class _MockSearchTool(BaseTool):
         return ToolResult.success(data={"result": f"found: {input_payload.get('query')}"})
 
 
+class TestProviderFallbackJsonMode:
+    """验证 provider 不支持 tool_calls 时降级到 JSON Mode。"""
+
+    @patch("graph.nodes.get_tool_registry")
+    @patch("graph.nodes._build_llm")
+    async def test_fallback_to_json_mode_when_provider_unsupported(self, mock_build_llm, mock_get_registry):
+        """当 provider 不支持 tool_calls 时，应降级到 JSON Mode。"""
+        from graph.nodes import agent_node
+
+        mock_llm = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.content = '{"action": "tool", "tool": "search", "query": "test"}'
+        mock_response.tool_calls = None
+        mock_llm.ainvoke.return_value = mock_response
+        mock_build_llm.return_value = mock_llm
+
+        mock_reg = MagicMock()
+        mock_reg.list_tools.return_value = [{"name": "search", "description": "Web search", "input_schema": {}}]
+        mock_get_registry.return_value = mock_reg
+
+        # Simulate provider not supporting tool_calls by patching settings
+        import graph.nodes as nodes
+        with patch("graph.nodes.settings") as mock_settings:
+            mock_settings.provider_supports_tool_calls = False
+            state = {
+                "messages": [],
+                "iteration_count": 0,
+                "consecutive_search_count": 0,
+                "tool_steps": [],
+                "reasoning_steps": [],
+                "active_agent": "default",
+            }
+            result = await agent_node(state)
+            assert result["route"] == "tool"
+            assert result.get("current_tool") == "search"
+
+
 class TestAgentNodeToolCallsRouting:
     """验证 agent_node 对 AIMessage.tool_calls 的路由逻辑。"""
 

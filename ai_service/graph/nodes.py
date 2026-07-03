@@ -21,7 +21,7 @@ from graph.normalizers.tool_result import (
 from graph.state import State
 from policy.gate import PolicyGate
 from policy.models import PolicyContext
-from tools.base import BaseTool
+from tools.base import BaseTool, ToolResult
 from tools.schema_adapter import ToolSchemaAdapter
 
 logger = logging.getLogger(__name__)
