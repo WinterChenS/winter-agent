@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from domain.event_envelope import (
+    build_envelope,
     envelope_agent_step,
     envelope_chart,
     envelope_message_delta,
