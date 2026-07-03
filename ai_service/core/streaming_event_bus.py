@@ -25,8 +25,14 @@ class StreamingEventBus:
         self._queue: asyncio.Queue[StreamingEvent | None] = asyncio.Queue()
 
     def emit(self, event_type: str, **data: Any) -> None:
-        """Publish an event. Called from inside graph nodes."""
+        """Publish an event. Called from inside graph nodes.
+
+        Uses ``put_nowait`` to avoid blocking the caller, then schedules a
+        no-op callback to prompt the event loop to wake bus_runner promptly
+        rather than deferring until the next await in the calling coroutine.
+        """
         self._queue.put_nowait(StreamingEvent(type=event_type, data=data))
+        asyncio.get_event_loop().call_soon(lambda: None)
 
     async def events(self):
         """Async generator yielding events. Called from the SSE event loop."""

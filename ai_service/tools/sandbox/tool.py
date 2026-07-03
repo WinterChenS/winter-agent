@@ -329,6 +329,7 @@ class CodeSandboxTool(BaseTool):
         )
 
         bus.emit("tool.started", toolName=self.name, arguments=input_payload)
+        await asyncio.sleep(0)
 
         stdout_chunks = []
         stderr_chunks = []

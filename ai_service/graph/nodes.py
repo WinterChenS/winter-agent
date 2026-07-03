@@ -618,6 +618,7 @@ async def _execute_single_tool(
                     await registry._run_post_hooks(tool_name, prepped, result)
             else:
                 bus.emit("tool.started", toolName=tool_name, arguments=call.input_payload)
+                await asyncio.sleep(0)
                 if effective_timeout_ms and effective_timeout_ms > 0:
                     result_obj = await asyncio.wait_for(
                         tool.execute(call.input_payload),
@@ -628,6 +629,7 @@ async def _execute_single_tool(
                 result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                 _elapsed_ms = int((time.time() - step_start) * 1000)
                 bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_elapsed_ms)
+                await asyncio.sleep(0)
         else:
             if effective_timeout_ms and effective_timeout_ms > 0:
                 result = await asyncio.wait_for(
@@ -910,6 +912,7 @@ async def tool_node(state: State) -> dict:
                             await registry._run_post_hooks(tool_name, _prepped, result)
                     else:
                         bus.emit("tool.started", toolName=tool_name, arguments=tool_input)
+                        await asyncio.sleep(0)
                         if _effective_timeout_ms and _effective_timeout_ms > 0:
                             result_obj = await asyncio.wait_for(
                                 tool.execute(tool_input),
@@ -920,6 +923,7 @@ async def tool_node(state: State) -> dict:
                         result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
                         _legacy_elapsed = int((time.time() - start_time) * 1000)
                         bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=_legacy_elapsed)
+                        await asyncio.sleep(0)
                 else:
                     if _effective_timeout_ms and _effective_timeout_ms > 0:
                         result = await asyncio.wait_for(
