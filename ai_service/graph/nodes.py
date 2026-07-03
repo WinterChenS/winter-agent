@@ -636,6 +636,12 @@ async def _execute_single_tool(
     ok = bool(result.get("ok", False))
     status = "completed" if ok else "error"
     error_msg = _error_text(result.get("error")) if not ok else None
+
+    # Record metrics
+    reg = get_tool_registry()
+    if reg and hasattr(reg, "record_metric"):
+        reg.record_metric(tool_name, elapsed_ms, status)
+
     return {"result": result, "elapsed_ms": elapsed_ms, "status": status, "error_msg": error_msg}
 
 

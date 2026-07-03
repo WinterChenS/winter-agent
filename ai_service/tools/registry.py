@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping
+from typing import Any, Awaitable, Callable, Mapping
 
 from domain.capability import CapabilityCall, CapabilityResult, CapabilitySpec
 from tools.base import BaseTool, ToolResult
+from tools.metrics import ToolMetrics
+
+PreHook = Callable[[str, dict], Awaitable[dict | None]]  # Return modified input or None to reject
+PostHook = Callable[[str, dict, dict], Awaitable[None]]   # (name, input, result)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,9 @@ class ToolNotFoundError(ToolRegistryError):
 class ToolRegistry:
 	def __init__(self) -> None:
 		self._tools: dict[str, BaseTool] = {}
+		self._metrics: dict[str, ToolMetrics] = {}
+		self._pre_hooks: list[PreHook] = []
+		self._post_hooks: list[PostHook] = []
 
 	def register(self, tool: BaseTool) -> None:
 		if tool.name in self._tools:
@@ -129,16 +136,62 @@ class ToolRegistry:
 
 		return "\n".join(lines)
 
+
+	def record_metric(self, name: str, elapsed_ms: int, status: str) -> None:
+		"""Record a tool invocation metric."""
+		if name not in self._metrics:
+			self._metrics[name] = ToolMetrics()
+		m = self._metrics[name]
+		m.invoke_count += 1
+		m.total_latency_ms += elapsed_ms
+		if status != "completed":
+			m.error_count += 1
+
+	def get_metrics(self, name: str) -> ToolMetrics | None:
+		"""Return metrics for a tool, or None if never invoked."""
+		return self._metrics.get(name)
+
+	def register_pre_hook(self, hook: PreHook) -> None:
+		"""Register a pre-execution hook."""
+		self._pre_hooks.append(hook)
+
+	def register_post_hook(self, hook: PostHook) -> None:
+		"""Register a post-execution hook."""
+		self._post_hooks.append(hook)
+
+	async def _run_pre_hooks(self, name: str, input_payload: dict) -> dict | None:
+		"""Run all pre-hooks in order. Returns modified input or None to reject."""
+		current_input = input_payload
+		for hook in self._pre_hooks:
+			result = await hook(name, current_input)
+			if result is None:
+				return None  # rejected
+			current_input = result
+		return current_input
+
+	async def _run_post_hooks(self, name: str, input_payload: dict, result: dict) -> None:
+		"""Run all post-hooks in order."""
+		for hook in self._post_hooks:
+			await hook(name, input_payload, result)
+
 	async def invoke(self, name: str, input_payload: Mapping[str, Any]) -> dict[str, Any]:
+		# Run pre-hooks
+		prepped = await self._run_pre_hooks(name, dict(input_payload))
+		if prepped is None:
+			return {"ok": False, "error": {"code": "HOOK_REJECTED", "message": "Tool invocation rejected by pre-hook", "retryable": False}}
 		tool = self.get(name)
-		result = await tool.execute(input_payload)
+		result = await tool.execute(prepped)
 		if isinstance(result, ToolResult):
-			return result.to_dict()
-		if isinstance(result, Mapping):
-			return dict(result)
-		raise ToolRegistryError(
-			f"Tool '{name}' returned an unsupported result type: {type(result).__name__}"
-		)
+			result_dict = result.to_dict()
+		else:
+			result_dict = dict(result) if isinstance(result, Mapping) else None
+		if result_dict is None:
+			raise ToolRegistryError(
+				f"Tool '{name}' returned an unsupported result type: {type(result).__name__}"
+			)
+		# Run post-hooks
+		await self._run_post_hooks(name, prepped, result_dict)
+		return result_dict
 
 	async def invoke_capability(self, call: CapabilityCall) -> dict[str, Any]:
 		try:
