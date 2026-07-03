@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^COMET_ENV=\"\\$\\{COMET_ENV:-\\$\\(find \\. \"\\$HOME\"/\\.\\*/skills \"\\$HOME/\\.config\" \"\\$HOME/\\.gemini\" -path '\\*/comet/scripts/comet-env\\.sh' -type f -print -quit 2>/dev/null\\)\\}\" && if \\[\\[ -z \"\\$COMET_ENV\" \\]\\]; then echo \"ERROR: comet-env\\.sh not found\" >&2; exit 1; fi && \\. \"\\$COMET_ENV\" && if \\[\\[ -z \"\\$COMET_HANDOFF\" \\]\\]; then echo \"ERROR: Comet scripts not found\" >&2; exit 1; fi && \"\\$COMET_BASH\" \"\\$COMET_HANDOFF\" agent-runtime-context-builder design --write$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -74,4 +74,7 @@ class State(TypedDict):
     artifacts: list[dict]                 # All artifact metadata [{artifact_id, type, purpose, source_step_id, content_ref}]
     current_plan_step: int                # 0-based index into execution_plan.steps
     plan_phase: str                       # "planning" | "executing" | "composing" | "done"
+    runtime_context_prompt: str | None
+    runtime_context_messages: list[dict]
+    runtime_context_meta: dict | None
 

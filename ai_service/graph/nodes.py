@@ -154,6 +154,7 @@ async def agent_node(state: State) -> dict:
     tool_result = state.get("tool_result")
     tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
     current_iteration = int(state.get("iteration_count", 0) or 0)
+    runtime_context_prompt = str(state.get("runtime_context_prompt") or "").strip()
 
     system_lines = [
         _REACT_SYSTEM_PROMPT,
@@ -161,6 +162,8 @@ async def agent_node(state: State) -> dict:
     ]
     if tools_desc:
         system_lines.append(f"Available tools:\n{tools_desc}")
+    if runtime_context_prompt:
+        system_lines.append(f"Runtime context:\n{runtime_context_prompt}")
 
     if tool_result_sanitized:
         remaining = MAX_ITERATIONS - current_iteration
