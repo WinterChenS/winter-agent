@@ -1736,9 +1736,6 @@ async def execution_node(state: State, event_bus=None) -> dict:
         # ── execute_python: generate chart code, execute, capture image URLs ──
         if tool_name == "execute_python":
             logger.info("[EXECUTION] generating chart code for step %d", step_id)
-            if event_bus:
-                event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name,
-                               arguments={"chart_type": expected_artifacts[0].get("chart_type", "line") if expected_artifacts else "line"})
             try:
                 retry_reason = None
                 result = None
@@ -1815,20 +1812,13 @@ async def execution_node(state: State, event_bus=None) -> dict:
                         logger.info("[EXECUTION] registered chart artifact: %s -> %s (metadata=%s)", artifact_id, url, "yes" if cinfo.get("metadata") else "no")
                 else:
                     logger.warning("[EXECUTION] chart generated but no images found in result")
-                if event_bus:
-                    event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": "completed", "images": len(images)})
             else:
                 step_status = "error"
-                if event_bus:
-                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "chart generation failed")))
             continue
 
         # ── Normal tools (search, browser, time, etc.) ──
         search_query = step.get("description", user_query)
         logger.info("[EXECUTION] invoking tool: %s query='%s'", tool_name, search_query[:80])
-        if event_bus:
-            event_bus.emit("tool.started", tool_call_id=tool_call_id, tool=tool_name, arguments={"query": search_query})
-
         try:
             result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
         except Exception as exc:
@@ -1843,8 +1833,6 @@ async def execution_node(state: State, event_bus=None) -> dict:
             if not is_retryable:
                 logger.info("[EXECUTION] skipping retry for tool: %s (non-retryable error)", tool_name)
                 step_status = "error"
-                if event_bus:
-                    event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(error_info.get("message", error_info.get("code", "unknown error"))))
             else:
                 logger.info("[EXECUTION] retrying tool: %s (first attempt failed)", tool_name)
                 result = await _execute_single_tool(tool_name, {"query": search_query}, gate, context)
@@ -1852,11 +1840,8 @@ async def execution_node(state: State, event_bus=None) -> dict:
 
         if result.get("status") == "error":
             step_status = "error"
-            if event_bus:
-                event_bus.emit("tool.failed", tool_call_id=tool_call_id, tool=tool_name, error=str(result.get("error_msg", "tool execution failed")))
         else:
-            if event_bus:
-                event_bus.emit("tool.finished", tool_call_id=tool_call_id, tool=tool_name, result={"status": "completed", "elapsed_ms": result.get("elapsed_ms", 0)})
+            pass  # _execute_single_tool already emits tool.completed via bus
 
         # Register search/data results as artifact
         if result.get("status") == "completed" and result.get("result"):
