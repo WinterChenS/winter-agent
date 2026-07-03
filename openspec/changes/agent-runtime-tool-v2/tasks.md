@@ -30,10 +30,10 @@
 
 ## 5. Tool Metrics
 
-- [ ] 5.1 在 `ToolRegistry` 中新增 metrics 存储：invoke_count、total_latency_ms、error_count
-- [ ] 5.2 在 `tool_node` 和 `_execute_single_tool` 中记录每次调用的耗时和状态
-- [ ] 5.3 新增 `ToolRegistry.get_metrics(name: str) -> ToolMetrics` 查询接口
-- [ ] 5.4 新增 `tool_summary` SSE 事件，在流结束后推送本轮所有工具调用统计
+- [x] 5.1 在 `ToolRegistry` 中新增 metrics 存储：invoke_count、total_latency_ms、error_count
+- [x] 5.2 在 `tool_node` 和 `_execute_single_tool` 中记录每次调用的耗时和状态
+- [x] 5.3 新增 `ToolRegistry.get_metrics(name: str) -> ToolMetrics` 查询接口
+- [x] 5.4 新增 `tool_summary` SSE 事件，在流结束后推送本轮所有工具调用统计
 
 ## 6. Migration, Compatibility, and Final Verification
 

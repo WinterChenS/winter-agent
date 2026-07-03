@@ -1518,7 +1518,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 ---
 
-- [ ] **Step 5.1: Write failing tests for tool metrics**
+- [x] **Step 5.1: Write failing tests for tool metrics**
 
 Create `ai_service/tests/test_tool_metrics.py`:
 
@@ -1583,7 +1583,7 @@ class TestToolMetrics:
         assert metrics.error_count == 1
 ```
 
-- [ ] **Step 5.2: Implement ToolMetrics**
+- [x] **Step 5.2: Implement ToolMetrics**
 
 Create `ai_service/tools/metrics.py`:
 
@@ -1608,7 +1608,7 @@ class ToolMetrics:
     error_count: int = 0
 ```
 
-- [ ] **Step 5.3: Add metrics storage and recording to ToolRegistry**
+- [x] **Step 5.3: Add metrics storage and recording to ToolRegistry**
 
 In `ai_service/tools/registry.py`, add:
 
@@ -1638,7 +1638,7 @@ class ToolRegistry:
         return self._metrics.get(name)
 ```
 
-- [ ] **Step 5.4: Record metrics in _execute_single_tool**
+- [x] **Step 5.4: Record metrics in _execute_single_tool**
 
 In `ai_service/graph/nodes.py`, in `_execute_single_tool`, after computing `elapsed_ms` and `status`, add:
 
@@ -1649,11 +1649,11 @@ if reg and hasattr(reg, "record_metric"):
     reg.record_metric(tool_name, elapsed_ms, status)
 ```
 
-- [ ] **Step 5.5: Add tool_summary SSE emission**
+- [x] **Step 5.5: Add tool_summary SSE emission**
 
 In `ai_service/domain/event_envelope.py`, `envelope_tool_summary` already exists (line 111). Ensure the tool_steps are properly populated (they are, via `_execute_single_tool` and `_execute_tool_calls`). The `emit_final_summary_envelope` in `event_mapper.py` already handles this.
 
-- [ ] **Step 5.6: Add lifecycle hooks to ToolRegistry**
+- [x] **Step 5.6: Add lifecycle hooks to ToolRegistry**
 
 In `ai_service/tools/registry.py`, add pre/post hook support:
 
@@ -1680,7 +1680,7 @@ class ToolRegistry:
         self._post_hooks.append(hook)
 ```
 
-- [ ] **Step 5.7: Run tests**
+- [x] **Step 5.7: Run tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -1688,7 +1688,7 @@ python -m pytest tests/test_tool_metrics.py tests/test_tool_registry.py -v
 ```
 Expected: ALL PASS
 
-- [ ] **Step 5.8: Commit**
+- [x] **Step 5.8: Commit**
 
 ```bash
 git add ai_service/tools/metrics.py \
