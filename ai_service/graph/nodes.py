@@ -20,6 +20,8 @@ from graph.normalizers.tool_result import (
 from graph.state import State
 from policy.gate import PolicyGate
 from policy.models import PolicyContext
+from tools.base import BaseTool
+from tools.schema_adapter import ToolSchemaAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,25 @@ logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────────────────────
 # ReAct 提示词：引导 LLM 按照 Thought → Action → Observation 循环解决问题
 # ────────────────────────────────────────────────────────────────────────────
+_REACT_SYSTEM_PROMPT_V2 = """\
+You are a ReAct agent that calls tools when you need information.
+
+[Internal Cycle: Thought → Tool call → Observation → Final Answer]
+
+Available tools are bound to your function-calling interface. Call them
+when you need up-to-date information. After you have collected enough
+evidence, respond with a plain-text final answer.
+
+Rules:
+1. Call a tool when you need factual, time-sensitive, or data-driven information.
+2. For simple greetings ("hello", "how are you"), you may answer directly.
+3. Use search results to open relevant URLs with the browser tool.
+4. If a tool returns an error, use available information or try another approach.
+5. Call multiple independent tools in the same turn when possible.
+6. Always provide a final answer once you have sufficient evidence.
+"""
+
+
 _REACT_SYSTEM_PROMPT = """\
 You are a ReAct agent. Your response MUST be a single valid JSON object.
 
@@ -103,7 +124,12 @@ def _append_reason(state: State, record: dict) -> list:
     return list(state.get("reasoning_steps", [])) + [record]
 
 
-def _build_llm(streaming: bool = True, json_mode: bool = False) -> ChatOpenAI:
+def _build_llm(
+    streaming: bool = True,
+    json_mode: bool = False,
+    tools: list[BaseTool] | None = None,
+    provider: str = "openai",
+) -> ChatOpenAI:
     kwargs = {
         "model": settings.model,
         "temperature": 0.3 if json_mode else settings.temperature,
@@ -113,7 +139,16 @@ def _build_llm(streaming: bool = True, json_mode: bool = False) -> ChatOpenAI:
     }
     if json_mode:
         kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
-    return ChatOpenAI(**kwargs)
+    llm = ChatOpenAI(**kwargs)
+    if tools and not json_mode:
+        tool_schemas = []
+        for t in tools:
+            if provider == "anthropic":
+                tool_schemas.append(ToolSchemaAdapter.to_anthropic(t))
+            else:
+                tool_schemas.append(ToolSchemaAdapter.to_openai(t))
+        llm = llm.bind_tools(tool_schemas)
+    return llm
 
 
 def _force_final_answer(state: State, tool_result: str | None,
@@ -135,7 +170,86 @@ def _force_final_answer(state: State, tool_result: str | None,
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# agent_node：LLM 决策节点（JSON Mode）
+# Guardrail helper
+# ────────────────────────────────────────────────────────────────────────────
+def _apply_guardrails(
+    state: State,
+    tool_calls: list[dict] | None,
+) -> dict | None:
+    """Centralized guardrail checks. Returns force-final-answer dict or None."""
+    current_iteration = int(state.get("iteration_count", 0) or 0)
+    tool_result = state.get("tool_result")
+    tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
+
+    # Guard: first turn with no tool_calls → force search (unless pure greeting)
+    if current_iteration == 0 and not tool_result_sanitized and not tool_calls:
+        user_query = _extract_user_query(state)
+        return _force_final_answer(
+            state, tool_result,
+            _reason_record("agent_node", "FIRST_TURN_FORCED_SEARCH",
+                "LLM attempted final answer without tools; auto-injecting search.",
+                extra={"user_query": user_query[:100]}),
+        )
+
+    # Guard: max iterations
+    if current_iteration >= MAX_ITERATIONS:
+        return _force_final_answer(
+            state, tool_result,
+            _reason_record("agent_node", "MAX_ITERATIONS_REACHED",
+                f"Iteration limit ({MAX_ITERATIONS}) reached; forcing final answer."),
+        )
+
+    if not tool_calls:
+        return None  # No tool calls, guardrails pass → route to chart_planner
+
+    # Compute consecutive search count from tool_calls
+    consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+    parallel_search_count = sum(
+        1 for tc in tool_calls if str(tc.get("name", "")).strip().lower() == "search"
+    )
+    next_consecutive = consecutive_search_count + parallel_search_count if parallel_search_count > 0 else 0
+
+    # Guard: max consecutive search
+    max_search = _max_consecutive_search_calls()
+    if parallel_search_count > 0 and next_consecutive > max_search:
+        return _force_final_answer(
+            state, tool_result,
+            _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
+                f"Consecutive search limit ({max_search}) reached; forcing final answer.",
+                extra={"parallel_search_count": parallel_search_count,
+                       "consecutive_search_count": next_consecutive, "limit": max_search}),
+        )
+
+    # Guard: duplicate tool call
+    last_tool_name = (state.get("last_tool_name") or "").strip().lower()
+    last_tool_query = _normalize_query(str(state.get("last_tool_query") or ""))
+    for tc in tool_calls:
+        tc_name = str(tc.get("name", "")).strip().lower()
+        tc_query = _normalize_query(str(tc.get("args", {}).get("query", "")))
+        if last_tool_name == tc_name and last_tool_query == tc_query:
+            return _force_final_answer(
+                state, tool_result,
+                _reason_record("agent_node", "DUPLICATE_TOOL_CALL_BLOCKED",
+                    f"Blocked duplicate: tool='{tc_name}'.",
+                    extra={"tool": tc_name}),
+            )
+
+    return None
+
+
+def _extract_user_query(state: State) -> str:
+    """Extract the last user message from state."""
+    raw_messages = list(state.get("messages") or [])
+    for msg in reversed(raw_messages):
+        if hasattr(msg, "type") and msg.type == "human":
+            return (msg.content or "")[:200]
+        if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
+            return str(msg.get("content", ""))[:200]
+    return ""
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# agent_node：LLM 决策节点（bind_tools + JSON Mode fallback）
 # ────────────────────────────────────────────────────────────────────────────
 async def agent_node(state: State) -> dict:
     active = state.get("active_agent", "default")
@@ -143,13 +257,105 @@ async def agent_node(state: State) -> dict:
 
     registry = get_tool_registry()
 
-    # 1. Build tool list description
+    # 1. Detect provider capability
+    provider_supports_tool_calls = getattr(settings, "provider_supports_tool_calls", True)
+    tools_list = registry.list_tools() if registry else []
+    registered_tools: list[BaseTool] = [registry.get(t["name"]) for t in tools_list] if registry else []
+
+    if provider_supports_tool_calls and registered_tools:
+        # ── V2: bind_tools path ──
+        llm = _build_llm(streaming=False, json_mode=False, tools=registered_tools)
+    else:
+        # ── Fallback: JSON Mode path (unchanged) ──
+        return await _agent_node_json_mode(state, registry)
+
+    # 2. Build messages
+    tool_result = state.get("tool_result")
+    tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
+    current_iteration = int(state.get("iteration_count", 0) or 0)
+    runtime_context_prompt = str(state.get("runtime_context_prompt") or "").strip()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    system_lines = [
+        _REACT_SYSTEM_PROMPT_V2,
+        f"Current server time: {now_str}",
+    ]
+    if runtime_context_prompt:
+        system_lines.append(f"Runtime context:\n{runtime_context_prompt}")
+    if tool_result_sanitized:
+        remaining = MAX_ITERATIONS - current_iteration
+        system_lines.append(
+            f"\n--- Observation (iteration {current_iteration}/{MAX_ITERATIONS}) ---\n"
+            f"{tool_result_sanitized}\n"
+            "--- End Observation ---\n"
+        )
+        system_lines.append(
+            "Continue the ReAct cycle: if you need more info, call a tool. "
+            f"Otherwise, output a plain-text final answer. ({remaining} iterations remaining)"
+        )
+
+    messages = [SystemMessage(content="\n".join(system_lines))] + list(state["messages"])
+
+    # 3. Call LLM
+    try:
+        response = await llm.ainvoke(messages)
+    except Exception as e:
+        logger.warning("agent_node: LLM invoke failed, forcing final answer: %s", e)
+        return _force_final_answer(state, tool_result)
+
+    tool_calls_raw = response.tool_calls if hasattr(response, "tool_calls") else None
+    tool_calls = _normalize_tool_calls(tool_calls_raw)
+
+    # 4. Guardrails
+    guard_result = _apply_guardrails(state, tool_calls)
+    if guard_result is not None:
+        return guard_result
+
+    # 5. Route
+    if tool_calls:
+        first_tool_name = str(tool_calls[0].get("name", "")).strip().lower()
+        consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
+        parallel_search_count = sum(
+            1 for tc in tool_calls if str(tc.get("name", "")).strip().lower() == "search"
+        )
+        next_consecutive = consecutive_search_count + parallel_search_count if parallel_search_count > 0 else 0
+
+        reason = _reason_record("agent_node", "TOOL_CALL_DECIDED",
+            f"Tool call: {len(tool_calls)} tool(s), first='{first_tool_name}'",
+            extra={"tools": [tc.get("name") for tc in tool_calls]})
+        return {
+            "current_tool": first_tool_name,
+            "tool_input": {"tool_calls": tool_calls},
+            "tool_result": None,
+            "iteration_count": current_iteration + 1,
+            "last_tool_name": first_tool_name,
+            "last_tool_query": str(tool_calls[0].get("args", {}).get("query", "")),
+            "consecutive_search_count": next_consecutive,
+            "reasoning_steps": _append_reason(state, reason),
+            "route": "tool",
+        }
+
+    # No tool_calls → final answer
+    reason = _reason_record("agent_node", "FINAL_ANSWER", "Agent decided data collection is complete.")
+    return {
+        "current_tool": None,
+        "tool_input": None,
+        "tool_result": None,
+        "last_tool_name": None,
+        "last_tool_query": None,
+        "consecutive_search_count": 0,
+        "reasoning_steps": _append_reason(state, reason),
+        "route": "chart_planner",
+    }
+
+
+async def _agent_node_json_mode(state: State, registry) -> dict:
+    """Fallback: JSON Mode agent node for providers that don't support tool_calls."""
     tools_desc = ""
     if registry:
         for t in registry.list_tools():
             tools_desc += f"  - {t['name']}: {t['description']}\n"
 
-    # 2. Build system prompt with Observation
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     tool_result = state.get("tool_result")
     tool_result_sanitized = normalize_tool_result_for_prompt(tool_result)
@@ -177,7 +383,6 @@ async def agent_node(state: State) -> dict:
             f"Otherwise, output final_answer. ({remaining} iterations remaining)"
         )
     else:
-        # First iteration: force tool call unless it's a trivial greeting
         system_lines.append(
             f"\nIMPORTANT: Your training data cutoff is before {now_str}. "
             "For factual, statistical, or data-related questions, your knowledge is likely outdated. "
@@ -187,8 +392,6 @@ async def agent_node(state: State) -> dict:
         )
 
     system_prompt = "\n".join(system_lines)
-
-    # 3. Call LLM with JSON Mode
     messages = [SystemMessage(content=system_prompt)] + list(state["messages"])
     llm = _build_llm(streaming=False, json_mode=True)
 
@@ -206,7 +409,6 @@ async def agent_node(state: State) -> dict:
         if not actions:
             return _force_final_answer(state, tool_result)
 
-        # Guard: max iterations
         if current_iteration >= MAX_ITERATIONS:
             reason = _reason_record("agent_node", "MAX_ITERATIONS_REACHED",
                 f"Iteration limit ({MAX_ITERATIONS}) reached; forcing final answer.")
@@ -216,18 +418,15 @@ async def agent_node(state: State) -> dict:
         if not first_tool_name:
             return _force_final_answer(state, tool_result)
 
-        # Count consecutive searches from all parallel actions
         consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
         parallel_search_count = sum(1 for a in actions if str(a.get("tool", "")).strip().lower() == "search")
         next_consecutive = consecutive_search_count + parallel_search_count if parallel_search_count > 0 else 0
 
-        # Guard: max consecutive search
         max_search = _max_consecutive_search_calls()
-        search_extra = {"parallel_search_count": parallel_search_count, "consecutive_search_count": next_consecutive, "limit": max_search}
         if parallel_search_count > 0 and next_consecutive > max_search:
             reason = _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
                 f"Consecutive search limit ({max_search}) reached in parallel call; forcing final answer.",
-                extra=search_extra)
+                extra={"parallel_search_count": parallel_search_count, "consecutive_search_count": next_consecutive, "limit": max_search})
             return _force_final_answer(state, tool_result, reason)
 
         reason = _reason_record("agent_node", "PARALLEL_TOOL_CALL",
@@ -247,11 +446,10 @@ async def agent_node(state: State) -> dict:
 
     action = str(parsed.get("action", "")).strip().lower()
 
-    # 4b. Handle tool call
     if action == "tool":
         tool_name = str(parsed.get("tool", "")).strip().lower()
         query = str(parsed.get("query", "")).strip()
-        logging.info("[AGENT_NODE] 🛠️ tool call decision: tool=%s query=%s", tool_name, query[:80])
+        logging.info("[AGENT_NODE] tool call decision: tool=%s query=%s", tool_name, query[:80])
 
         if not tool_name:
             return _force_final_answer(state, tool_result)
@@ -260,13 +458,11 @@ async def agent_node(state: State) -> dict:
         consecutive_search_count = int(state.get("consecutive_search_count", 0) or 0)
         next_consecutive = consecutive_search_count + 1 if tool_name == "search" else 0
 
-        # Guard: max iterations
         if current_iteration >= MAX_ITERATIONS:
             reason = _reason_record("agent_node", "MAX_ITERATIONS_REACHED",
                 f"Iteration limit ({MAX_ITERATIONS}) reached; forcing final answer.")
             return _force_final_answer(state, tool_result, reason)
 
-        # Guard: duplicate tool call
         last_tool_name = (state.get("last_tool_name") or "").strip().lower()
         last_tool_query = _normalize_query(str(state.get("last_tool_query") or ""))
         if last_tool_name == tool_name and last_tool_query == normalized_query:
@@ -275,7 +471,6 @@ async def agent_node(state: State) -> dict:
                 extra={"tool": tool_name, "query": query})
             return _force_final_answer(state, tool_result, reason)
 
-        # Guard: max consecutive search
         max_search = _max_consecutive_search_calls()
         if tool_name == "search" and next_consecutive > max_search:
             reason = _reason_record("agent_node", "MAX_CONSECUTIVE_SEARCH_REACHED",
@@ -297,21 +492,10 @@ async def agent_node(state: State) -> dict:
             "route": "tool",
         }
 
-    # 5. Handle final_answer — reject on first iteration
     if action == "final_answer":
         logging.info("[AGENT_NODE] LLM returned final_answer (iter=%s, has_tool_result=%s)", current_iteration, bool(tool_result_sanitized))
         if not tool_result_sanitized:
-            logging.warning("[AGENT_NODE] ⚠️ final_answer on first turn — auto-injecting forced search")
-            # First iteration with no tools → force search with user's question
-            user_query = ""
-            raw_messages = list(state.get("messages") or [])
-            for msg in reversed(raw_messages):
-                if hasattr(msg, "type") and msg.type == "human":
-                    user_query = (msg.content or "")[:200]
-                    break
-                if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
-                    user_query = str(msg.get("content", ""))[:200]
-                    break
+            user_query = _extract_user_query(state)
             reason = _reason_record("agent_node", "FIRST_TURN_FORCED_SEARCH",
                 "LLM attempted final_answer without tools; auto-injecting search.",
                 extra={"user_query": user_query[:100]})
@@ -339,7 +523,6 @@ async def agent_node(state: State) -> dict:
             "route": "chart_planner",
         }
 
-    # Unknown action → force final
     logger.warning("agent_node: unknown action '%s', forcing final answer", action)
     return _force_final_answer(state, tool_result)
 
@@ -526,12 +709,83 @@ async def _parallel_tool_execution(state: State, actions: list[dict]) -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# _execute_tool_calls：bind_tools 路径的多工具并行执行
+# ────────────────────────────────────────────────────────────────────────────
+async def _execute_tool_calls(state: State, tool_calls: list[dict]) -> dict:
+    """Execute tool_calls from bind_tools path in parallel."""
+    gate = _build_policy_gate()
+    context = PolicyContext(
+        conversation_id=str(state.get("conversation_id") or ""),
+        agent_id=str(state.get("active_agent") or "agent.main"),
+    )
+
+    raw_results = await asyncio.gather(
+        *[_execute_single_tool(
+            str(tc.get("name", "")).strip().lower(),
+            dict(tc.get("args", {})),
+            gate,
+            context,
+        ) for tc in tool_calls],
+        return_exceptions=True,
+    )
+
+    new_steps = list(state.get("tool_steps", []))
+    results = []
+    reasoning_msgs = []
+
+    for i, tc in enumerate(tool_calls):
+        raw = raw_results[i]
+        if isinstance(raw, BaseException):
+            result = {"ok": False, "error": {"code": "PARALLEL_EXCEPTION", "message": str(raw)[:200], "retryable": False}}
+            elapsed_ms = 0
+            status = "error"
+            error_msg = str(raw)[:200]
+        else:
+            result = raw["result"]
+            elapsed_ms = raw["elapsed_ms"]
+            status = raw["status"]
+            error_msg = raw.get("error_msg")
+
+        results.append(result)
+        tool_name = str(tc.get("name", "")).strip().lower()
+        step_record = normalize_tool_step_record(
+            tool_name=tool_name,
+            tool_input=tc.get("args", {}),
+            status=status,
+            elapsed_ms=elapsed_ms,
+            timestamp=time.time(),
+            error=error_msg,
+        )
+        new_steps.append(step_record)
+        reasoning_msgs.append(
+            f"[tool_node] Tool '{tool_name}' {'executed successfully' if status == 'completed' else 'returned error: ' + (error_msg or '')}"
+        )
+
+    merged = {"parallel": True, "results": results}
+    result_str = json.dumps(merged, ensure_ascii=False)
+    return {
+        "tool_result": result_str,
+        "tool_steps": new_steps,
+        "current_tool": None,
+        "tool_input": None,
+        "last_tool_name": None,
+        "last_tool_query": None,
+        "reasoning_steps": state.get("reasoning_steps", []) + reasoning_msgs,
+        "route": "agent",
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # tool_node：工具执行节点
 # ────────────────────────────────────────────────────────────────────────────
 async def tool_node(state: State) -> dict:
     tool_input = state.get("tool_input") or {}
     tool_name = state.get("current_tool") or ""
     logging.info("[TOOL_NODE] 🛠️ executing tool=%s input_keys=%s", tool_name, list(tool_input.keys())[:5])
+
+    # ── V2: bind_tools path ──
+    if "tool_calls" in tool_input:
+        return await _execute_tool_calls(state, tool_input["tool_calls"])
 
     # ── Parallel execution path ──
     if "actions" in tool_input:
@@ -642,6 +896,27 @@ async def tool_node(state: State) -> dict:
 
 def _normalize_query(text: str) -> str:
     return " ".join((text or "").strip().lower().split())
+
+
+def _normalize_tool_calls(tool_calls_raw: Any) -> list[dict]:
+    """Normalize tool_calls from LLM response to list of dicts with 'name' and 'args'."""
+    if not tool_calls_raw:
+        return []
+    normalized = []
+    for tc in tool_calls_raw:
+        if isinstance(tc, dict):
+            normalized.append({
+                "id": tc.get("id", ""),
+                "name": tc.get("name", tc.get("function", {}).get("name", "unknown")),
+                "args": tc.get("args", tc.get("function", {}).get("arguments", {})),
+            })
+        elif hasattr(tc, "name"):
+            normalized.append({
+                "id": getattr(tc, "id", ""),
+                "name": tc.name,
+                "args": tc.args if hasattr(tc, "args") else {},
+            })
+    return normalized
 
 
 # ────────────────────────────────────────────────────────────────────────────
