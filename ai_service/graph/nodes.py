@@ -594,6 +594,10 @@ async def _execute_single_tool(
     try:
         bus = get_streaming_bus()
         tool = registry.get(tool_name) if registry else None
+        logger.info("[EXEC_SINGLE] tool=%s bus=%s has_exec_stream=%s overridden=%s",
+                    tool_name, bus is not None,
+                    hasattr(tool, "execute_stream") if tool else False,
+                    type(tool).execute_stream is not BaseTool.execute_stream if (tool and hasattr(tool, "execute_stream")) else "N/A")
 
         # Determine effective timeout: gate override > tool timeout > None
         effective_timeout_ms = gate.timeout_override_ms or getattr(tool, "timeout_ms", None)
