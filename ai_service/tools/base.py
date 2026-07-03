@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from core.streaming_event_bus import StreamingEventBus
 from tools.schema import ToolSchema
 
 
@@ -57,5 +58,18 @@ class BaseTool(ABC):
 	@abstractmethod
 	async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
 		"""Execute the tool with validated input payload."""
+
+	async def execute_stream(
+		self,
+		input_payload: Mapping[str, Any],
+		bus: StreamingEventBus,
+	) -> ToolResult:
+		"""Execute the tool with streaming progress via EventBus.
+
+		Optional -- the default implementation calls ``execute()`` without
+		emitting intermediate events. Tools that override this SHOULD emit
+		``tool.progress`` and ``tool.output`` events during execution.
+		"""
+		return await self.execute(input_payload)
 
 

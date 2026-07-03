@@ -108,3 +108,37 @@ def test_to_sse_data_wraps_json():
     assert "data" in sse
     assert "message.delta" in sse["data"]
 
+
+class TestToolProgressEnvelope:
+    def test_envelope_tool_progress(self):
+        """tool.progress 信封应包含进度百分比和消息。"""
+        from domain.event_envelope import envelope_tool_progress
+
+        ctx = make_ctx()
+        envelope = envelope_tool_progress(ctx, tool_name="execute_python", progress=50, message="Executing...")
+        assert envelope["type"] == "tool.progress"
+        assert envelope["payload"]["toolName"] == "execute_python"
+        assert envelope["payload"]["progress"] == 50
+        assert envelope["payload"]["message"] == "Executing..."
+
+    def test_envelope_tool_output(self):
+        """tool.output 信封应携带输出内容块。"""
+        from domain.event_envelope import envelope_tool_output
+
+        ctx = make_ctx()
+        envelope = envelope_tool_output(ctx, tool_name="execute_python", output="print('hello')", chunk_index=0)
+        assert envelope["type"] == "tool.output"
+        assert envelope["payload"]["toolName"] == "execute_python"
+        assert envelope["payload"]["output"] == "print('hello')"
+        assert envelope["payload"]["chunkIndex"] == 0
+
+    def test_envelope_tool_completed(self):
+        """tool.completed 信封应携带最终结果和耗时。"""
+        from domain.event_envelope import envelope_tool_completed
+
+        ctx = make_ctx()
+        envelope = envelope_tool_completed(ctx, tool_name="execute_python", result={"ok": True}, elapsed_ms=1500)
+        assert envelope["type"] == "tool.completed"
+        assert envelope["payload"]["toolName"] == "execute_python"
+        assert envelope["payload"]["elapsed_ms"] == 1500
+

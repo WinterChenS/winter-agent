@@ -138,6 +138,60 @@ def envelope_chart(trace_ctx: TraceContext, chart_spec: dict[str, Any]) -> Event
     )
 
 
+def envelope_tool_progress(
+    trace_ctx: TraceContext,
+    tool_name: str,
+    progress: int,
+    message: str,
+) -> dict[str, Any]:
+    """tool.progress -- execution progress update (0-100)."""
+    return build_envelope(
+        "tool.progress",
+        trace_ctx,
+        payload={
+            "toolName": tool_name,
+            "progress": progress,
+            "message": message,
+        },
+    )
+
+
+def envelope_tool_output(
+    trace_ctx: TraceContext,
+    tool_name: str,
+    output: str,
+    chunk_index: int = 0,
+) -> dict[str, Any]:
+    """tool.output -- incremental output chunk during execution."""
+    return build_envelope(
+        "tool.output",
+        trace_ctx,
+        payload={
+            "toolName": tool_name,
+            "output": output,
+            "chunkIndex": chunk_index,
+        },
+    )
+
+
+def envelope_tool_completed(
+    trace_ctx: TraceContext,
+    tool_name: str,
+    result: dict[str, Any],
+    elapsed_ms: int = 0,
+) -> dict[str, Any]:
+    """tool.completed -- final execution result."""
+    return build_envelope(
+        "tool.completed",
+        trace_ctx,
+        payload={
+            "toolName": tool_name,
+            "result": result,
+            "elapsed_ms": elapsed_ms,
+        },
+    )
+
+
 def envelope_error(trace_ctx: TraceContext, message: str) -> dict[str, Any]:
     return build_envelope(
         "error",

@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 
 from config import settings
 from core.runtime import get_tool_registry
+from core.streaming_event_bus import StreamingEventBus
 from domain.capability import CapabilityCall
 from graph.normalizers.tool_result import (
     normalize_tool_result_for_prompt,
@@ -24,6 +25,19 @@ from tools.base import BaseTool
 from tools.schema_adapter import ToolSchemaAdapter
 
 logger = logging.getLogger(__name__)
+
+# ── Per-request StreamingEventBus (set by chat route) ──
+_streaming_bus: StreamingEventBus | None = None
+
+
+def get_streaming_bus() -> StreamingEventBus | None:
+    """Get the current StreamingEventBus (set per-request by chat route)."""
+    return _streaming_bus
+
+
+def set_streaming_bus(bus: StreamingEventBus | None) -> None:
+    global _streaming_bus
+    _streaming_bus = bus
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -578,14 +592,29 @@ async def _execute_single_tool(
         }
 
     try:
-        timeout_ms = gate.timeout_override_ms
-        if timeout_ms and timeout_ms > 0:
-            result = await asyncio.wait_for(
-                registry.invoke_capability(call),
-                timeout=timeout_ms / 1000,
-            )
+        bus = get_streaming_bus()
+        tool = registry.get(tool_name) if registry else None
+
+        # Check if tool supports execute_stream with a bus
+        if bus and tool and hasattr(tool, "execute_stream"):
+            stream_method = tool.execute_stream
+            if stream_method is not BaseTool.execute_stream:
+                result_obj = await stream_method(call.input_payload, bus)
+                result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+            else:
+                bus.emit("tool.started", toolName=tool_name, arguments=call.input_payload)
+                result_obj = await tool.execute(call.input_payload)
+                result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=0)
         else:
-            result = await registry.invoke_capability(call)
+            timeout_ms = gate.timeout_override_ms
+            if timeout_ms and timeout_ms > 0:
+                result = await asyncio.wait_for(
+                    registry.invoke_capability(call),
+                    timeout=timeout_ms / 1000,
+                )
+            else:
+                result = await registry.invoke_capability(call)
     except asyncio.TimeoutError:
         result = {
             "ok": False,
@@ -828,14 +857,29 @@ async def tool_node(state: State) -> dict:
             error_msg = "ToolRegistry not initialized"
         else:
             try:
-                timeout_ms = gate.timeout_override_ms
-                if timeout_ms and timeout_ms > 0:
-                    result = await asyncio.wait_for(
-                        registry.invoke_capability(call),
-                        timeout=timeout_ms / 1000,
-                    )
+                bus = get_streaming_bus()
+                tool = registry.get(tool_name) if registry else None
+
+                # Check if tool supports execute_stream with a bus
+                if bus and tool and hasattr(tool, "execute_stream"):
+                    stream_method = tool.execute_stream
+                    if stream_method is not BaseTool.execute_stream:
+                        result_obj = await stream_method(tool_input, bus)
+                        result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                    else:
+                        bus.emit("tool.started", toolName=tool_name, arguments=tool_input)
+                        result_obj = await tool.execute(tool_input)
+                        result = result_obj.to_dict() if isinstance(result_obj, ToolResult) else result_obj
+                        bus.emit("tool.completed", toolName=tool_name, result=result, elapsed_ms=0)
                 else:
-                    result = await registry.invoke_capability(call)
+                    timeout_ms = gate.timeout_override_ms
+                    if timeout_ms and timeout_ms > 0:
+                        result = await asyncio.wait_for(
+                            registry.invoke_capability(call),
+                            timeout=timeout_ms / 1000,
+                        )
+                    else:
+                        result = await registry.invoke_capability(call)
             except asyncio.TimeoutError:
                 result = {
                     "ok": False,

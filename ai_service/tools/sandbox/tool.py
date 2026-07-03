@@ -7,6 +7,7 @@ import platform
 import sys
 from typing import Any, Mapping
 
+from core.streaming_event_bus import StreamingEventBus
 from tools.base import BaseTool, ToolResult
 from tools.schema import tool, ToolSchema
 
@@ -299,3 +300,76 @@ class CodeSandboxTool(BaseTool):
                 message=str(exc)[:200],
                 retryable=False,
             )
+
+    async def execute_stream(
+        self,
+        input_payload: Mapping[str, Any],
+        bus: StreamingEventBus,
+    ) -> ToolResult:
+        """Execute Python code with streaming stdout/stderr output."""
+        code: str = str(input_payload.get("code", "")).strip()
+        if not code:
+            return ToolResult.failure(code="INVALID_INPUT", message="code is required", retryable=False)
+
+        timeout: int = min(max(int(input_payload.get("timeout", 30)), 1), 60)
+        preamble = self._build_preamble()
+        full_code = f"{preamble}\n{code}" if preamble else code
+
+        import os as _os
+        _venv_python = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), ".venv", "bin", "python")
+        _python_exe = _venv_python if _os.path.isfile(_venv_python) else sys.executable
+
+        proc = await asyncio.create_subprocess_exec(
+            _python_exe, "-c", full_code,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        bus.emit("tool.started", toolName=self.name, arguments=input_payload)
+
+        stdout_chunks = []
+        stderr_chunks = []
+        chunk_idx = 0
+
+        async def read_stream(stream, label, chunks):
+            nonlocal chunk_idx
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="replace")
+                chunks.append(decoded)
+                bus.emit("tool.output", toolName=self.name, output=decoded, chunkIndex=chunk_idx)
+                chunk_idx += 1
+
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(
+                    read_stream(proc.stdout, "stdout", stdout_chunks),
+                    read_stream(proc.stderr, "stderr", stderr_chunks),
+                ),
+                timeout=timeout,
+            )
+            await proc.wait()
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            bus.emit("tool.completed", toolName=self.name, result={"ok": False, "error": {"code": "TIMEOUT", "message": f"Execution exceeded {timeout}s"}}, elapsed_ms=timeout * 1000)
+            return ToolResult.failure(code="TIMEOUT", message=f"Code execution exceeded {timeout}s limit", retryable=False)
+
+        stdout_str = "".join(stdout_chunks)
+        stderr_str = "".join(stderr_chunks)
+
+        if proc.returncode != 0:
+            result = ToolResult.failure(code="EXECUTION_ERROR", message=(stderr_str.strip() or stdout_str.strip() or f"Exit code {proc.returncode}")[:500], retryable=False)
+        else:
+            output = stdout_str
+            if stderr_str:
+                output += "\n[stderr]\n" + stderr_str
+            result = ToolResult.success({"output": output.strip() or "(no output)"})
+
+        bus.emit("tool.completed", toolName=self.name, result=result.to_dict(), elapsed_ms=0)
+        return result
