@@ -1018,7 +1018,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 ---
 
-- [ ] **Step 3.1: Write failing tests for new SSE events**
+- [x] **Step 3.1: Write failing tests for new SSE events**
 
 Add tests to `ai_service/tests/test_event_envelope.py`:
 
@@ -1060,7 +1060,7 @@ class TestToolProgressEnvelope:
         assert envelope["payload"]["elapsed_ms"] == 1500
 ```
 
-- [ ] **Step 3.2: Add execute_stream to BaseTool**
+- [x] **Step 3.2: Add execute_stream to BaseTool**
 
 In `ai_service/tools/base.py`, add:
 
@@ -1085,7 +1085,7 @@ class BaseTool(ABC):
         return await self.execute(input_payload)
 ```
 
-- [ ] **Step 3.3: Add envelope builders for streaming events**
+- [x] **Step 3.3: Add envelope builders for streaming events**
 
 In `ai_service/domain/event_envelope.py`, add:
 
@@ -1144,7 +1144,7 @@ def envelope_tool_completed(
     )
 ```
 
-- [ ] **Step 3.4: Add streaming event mapping in event_mapper.py**
+- [x] **Step 3.4: Add streaming event mapping in event_mapper.py**
 
 In `ai_service/api/events/event_mapper.py`, add to `map_langgraph_event_to_envelopes` or a new handler function:
 
@@ -1179,7 +1179,7 @@ def map_streaming_bus_event_to_envelope(
     return None
 ```
 
-- [ ] **Step 3.5: Wire StreamingEventBus in tool_node**
+- [x] **Step 3.5: Wire StreamingEventBus in tool_node**
 
 In `ai_service/graph/nodes.py`, update the streaming path in `tool_node` and `_execute_single_tool`:
 
@@ -1236,7 +1236,7 @@ except Exception as exc:
     ...  # existing
 ```
 
-- [ ] **Step 3.6: Add execute_stream to CodeSandboxTool**
+- [x] **Step 3.6: Add execute_stream to CodeSandboxTool**
 
 In `ai_service/tools/sandbox/tool.py`, add:
 
@@ -1315,7 +1315,7 @@ async def execute_stream(
     return result
 ```
 
-- [ ] **Step 3.7: Wire StreamingEventBus into chat route**
+- [x] **Step 3.7: Wire StreamingEventBus into chat route**
 
 In `ai_service/api/routes/chat.py`, modify the stream_generate endpoint to create a `StreamingEventBus`, pass it to graph execution via `set_streaming_bus`, and consume its events:
 
@@ -1349,7 +1349,7 @@ finally:
     await bus_task
 ```
 
-- [ ] **Step 3.8: Run tests**
+- [x] **Step 3.8: Run tests**
 
 ```bash
 cd /Volumes/work/projects/winter-agent/ai_service
@@ -1362,7 +1362,7 @@ python -m pytest tests/test_tool_migration.py tests/test_tool_registry.py tests/
 ```
 Expected: ALL PASS (no regressions on existing tests)
 
-- [ ] **Step 3.9: Commit**
+- [x] **Step 3.9: Commit**
 
 ```bash
 git add ai_service/tools/base.py \

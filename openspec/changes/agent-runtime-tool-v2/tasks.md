@@ -16,11 +16,11 @@
 
 ## 3. Streaming Tool Results
 
-- [ ] 3.1 在 `tool_node` 中注入 `StreamingEventBus`，支持发射 `tool.progress` 事件
-- [ ] 3.2 新增 `tool.output` 和 `tool.completed` SSE 事件类型到 `event_envelope.py`
-- [ ] 3.3 在 `event_mapper.py` 中新增 `tool.progress`/`tool.output`/`tool.completed` 映射
-- [ ] 3.4 为 `CodeSandboxTool` 添加流式输出能力（验证 streaming path）
-- [ ] 3.5 确保流式事件不影响 tool_steps 持久化和最终结果聚合
+- [x] 3.1 在 `tool_node` 中注入 `StreamingEventBus`，支持发射 `tool.progress` 事件
+- [x] 3.2 新增 `tool.output` 和 `tool.completed` SSE 事件类型到 `event_envelope.py`
+- [x] 3.3 在 `event_mapper.py` 中新增 `tool.progress`/`tool.output`/`tool.completed` 映射
+- [x] 3.4 为 `CodeSandboxTool` 添加流式输出能力（验证 streaming path）
+- [x] 3.5 确保流式事件不影响 tool_steps 持久化和最终结果聚合
 
 ## 4. Parallel Execution — Per-tool Timeout
 
