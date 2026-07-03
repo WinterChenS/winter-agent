@@ -67,3 +67,15 @@ def test_agent_factory_default_context(monkeypatch):
 
     runtime = factory.build(definition)
     assert "current_time" not in runtime.system_prompt  # Replaced with datetime
+
+
+def test_agent_factory_appends_runtime_context(monkeypatch):
+    monkeypatch.setattr("core.agent_factory.get_tool_registry", lambda: None)
+
+    factory = AgentFactory()
+    definition = AgentDefinition(name="test", display_name="T", system_prompt="Base prompt")
+
+    runtime = factory.build(definition, context={"runtime_context_prompt": "[session]\nuser: 历史"})
+
+    assert "Base prompt" in runtime.system_prompt
+    assert "[session]" in runtime.system_prompt

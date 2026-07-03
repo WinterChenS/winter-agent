@@ -1,0 +1,14 @@
+{
+  "change": "roadmap-skill-engine",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "7b815cf020885566e1ef3669e1afb9b476a33b0f72238cbbed7a17d7b104d8af",
+  "files": [
+    { "path": "openspec/changes/roadmap-skill-engine/proposal.md", "sha256": "c911386e70e28738bb5f3b958d1b70f2df7db4b4b947275c9db4e6241ebbdd2b" },
+    { "path": "openspec/changes/roadmap-skill-engine/design.md", "sha256": "1f9b3152f9a774cb92650ebc967f49a5ba96dd6f0d70d09e7d393b791ba36c89" },
+    { "path": "openspec/changes/roadmap-skill-engine/tasks.md", "sha256": "53fa26871198536670ab1acd191e5f6a958d8783be8db12e5ce79780248704be" },
+    { "path": "openspec/changes/roadmap-skill-engine/specs/roadmap-skill-engine-docs/spec.md", "sha256": "da556e97057e6f8c867d362fce35664e376ab98b946e7d5ffa9b0a824bdacead" }
+  ]
+}

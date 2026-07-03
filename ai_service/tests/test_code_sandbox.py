@@ -43,6 +43,18 @@ print(df.shape)
         assert "(2, 2)" in output
 
     @pytest.mark.asyncio
+    async def test_import_scipy_and_use_it(self, sandbox: CodeSandboxTool) -> None:
+        """应能导入 scipy 并访问版本信息。"""
+        code = """
+import scipy
+print(scipy.__version__)
+"""
+        result: ToolResult = await sandbox.execute({"code": code})
+        assert result.ok is True
+        output = result.data.get("output", "")
+        assert output.strip()
+
+    @pytest.mark.asyncio
     async def test_timeout_kills_long_running_code(self, sandbox: CodeSandboxTool) -> None:
         """无限循环应在超时后返回 TIMEOUT 错误。"""
         result: ToolResult = await sandbox.execute({"code": "while True: pass", "timeout": 2})

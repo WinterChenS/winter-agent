@@ -31,13 +31,16 @@ class AgentRuntime:
 class AgentFactory:
     def build(self, definition: AgentDefinition, context: dict | None = None) -> AgentRuntime:
         """Assemble an AgentRuntime from an AgentDefinition."""
-        ctx = context or {}
+        ctx = dict(context or {})
         ctx.setdefault("current_time", datetime.now().strftime("%Y-%m-%d %H:%M"))
+        runtime_context_prompt = str(ctx.pop("runtime_context_prompt", "") or "").strip()
 
         # Render prompt template
         prompt = definition.system_prompt
         for key, value in ctx.items():
             prompt = prompt.replace("{" + key + "}", str(value))
+        if runtime_context_prompt:
+            prompt = f"{prompt}\n\nRuntime context:\n{runtime_context_prompt}"
 
         # Resolve tools
         registry = get_tool_registry()

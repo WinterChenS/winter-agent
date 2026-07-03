@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 import random
+from typing import Any
 
 from fastapi import APIRouter
 from langchain_core.messages import HumanMessage
@@ -18,6 +19,12 @@ from api.events.event_mapper import (
     map_langgraph_event_to_envelopes,
 )
 from config import settings
+from context.builder import ContextBuilder
+from context.models import AgentContext, ContextRequest
+from context.providers.files import FileContextProvider
+from context.providers.knowledge import KnowledgeContextProvider
+from context.providers.memory import MemoryContextProvider
+from context.providers.session import SessionContextProvider
 from core.runtime import get_checkpointer, get_pool, get_tool_registry
 
 
@@ -136,6 +143,30 @@ def _tool_names() -> set[str]:
         return set()
 
 
+async def _build_runtime_context(
+    pool: Any,
+    conversation_id: str | None,
+    active_agent: str | None,
+    user_query: str,
+) -> AgentContext:
+    builder = ContextBuilder(
+        [
+            SessionContextProvider(pool=pool, history_limit=10),
+            FileContextProvider(),
+            MemoryContextProvider(),
+            KnowledgeContextProvider(),
+        ]
+    )
+    return await builder.build(
+        ContextRequest(
+            session_id=conversation_id,
+            user_query=user_query,
+            agent_id=active_agent,
+            max_tokens=400,
+        )
+    )
+
+
 @router.post("/generate/stream")
 async def stream_generate(request: GenerateRequest):
     @timeit
@@ -164,9 +195,24 @@ async def stream_generate(request: GenerateRequest):
 
         event_ctx = EventMapContext(trace_ctx=trace_ctx, known_tools=_tool_names())
         try:
-            # Persist user message to database (before streaming, both modes)
+            pool_user = None
             try:
                 pool_user = get_pool()
+                runtime_context = await _build_runtime_context(
+                    pool_user,
+                    trace_ctx.conversation_id,
+                    active_agent,
+                    request.message,
+                )
+            except Exception as exc:
+                logging.warning("[CHAT] failed to build runtime context: %s", exc)
+                runtime_context = AgentContext(
+                    session_id=trace_ctx.conversation_id,
+                    agent_id=active_agent,
+                )
+
+            # Persist user message to database (before streaming, both modes)
+            try:
                 if pool_user:
                     from db.chat_message_repository import save_message as _save_msg
                     user_msg_id = str(uuid.uuid4())
@@ -223,6 +269,9 @@ async def stream_generate(request: GenerateRequest):
                     "messages": [HumanMessage(content=request.message)],
                     "conversation_id": trace_ctx.conversation_id,
                     "active_agent": active_agent,
+                    "runtime_context_prompt": runtime_context.rendered_prompt or None,
+                    "runtime_context_messages": runtime_context.recent_messages,
+                    "runtime_context_meta": runtime_context.metadata or None,
                     "chart_specs": [],
                     "blocks": [],
                     "route": "start",

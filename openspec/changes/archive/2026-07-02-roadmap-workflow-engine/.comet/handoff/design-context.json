@@ -1,0 +1,14 @@
+{
+  "change": "roadmap-workflow-engine",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "59c1bd8ae94f372b4b9f909eb83282c3e9b74ef32eeaa025bb04774eb0fd9a65",
+  "files": [
+    { "path": "openspec/changes/roadmap-workflow-engine/proposal.md", "sha256": "2510b8cc94827b7dbf638615df9c7364b242349ec5911f0d2952f20987b7e16d" },
+    { "path": "openspec/changes/roadmap-workflow-engine/design.md", "sha256": "26f94e81ca80d92ae1c471429b960a232634cb63f5843a3205f06acf0c842561" },
+    { "path": "openspec/changes/roadmap-workflow-engine/tasks.md", "sha256": "a812d2bf9710659b23a3008ecc8f828770d0e868959d89487e3aa6e32ee1f89a" },
+    { "path": "openspec/changes/roadmap-workflow-engine/specs/roadmap-workflow-engine-docs/spec.md", "sha256": "55a8670984eb94bcfc90573825824caf65be0151ac7f3495b8131a07241452b7" }
+  ]
+}

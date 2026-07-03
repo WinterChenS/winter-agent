@@ -69,6 +69,10 @@ class TestChartCodePrompt:
         """Should reference figsize."""
         assert "figure size to (12, 6)" in _CHART_CODE_PROMPT
 
+    def test_prohibits_width_height_chartspec_keywords(self):
+        """Must forbid width/height kwargs on ChartSpec constructors."""
+        assert "Do NOT pass `width=` or `height=` to ChartSpec" in _CHART_CODE_PROMPT
+
     def test_no_no_plt_show(self):
         """Must have a rule that says Do NOT call plt.show()."""
         assert "Do NOT call plt.savefig() or plt.show() directly" in _CHART_CODE_PROMPT
@@ -99,6 +103,21 @@ spec = ChartSpec(title="T", chart_type="bar", series=[])
 plt.savefig("chart_0.png")
 """
         assert "render_from_spec" in _validate_chart_code_uses_spec_renderer(code)
+
+    def test_rejects_chart_spec_width_keyword(self):
+        code = """
+colors = Palette.get_series_colors(2)
+spec = ChartSpec(
+    title="堆积图",
+    chart_type="area",
+    width=0.8,
+    series=[],
+)
+result = MatplotlibRenderer().render_from_spec(spec, "chart_0.png")
+"""
+        reason = _validate_chart_code_uses_spec_renderer(code)
+        assert reason is not None
+        assert "width" in reason
 
 
 class TestChartResultMetadataGate:

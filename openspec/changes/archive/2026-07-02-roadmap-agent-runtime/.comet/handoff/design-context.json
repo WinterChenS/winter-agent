@@ -1,0 +1,14 @@
+{
+  "change": "roadmap-agent-runtime",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "92ac662bc50a58758c91cd37e062baf93257438cc78f3f2907a0e1228fd58ccf",
+  "files": [
+    { "path": "openspec/changes/roadmap-agent-runtime/proposal.md", "sha256": "f46aba88b92c4018393103d2f8143a56b33d57aef46773c771c200e35d718e5a" },
+    { "path": "openspec/changes/roadmap-agent-runtime/design.md", "sha256": "334483168519cc209aca73f8aa20f7d48402e453b7da4334c70d43248b3bbe35" },
+    { "path": "openspec/changes/roadmap-agent-runtime/tasks.md", "sha256": "f1205804404b526ccec8b2297fb67eff2ac434bda93a2db6532cb235f4b13276" },
+    { "path": "openspec/changes/roadmap-agent-runtime/specs/roadmap-agent-runtime-docs/spec.md", "sha256": "295b5eae1b88f227efea286c2d844c77fda3e282d5458a39a824114a485285a5" }
+  ]
+}

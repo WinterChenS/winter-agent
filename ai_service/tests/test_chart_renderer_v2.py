@@ -95,6 +95,63 @@ class TestRenderFromSpec:
         result = renderer.render_from_spec(spec, output)
         assert os.path.isfile(output)
 
+    def test_render_area(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Area",
+            chart_type="area",
+            labels=["Q1", "Q2", "Q3"],
+            series=[
+                SeriesSpec(name="S1", color="#2F80ED", color_name="蓝色", values=[10, 20, 30]),
+                SeriesSpec(name="S2", color="#27AE60", color_name="绿色", values=[5, 10, 15]),
+            ],
+        )
+        output = os.path.join(temp_dir, "area.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+        assert result.metadata["chart_type"] == "area"
+
+    def test_render_radar(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Radar",
+            chart_type="radar",
+            labels=["性能", "稳定性", "成本", "扩展性"],
+            series=[
+                SeriesSpec(name="方案A", color="#2F80ED", color_name="蓝色", values=[8, 7, 6, 9]),
+                SeriesSpec(name="方案B", color="#EB5757", color_name="红色", values=[7, 8, 8, 7]),
+            ],
+        )
+        output = os.path.join(temp_dir, "radar.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+        assert result.metadata["chart_type"] == "radar"
+
+    def test_render_histogram(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Histogram",
+            chart_type="histogram",
+            data=[[1, 2, 2, 3, 3, 3, 4, 4, 5]],
+        )
+        output = os.path.join(temp_dir, "histogram.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+        assert result.metadata["chart_type"] == "histogram"
+
+    def test_render_heatmap(self, renderer, temp_dir):
+        spec = ChartSpec(
+            title="Test Heatmap",
+            chart_type="heatmap",
+            labels=["一月", "二月", "三月"],
+            data=[
+                [1, 2, 3],
+                [2, 3, 4],
+                [3, 4, 5],
+            ],
+        )
+        output = os.path.join(temp_dir, "heatmap.png")
+        result = renderer.render_from_spec(spec, output)
+        assert os.path.isfile(output)
+        assert result.metadata["chart_type"] == "heatmap"
+
     def test_metadata_json_created(self, renderer, temp_dir):
         spec = ChartSpec(
             title="Meta",
