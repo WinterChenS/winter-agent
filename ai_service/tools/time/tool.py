@@ -5,12 +5,13 @@ from typing import Any, Mapping
 
 from tools.base import BaseTool, ToolResult
 from tools.schema import tool, ToolSchema
+from tools.versioned_tool import ToolSchemaVersion, VersionedTool
 
 logger = logging.getLogger(__name__)
 
 
 @tool
-class TimeTool(BaseTool):
+class TimeTool(VersionedTool):
     name = "time"
     description = "Get the current date and time. Useful for questions about the current time or date."
     input_schema = {
@@ -35,6 +36,34 @@ class TimeTool(BaseTool):
             "required": [],
         },
     )
+
+    schema_versions: list[ToolSchemaVersion] = [
+        ToolSchemaVersion(
+            version="1.0.0",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "timezone": {"type": "string", "description": "The timezone to get the time for (e.g., 'Asia/Shanghai', 'UTC'). Defaults to local system time if not provided."}
+                },
+                "required": [],
+            },
+            deprecated_params=[],
+            migration_note="Initial version",
+        ),
+        ToolSchemaVersion(
+            version="2.0.0",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "timezone": {"type": "string", "description": "IANA timezone name (e.g., 'Asia/Shanghai', 'UTC'). Optional, defaults to system time."},
+                    "format": {"type": "string", "description": "Output format: 'full' includes timezone offset, 'short' is date+time only (default: 'full')."},
+                },
+                "required": [],
+            },
+            deprecated_params=["timezone"],
+            migration_note="Added format parameter; timezone is now optional with clearer docs",
+        ),
+    ]
 
     async def execute(self, input_payload: Mapping[str, Any]) -> ToolResult:
         try:

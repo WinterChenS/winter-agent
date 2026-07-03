@@ -62,17 +62,27 @@ class ToolRegistry:
 			for tool in self._tools.values()
 		]
 
+	@staticmethod
+	def _walk_subclasses(cls: type) -> list[type]:
+		"""Recursively collect all subclasses of *cls* (not just direct)."""
+		result: list[type] = []
+		for sub in cls.__subclasses__():
+			result.append(sub)
+			result.extend(ToolRegistry._walk_subclasses(sub))
+		return result
+
 	def discover(self) -> None:
 		"""Auto-discover and register all @tool-decorated BaseTool subclasses.
 
-		Scans ``BaseTool.__subclasses__()`` for classes that have ``_is_tool = True``
-		(set by the ``@tool`` decorator) and a non-``None`` ``schema``.  Each valid
-		class is instantiated and registered via ``register()``.
+		Recursively scans the ``BaseTool`` subclass tree for classes that have
+		``_is_tool = True`` (set by the ``@tool`` decorator) and a non-``None``
+		``schema``.  Each valid class is instantiated and registered via
+		``register()``.
 
 		Incomplete tools (missing ``_is_tool`` or missing schema) are skipped
 		with a warning logged.
 		"""
-		for cls in BaseTool.__subclasses__():
+		for cls in self._walk_subclasses(BaseTool):
 			if not getattr(cls, "_is_tool", False):
 				logger.warning("Skipping %s: missing _is_tool marker", cls.__name__)
 				continue
@@ -144,5 +154,3 @@ class ToolRegistry:
 				message=str(exc)[:200],
 				retryable=False,
 			).to_dict()
-
-
