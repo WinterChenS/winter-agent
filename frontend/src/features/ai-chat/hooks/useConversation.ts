@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useChatStore } from '../store/chatStore';
+import { apiFetch } from '../../../../services/api';
 import type { ToolCall } from '../types/message';
 import type { Message } from '../types/message';
 
@@ -33,7 +34,7 @@ function normalizeMessage(msg: Record<string, unknown>): Message {
 export function useConversation() {
   const loadHistory = useCallback(async (conversationId: string) => {
     const token = localStorage.getItem('auth_token');
-    const res = await fetch(`/api/chat/history/${conversationId}`, {
+    const res = await apiFetch(`/api/chat/history/${conversationId}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) throw new Error('Failed to load history');

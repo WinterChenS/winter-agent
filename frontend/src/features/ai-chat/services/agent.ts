@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../../services/api';
 import type { AgentInfo, AgentCreateRequest } from '../types/agent';
 
 function authHeaders(): Record<string, string> {
@@ -9,20 +10,20 @@ function authHeaders(): Record<string, string> {
 
 export const agentApi = {
   async listAgents(): Promise<AgentInfo[]> {
-    const res = await fetch('/api/agents', { headers: authHeaders() });
+    const res = await apiFetch('/api/agents', { headers: authHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch agents: ${res.status}`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
 
   async getAgent(id: string): Promise<AgentInfo> {
-    const res = await fetch(`/api/agents/${id}`, { headers: authHeaders() });
+    const res = await apiFetch(`/api/agents/${id}`, { headers: authHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch agent: ${res.status}`);
     return res.json();
   },
 
   async createAgent(data: AgentCreateRequest): Promise<AgentInfo> {
-    const res = await fetch('/api/agents', {
+    const res = await apiFetch('/api/agents', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(data),
@@ -32,7 +33,7 @@ export const agentApi = {
   },
 
   async updateAgent(id: string, data: Partial<AgentCreateRequest>): Promise<AgentInfo> {
-    const res = await fetch(`/api/agents/${id}`, {
+    const res = await apiFetch(`/api/agents/${id}`, {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify(data),
@@ -42,7 +43,7 @@ export const agentApi = {
   },
 
   async deleteAgent(id: string): Promise<void> {
-    const res = await fetch(`/api/agents/${id}`, {
+    const res = await apiFetch(`/api/agents/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     });
@@ -54,7 +55,7 @@ export const agentApi = {
   },
 
   async cloneAgent(id: string): Promise<AgentInfo> {
-    const res = await fetch(`/api/agents/${id}/clone`, { method: 'POST', headers: authHeaders() });
+    const res = await apiFetch(`/api/agents/${id}/clone`, { method: 'POST', headers: authHeaders() });
     if (!res.ok) throw new Error(`Failed to clone agent: ${res.status}`);
     return res.json();
   },

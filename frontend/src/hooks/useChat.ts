@@ -179,6 +179,12 @@ export function useChat() {
         }),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_username');
+        window.location.href = '/login';
+        return;
+      }
       if (!response.ok) throw new Error('请求失败');
       if (!response.body) throw new Error('响应体为空');
 

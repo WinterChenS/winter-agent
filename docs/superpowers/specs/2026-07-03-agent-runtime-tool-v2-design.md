@@ -2,6 +2,8 @@
 comet_change: agent-runtime-tool-v2
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-04-agent-runtime-tool-v2
+status: final
 ---
 
 # Agent Runtime Tool V2 — Technical Design

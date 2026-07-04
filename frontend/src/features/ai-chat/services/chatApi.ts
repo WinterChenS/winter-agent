@@ -42,6 +42,12 @@ export async function sendChatMessage(req: ChatRequest): Promise<void> {
     }),
   });
 
+  if (response.status === 401) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_username');
+    window.location.href = '/login';
+    return;
+  }
   if (!response.ok) throw new Error(`Chat request failed: ${response.status}`);
   if (!response.body) throw new Error('Empty response body');
 

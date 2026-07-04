@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-07-03-agent-runtime-tool-v2-v
 branch_status: handled
 created_at: 2026-07-03
 verified_at: 2026-07-03
-archived: false
+archived: true
 handoff_context: openspec/changes/agent-runtime-tool-v2/.comet/handoff/design-context.json
 handoff_hash: 063cebca13c84be7694967fb603b5bad156db6ab822a96363ef4e39cfdbc7c89

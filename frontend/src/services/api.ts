@@ -5,12 +5,27 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+function handle401(): void {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_username');
+  window.location.href = '/login';
+}
+
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const response = await apiFetch(input, init);
+  if (response.status === 401) {
+    handle401();
+    throw new Error('登录已过期，请重新登录');
+  }
+  return response;
+}
+
 export async function streamChat(
   message: string,
   onToken: (token: string) => void,
   conversationId?: string
 ): Promise<string | undefined> {
-  const response = await fetch('/api/chat/stream', {
+  const response = await apiFetch('/api/chat/stream', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
@@ -83,7 +98,7 @@ export async function streamChat(
 }
 
 export async function getChatHistory(conversationId: string): Promise<any> {
-  const response = await fetch(`/api/chat/history/${conversationId}`, {
+  const response = await apiFetch(`/api/chat/history/${conversationId}`, {
     headers: authHeaders(),
   });
   if (!response.ok) {

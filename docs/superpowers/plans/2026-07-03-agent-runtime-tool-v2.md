@@ -2,6 +2,7 @@
 change: agent-runtime-tool-v2
 design-doc: docs/superpowers/specs/2026-07-03-agent-runtime-tool-v2-design.md
 base-ref: 2e19de0b59528c7658f8a0bfc7365361581e16f6
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 # Agent Runtime Tool V2 Implementation Plan
@@ -24,6 +25,7 @@ base-ref: 2e19de0b59528c7658f8a0bfc7365361581e16f6
 - `BaseTool` backward compatibility: existing subclasses MUST NOT require changes
 - Provider fallback: when provider does not support `tool_calls`, MUST fall back to current JSON Mode
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ## File Structure
@@ -54,6 +56,7 @@ base-ref: 2e19de0b59528c7658f8a0bfc7365361581e16f6
 | `ai_service/tools/time/tool.py` | Add v2 schema via `VersionedTool` (Task 2.4 example) |
 | `ai_service/tools/sandbox/tool.py` | Add `execute_stream()` for real-time progress |
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 1: Native Tool Calling — bind_tools Migration
@@ -68,6 +71,7 @@ base-ref: 2e19de0b59528c7658f8a0bfc7365361581e16f6
 - Produces: `ToolSchemaAdapter.to_openai(tool: BaseTool) -> dict`, `ToolSchemaAdapter.to_anthropic(tool: BaseTool) -> dict`
 - Consumes: `BaseTool` from `ai_service/tools/base.py`
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 1.1: Write failing tests for ToolSchemaAdapter**
@@ -748,6 +752,7 @@ Update tool_node to handle AIMessage.tool_calls from bind_tools path.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 2: Schema Version Management
@@ -762,6 +767,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - Consumes: `BaseTool` from `tools/base.py`
 - Produces: `ToolSchemaVersion(version: str, parameters: dict, deprecated_params: list[str] = [], migration_note: str = "")`, `VersionedTool(BaseTool)` mixin
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 2.1: Write failing tests for VersionedTool**
@@ -1003,6 +1009,7 @@ as a versioned schema example with deprecated_params tracking.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 3: Streaming Tool Results
@@ -1016,6 +1023,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - Modify: `ai_service/tools/sandbox/tool.py` (add `execute_stream` for real-time progress)
 - Test: Update `ai_service/tests/test_event_envelope.py`
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 3.1: Write failing tests for new SSE events**
@@ -1382,6 +1390,7 @@ Add streaming implementation for CodeSandboxTool.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 4: Parallel Execution — Per-tool Timeout
@@ -1390,6 +1399,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - Modify: `ai_service/graph/nodes.py` (_execute_single_tool timeout control)
 - Test: `ai_service/tests/test_parallel_protocol.py`
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 4.1: Write failing tests for per-tool timeout**
@@ -1506,6 +1516,7 @@ parallel execution of other tools via asyncio.gather.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 5: Tool Metrics
@@ -1516,6 +1527,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - Create: `ai_service/tools/metrics.py` (ToolMetrics dataclass)
 - Test: `ai_service/tests/test_tool_metrics.py`
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 5.1: Write failing tests for tool metrics**
@@ -1704,6 +1716,7 @@ get_metrics query interface.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ### Task 6: Migration, Compatibility, and Final Verification
@@ -1713,6 +1726,7 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 - Test: Run all existing test suites
 - Docs: Update roadmap V0.6 status
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 - [x] **Step 6.1: Verify all existing tools are compatible**
@@ -1832,6 +1846,7 @@ from tools/__init__.py. Mark V0.6 roadmap as completed.
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+archived-with: 2026-07-04-agent-runtime-tool-v2
 ---
 
 ## Self-Review
