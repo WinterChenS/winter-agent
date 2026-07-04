@@ -6,13 +6,18 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from domain.event_envelope import (
+    build_envelope,
     envelope_agent_step,
     envelope_chart,
     envelope_message_delta,
     envelope_message_reasoning,
     envelope_message_tool_call,
+    envelope_tool_completed,
+    envelope_tool_output,
+    envelope_tool_progress,
     envelope_tool_summary,
 )
+from core.streaming_event_bus import StreamingEvent
 from observability.trace import TraceContext, new_span
 
 
@@ -217,5 +222,63 @@ def emit_chart_envelopes(
     if isinstance(single, dict) and single:
         return [envelope_chart(ctx.trace_ctx, single)]
     return []
+
+
+def map_streaming_bus_event_to_envelope(
+    event: StreamingEvent,
+    ctx: EventMapContext,
+    message_id: str,
+) -> dict[str, Any] | None:
+    if event.type == "tool.started":
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = event.data.get("tool_call_id") or f"{tool_name}_{event.timestamp}"
+        return build_envelope(
+            "tool.started",
+            ctx.trace_ctx,
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "arguments": event.data.get("arguments", {}),
+                "status": "running",
+            },
+        )
+    elif event.type == "tool.progress":
+        return envelope_tool_progress(
+            ctx.trace_ctx,
+            tool_name=event.data.get("toolName", "unknown"),
+            progress=event.data.get("progress", 0),
+            message=event.data.get("message", ""),
+        )
+    elif event.type == "tool.output":
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = f"{tool_name}_{event.timestamp}"
+        return build_envelope(
+            "tool.output",
+            ctx.trace_ctx,
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "output": event.data.get("output", ""),
+                "chunkIndex": event.data.get("chunkIndex", 0),
+            },
+        )
+    elif event.type == "tool.completed":
+        tool_name = event.data.get("toolName", "unknown")
+        tc_id = event.data.get("tool_call_id") or f"{tool_name}_{event.timestamp}"
+        result_data = event.data.get("result", {})
+        if isinstance(result_data, dict) and result_data.get("ok"):
+            summary = summarize_tool_result(tool_name, result_data)
+        else:
+            summary = str(result_data.get("error", {}).get("message", "")) if isinstance(result_data, dict) else ""
+        return build_envelope(
+            "tool.finished",
+            ctx.trace_ctx,
+            payload={
+                "tool_call_id": tc_id,
+                "tool": tool_name,
+                "result": {"status": "completed", "summary": summary, "elapsed_ms": event.data.get("elapsed_ms", 0)},
+            },
+        )
+    return None
 
 

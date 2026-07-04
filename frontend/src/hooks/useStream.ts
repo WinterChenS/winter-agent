@@ -27,6 +27,12 @@ export function useStream() {
         signal: abortControllerRef.current.signal,
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_username');
+        window.location.href = '/login';
+        return;
+      }
       if (!response.ok) {
         throw new Error('网络响应失败');
       }

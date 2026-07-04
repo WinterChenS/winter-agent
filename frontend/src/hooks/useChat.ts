@@ -10,7 +10,7 @@ import { parseSseChunk } from '../services/sse';
 import { generateUUID } from '../utils/uuid';
 
 interface StreamPayload {
-  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta';
+  type?: 'token' | 'tool_start' | 'tool_result' | 'tool_summary' | 'agent_step' | 'chart' | 'error' | 'thought' | 'reasoning_delta' | 'tool.progress' | 'tool.output' | 'tool.completed';
   schemaVersion?: string;
   payload?: {
     content?: string;
@@ -20,6 +20,10 @@ interface StreamPayload {
     summary?: string;
     elapsed_ms?: number;
     error?: string;
+    message?: string;
+    progress?: number;
+    output?: string;
+    arguments?: Record<string, unknown>;
     chartId?: string;
     chartSpec?: ChartSpecData;
     block?: unknown;
@@ -175,6 +179,12 @@ export function useChat() {
         }),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_username');
+        window.location.href = '/login';
+        return;
+      }
       if (!response.ok) throw new Error('请求失败');
       if (!response.body) throw new Error('响应体为空');
 
@@ -293,6 +303,43 @@ export function useChat() {
                 summary: payload.summary || contentText.trim() || s.summary,
                 detail: contentText.trim(),
                 error: payload.error || (contentText.includes('失败') ? contentText.slice(0, 100) : undefined),
+              };
+            }
+            return s;
+          });
+          updateThinkingMessage();
+          return;
+        }
+
+        // Tool progress
+        if (parsed.type === 'tool.progress') {
+          const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
+          const message = payload.message ?? '';
+          const progress = typeof payload.progress === 'number' ? payload.progress : undefined;
+          thinkingSteps = thinkingSteps.map(s => {
+            if (s.tool === toolName && s.status === 'running') {
+              return {
+                ...s,
+                summary: message || (progress !== undefined ? `${progress}%` : s.summary),
+              };
+            }
+            return s;
+          });
+          updateThinkingMessage();
+          return;
+        }
+
+        // Tool streaming output
+        if (parsed.type === 'tool.output') {
+          const toolName = payload.toolName ?? parsed.toolName ?? 'unknown';
+          const chunk = payload.output ?? '';
+          thinkingSteps = thinkingSteps.map(s => {
+            if (s.tool === toolName && s.status === 'running') {
+              const existingDetail = s.detail || '';
+              return {
+                ...s,
+                summary: chunk.length > 80 ? chunk.slice(0, 80) + '...' : chunk,
+                detail: existingDetail + chunk,
               };
             }
             return s;

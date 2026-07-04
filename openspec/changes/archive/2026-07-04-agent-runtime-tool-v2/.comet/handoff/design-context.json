@@ -1,0 +1,14 @@
+{
+  "change": "agent-runtime-tool-v2",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "063cebca13c84be7694967fb603b5bad156db6ab822a96363ef4e39cfdbc7c89",
+  "files": [
+    { "path": "openspec/changes/agent-runtime-tool-v2/proposal.md", "sha256": "c9d199f913d79cefd5d5d1c567d69698fcd998e66e957341f9a57e9852f045e5" },
+    { "path": "openspec/changes/agent-runtime-tool-v2/design.md", "sha256": "5b1bed9b03f6aa04a854be24a11cbe007ac873284f53771f443fda657cd85dd0" },
+    { "path": "openspec/changes/agent-runtime-tool-v2/tasks.md", "sha256": "21439b0b7b66fcc41624af841e7a8619f6922d5c860ae7b51f4ef90171193784" },
+    { "path": "openspec/changes/agent-runtime-tool-v2/specs/tool-runtime-v2/spec.md", "sha256": "68b52c37134cb462cd826542195bba912f97696e334ef0f07b40fb3d33202972" }
+  ]
+}

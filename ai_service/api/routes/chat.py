@@ -17,6 +17,7 @@ from api.events.event_mapper import (
     emit_final_summary_envelope,
     extract_last_assistant_text,
     map_langgraph_event_to_envelopes,
+    map_streaming_bus_event_to_envelope,
 )
 from config import settings
 from context.builder import ContextBuilder
@@ -49,6 +50,7 @@ def _is_internal_react_message(content: str) -> bool:
         return True
     return False
 from decorator.timeit import timeit
+from graph.nodes import set_streaming_bus
 from domain.event_envelope import (
     build_envelope,
     envelope_chart,
@@ -259,6 +261,7 @@ async def stream_generate(request: GenerateRequest):
                 # ── Plan-Execute-Compose Graph with Event Bus ────────────
                 from core.streaming_event_bus import StreamingEventBus
                 event_bus = StreamingEventBus()
+                set_streaming_bus(event_bus)
                 graph = create_plan_execute_graph(checkpointer=checkpointer, event_bus=event_bus)
 
                 logging.info("[CHAT] streaming plan-execute-compose graph")
@@ -326,18 +329,25 @@ async def stream_generate(request: GenerateRequest):
                 async def bus_runner():
                     try:
                         async for bus_event in event_bus.events():
-                            envelope = {
-                                "type": bus_event.type,
-                                "schemaVersion": "1.0",
-                                "conversationId": trace_ctx.conversation_id,
-                                "messageId": message_id,
-                                "agentId": active_agent,
-                                "timestamp": bus_event.timestamp,
-                                "payload": bus_event.data,
-                            }
-                            await merge_queue.put(("bus", envelope))
-                    except Exception:
-                        pass
+                            # Use proper event mapper for streaming events
+                            mapped = map_streaming_bus_event_to_envelope(bus_event, event_ctx, message_id)
+                            if mapped:
+                                mapped["messageId"] = message_id
+                                await merge_queue.put(("bus", mapped))
+                            else:
+                                # Fallback: raw envelope for non-streaming events
+                                envelope = {
+                                    "type": bus_event.type,
+                                    "schemaVersion": "1.0",
+                                    "conversationId": trace_ctx.conversation_id,
+                                    "messageId": message_id,
+                                    "agentId": active_agent,
+                                    "timestamp": bus_event.timestamp,
+                                    "payload": bus_event.data,
+                                }
+                                await merge_queue.put(("bus", envelope))
+                    except Exception as _bus_err:
+                        logging.warning("[CHAT] bus_runner crashed: %s", _bus_err, exc_info=True)
                     finally:
                         await merge_queue.put(("bus_done", None))
 
