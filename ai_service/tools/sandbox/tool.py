@@ -6,6 +6,7 @@ import json
 import logging
 import platform
 import sys
+import time
 from typing import Any, Mapping
 
 from core.streaming_event_bus import StreamingEventBus
@@ -328,7 +329,8 @@ class CodeSandboxTool(BaseTool):
             stderr=asyncio.subprocess.PIPE,
         )
 
-        bus.emit("tool.started", toolName=self.name, arguments=input_payload)
+        _tc_id = f"{self.name}_{int(time.time() * 1000)}"
+        bus.emit("tool.started", tool_call_id=_tc_id, toolName=self.name, arguments=input_payload)
         await asyncio.sleep(0)
 
         stdout_chunks = []
@@ -359,7 +361,7 @@ class CodeSandboxTool(BaseTool):
                 await proc.wait()
             except Exception:
                 pass
-            bus.emit("tool.completed", toolName=self.name, result={"ok": False, "error": {"code": "TIMEOUT", "message": f"Execution exceeded {timeout}s"}}, elapsed_ms=timeout * 1000)
+            bus.emit("tool.completed", tool_call_id=_tc_id, toolName=self.name, result={"ok": False, "error": {"code": "TIMEOUT", "message": f"Execution exceeded {timeout}s"}}, elapsed_ms=timeout * 1000)
             return ToolResult.failure(code="TIMEOUT", message=f"Code execution exceeded {timeout}s limit", retryable=False)
 
         stdout_str = "".join(stdout_chunks)
@@ -367,7 +369,7 @@ class CodeSandboxTool(BaseTool):
 
         if proc.returncode != 0:
             result = ToolResult.failure(code="EXECUTION_ERROR", message=(stderr_str.strip() or stdout_str.strip() or f"Exit code {proc.returncode}")[:500], retryable=False)
-            bus.emit("tool.completed", toolName=self.name, result=result.to_dict(), elapsed_ms=0)
+            bus.emit("tool.completed", tool_call_id=_tc_id, toolName=self.name, result=result.to_dict(), elapsed_ms=0)
             return result
 
         output = stdout_str
@@ -380,5 +382,5 @@ class CodeSandboxTool(BaseTool):
             "images": processed_data["images"],
             "charts": processed_data["charts"],
         })
-        bus.emit("tool.completed", toolName=self.name, result=result.to_dict(), elapsed_ms=0)
+        bus.emit("tool.completed", tool_call_id=_tc_id, toolName=self.name, result=result.to_dict(), elapsed_ms=0)
         return result
