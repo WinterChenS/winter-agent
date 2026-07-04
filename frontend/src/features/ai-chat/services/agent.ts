@@ -1,4 +1,4 @@
-import { apiFetch } from '../../../../services/api';
+import { apiFetch } from '../../../services/api';
 import type { AgentInfo, AgentCreateRequest } from '../types/agent';
 
 function authHeaders(): Record<string, string> {

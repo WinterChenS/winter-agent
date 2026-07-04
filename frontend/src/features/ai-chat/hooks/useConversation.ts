@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useChatStore } from '../store/chatStore';
-import { apiFetch } from '../../../../services/api';
+import { apiFetch } from '../../../services/api';
 import type { ToolCall } from '../types/message';
 import type { Message } from '../types/message';
 
