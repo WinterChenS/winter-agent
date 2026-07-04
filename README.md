@@ -181,8 +181,8 @@ winter-agent/
 | V0.3 | ✅ 完成 | Tool Runtime（ReAct + Tool Registry + Strategy Guard） |
 | V0.4 | ✅ 完成 | 多 Agent 路由 + 顺序 / 并行 / Supervisor 协作模式 |
 | V0.5 | ✅ 完成 | Planner → Execute → Synthesize 执行流水线 + ChartSpec 图表生成 |
-| V0.6 | 🚧 进行中 | 原生 Function Calling Runtime（替代文本解析） |
-| V0.7 | 📋 规划中 | Context Builder（会话、文件、Memory、Knowledge 上下文自动构建） |
+| V0.6 | ✅ 完成 | 原生 Function Calling Runtime（替代文本解析） |
+| V0.7 | ✅ 完成 | Context Builder（会话、文件、Memory、Knowledge 上下文自动构建） |
 | V0.8 | 📋 规划中 | Event Bus（Tool、LLM、Workflow 全事件流） |
 | V0.9 | 📋 规划中 | Runtime Stability（Retry、Timeout、Cancellation、Checkpoint、Recovery） |
 | V1.0 | 📋 规划中 | Runtime SDK（统一 Agent Runtime API，所有 Agent 共用） |
