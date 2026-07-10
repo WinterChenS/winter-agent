@@ -1,4 +1,6 @@
-from core.event_bus import RuntimeEvent
+import pytest
+
+from core.event_bus import EventBus, RuntimeEvent
 
 
 def test_runtime_event_create_fills_defaults():
@@ -42,3 +44,53 @@ def test_runtime_event_to_dict_preserves_fields():
         "payload": {"node": "planning"},
         "metadata": {"conversation_id": "conv-1"},
     }
+
+
+@pytest.mark.asyncio
+async def test_event_bus_exact_topic_subscription():
+    bus = EventBus()
+    received = []
+
+    async def handler(event: RuntimeEvent):
+        received.append(event)
+
+    bus.subscribe("tool.invoke", handler)
+    event = RuntimeEvent.create(event_type="tool.invoke", source="test")
+
+    await bus.publish(event)
+
+    assert received == [event]
+
+
+@pytest.mark.asyncio
+async def test_event_bus_wildcard_subscription_matches_single_segment():
+    bus = EventBus()
+    received = []
+
+    bus.subscribe("tool.*", lambda event: received.append(event.event_type))
+
+    await bus.publish(RuntimeEvent.create(event_type="tool.invoke", source="test"))
+    await bus.publish(RuntimeEvent.create(event_type="tool.result", source="test"))
+    await bus.publish(RuntimeEvent.create(event_type="tool.sandbox.output", source="test"))
+
+    assert received == ["tool.invoke", "tool.result"]
+
+
+@pytest.mark.asyncio
+async def test_event_bus_unsubscribe_stops_delivery():
+    bus = EventBus()
+    received = []
+
+    subscription = bus.subscribe("graph.enter", lambda event: received.append(event))
+    bus.unsubscribe(subscription.subscription_id)
+
+    await bus.publish(RuntimeEvent.create(event_type="graph.enter", source="test"))
+
+    assert received == []
+
+
+@pytest.mark.asyncio
+async def test_event_bus_publish_without_subscribers_succeeds():
+    bus = EventBus()
+
+    await bus.publish(RuntimeEvent.create(event_type="llm.request", source="test"))

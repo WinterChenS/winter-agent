@@ -6,8 +6,8 @@
 
 ## 2. Event Bus Core
 
-- [ ] 2.1 Implement in-process Event Bus publish, subscribe, and unsubscribe APIs.
-- [ ] 2.2 Implement exact topic matching and single-segment wildcard matching.
+- [x] 2.1 Implement in-process Event Bus publish, subscribe, and unsubscribe APIs.
+- [x] 2.2 Implement exact topic matching and single-segment wildcard matching.
 - [ ] 2.3 Ensure subscriber failures are isolated from publish callers.
 - [ ] 2.4 Add tests for exact subscriptions, wildcard subscriptions, no-subscriber publish, unsubscribe, and handler failure.
 
