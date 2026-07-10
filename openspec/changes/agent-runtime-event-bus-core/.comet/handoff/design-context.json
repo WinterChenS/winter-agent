@@ -1,0 +1,14 @@
+{
+  "change": "agent-runtime-event-bus-core",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "1d80f21d3c53ba1d941b21012acc3cefecdf9ad2001ae1b0ca3628022a8f2491",
+  "files": [
+    { "path": "openspec/changes/agent-runtime-event-bus-core/proposal.md", "sha256": "d217d84537818b73c7aa9ef034b01890d2f176706ab2e6fdf8929a4346e2d4c8" },
+    { "path": "openspec/changes/agent-runtime-event-bus-core/design.md", "sha256": "f4177a87df760cde0d0a513096c3de4294bdf61f6e0b8a580ffe0a9850035898" },
+    { "path": "openspec/changes/agent-runtime-event-bus-core/tasks.md", "sha256": "c83fdcdbfcb8bbbd9ec7cdfdf0e22f1864a1ef46d1049553ffe0b23fdfe0653f" },
+    { "path": "openspec/changes/agent-runtime-event-bus-core/specs/agent-runtime-event-bus/spec.md", "sha256": "21db251523c179515a1bebfa5d51c3ac84f071de6446f549b25cc646c77a38e7" }
+  ]
+}
