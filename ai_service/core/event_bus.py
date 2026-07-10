@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import time
-import uuid
+import asyncio
 import inspect
 import logging
+import time
+import uuid
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
 from typing import Any, Mapping
@@ -76,8 +77,9 @@ class EventBus:
     It does not depend on Redis, RabbitMQ, Kafka, or any external broker.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, handler_timeout_seconds: float = 1.0) -> None:
         self._subscriptions: dict[str, Subscription] = {}
+        self._handler_timeout_seconds = handler_timeout_seconds
 
     def subscribe(self, topic: str, handler: EventHandler) -> Subscription:
         subscription = Subscription(
@@ -98,7 +100,18 @@ class EventBus:
             try:
                 result = subscription.handler(event)
                 if inspect.isawaitable(result):
-                    await result
+                    await asyncio.wait_for(
+                        result,
+                        timeout=self._handler_timeout_seconds,
+                    )
+            except TimeoutError:
+                logger.warning(
+                    "EventBus subscriber timed out: subscription_id=%s topic=%s event_type=%s timeout=%s",
+                    subscription.subscription_id,
+                    subscription.topic,
+                    event.event_type,
+                    self._handler_timeout_seconds,
+                )
             except Exception:
                 logger.exception(
                     "EventBus subscriber failed: subscription_id=%s topic=%s event_type=%s",

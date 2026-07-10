@@ -1,3 +1,6 @@
+import asyncio
+import time
+
 import pytest
 
 from core.event_bus import EventBus, RuntimeEvent
@@ -58,6 +61,8 @@ async def test_event_bus_exact_topic_subscription():
     bus.subscribe("tool.invoke", handler)
     event = RuntimeEvent.create(event_type="tool.invoke", source="test")
 
+    await bus.publish(RuntimeEvent.create(event_type="tool.result", source="test"))
+    await bus.publish(RuntimeEvent.create(event_type="tool.invoke.extra", source="test"))
     await bus.publish(event)
 
     assert received == [event]
@@ -113,6 +118,28 @@ async def test_event_bus_subscriber_failure_does_not_stop_publish_or_other_handl
 
     await bus.publish(RuntimeEvent.create(event_type="tool.invoke", source="test"))
 
+    assert received == ["tool.invoke"]
+
+
+@pytest.mark.asyncio
+async def test_event_bus_slow_subscriber_does_not_block_indefinitely():
+    bus = EventBus(handler_timeout_seconds=0.01)
+    received = []
+
+    async def slow_handler(event: RuntimeEvent):
+        await asyncio.sleep(60)
+
+    async def good_handler(event: RuntimeEvent):
+        received.append(event.event_type)
+
+    bus.subscribe("tool.*", slow_handler)
+    bus.subscribe("tool.*", good_handler)
+
+    start = time.monotonic()
+    await bus.publish(RuntimeEvent.create(event_type="tool.invoke", source="test"))
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 1
     assert received == ["tool.invoke"]
 
 
