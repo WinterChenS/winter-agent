@@ -1,6 +1,7 @@
 import pytest
 
 from core.event_bus import EventBus, RuntimeEvent
+from core.streaming_event_bus import StreamingEventBus
 
 
 def test_runtime_event_create_fills_defaults():
@@ -94,3 +95,54 @@ async def test_event_bus_publish_without_subscribers_succeeds():
     bus = EventBus()
 
     await bus.publish(RuntimeEvent.create(event_type="llm.request", source="test"))
+
+
+@pytest.mark.asyncio
+async def test_event_bus_subscriber_failure_does_not_stop_publish_or_other_handlers():
+    bus = EventBus()
+    received = []
+
+    async def bad_handler(event: RuntimeEvent):
+        raise RuntimeError("boom")
+
+    async def good_handler(event: RuntimeEvent):
+        received.append(event.event_type)
+
+    bus.subscribe("tool.*", bad_handler)
+    bus.subscribe("tool.*", good_handler)
+
+    await bus.publish(RuntimeEvent.create(event_type="tool.invoke", source="test"))
+
+    assert received == ["tool.invoke"]
+
+
+@pytest.mark.asyncio
+async def test_event_bus_instances_are_isolated_for_request_scope():
+    first_bus = EventBus()
+    second_bus = EventBus()
+    first_received = []
+    second_received = []
+
+    first_bus.subscribe("message.delta", lambda event: first_received.append(event.event_id))
+    second_bus.subscribe("message.delta", lambda event: second_received.append(event.event_id))
+
+    event = RuntimeEvent.create(event_type="message.delta", source="request-1", event_id="evt-1")
+    await first_bus.publish(event)
+
+    assert first_received == ["evt-1"]
+    assert second_received == []
+
+
+@pytest.mark.asyncio
+async def test_streaming_event_bus_legacy_emit_events_and_close():
+    bus = StreamingEventBus()
+    bus.emit("tool.started", toolName="search")
+
+    events = bus.events()
+    event = await events.__anext__()
+    assert event.type == "tool.started"
+    assert event.data == {"toolName": "search"}
+
+    bus.close()
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()

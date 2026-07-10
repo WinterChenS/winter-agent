@@ -8,16 +8,16 @@
 
 - [x] 2.1 Implement in-process Event Bus publish, subscribe, and unsubscribe APIs.
 - [x] 2.2 Implement exact topic matching and single-segment wildcard matching.
-- [ ] 2.3 Ensure subscriber failures are isolated from publish callers.
-- [ ] 2.4 Add tests for exact subscriptions, wildcard subscriptions, no-subscriber publish, unsubscribe, and handler failure.
+- [x] 2.3 Ensure subscriber failures are isolated from publish callers.
+- [x] 2.4 Add tests for exact subscriptions, wildcard subscriptions, no-subscriber publish, unsubscribe, and handler failure.
 
 ## 3. Compatibility and Integration Boundary
 
-- [ ] 3.1 Add a compatibility path or adapter for existing `StreamingEventBus` usage.
-- [ ] 3.2 Document the no-external-component constraint in code comments or module docs where the bus implementation is introduced.
-- [ ] 3.3 Verify existing tests for streaming event behavior still pass.
+- [x] 3.1 Add a compatibility path or adapter for existing `StreamingEventBus` usage.
+- [x] 3.2 Document the no-external-component constraint in code comments or module docs where the bus implementation is introduced.
+- [x] 3.3 Verify existing tests for streaming event behavior still pass.
 
 ## 4. Validation
 
-- [ ] 4.1 Run targeted AI service tests for event bus and streaming compatibility.
-- [ ] 4.2 Run OpenSpec validation for `agent-runtime-event-bus-core`.
+- [x] 4.1 Run targeted AI service tests for event bus and streaming compatibility.
+- [x] 4.2 Run OpenSpec validation for `agent-runtime-event-bus-core`.
