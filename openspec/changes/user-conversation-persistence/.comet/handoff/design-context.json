@@ -1,0 +1,13 @@
+{
+  "change": "user-conversation-persistence",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "91e403499ebf904975260fc7b717c2b551ff8bb5bb6e1204539fdbdbaee4caa5",
+  "files": [
+    { "path": "openspec/changes/user-conversation-persistence/proposal.md", "sha256": "828518407898f98f5fd39c0ce16b5e345f4a2430a6f7a2501254de8962d692ad" },
+    { "path": "openspec/changes/user-conversation-persistence/design.md", "sha256": "e9942f88eea3fb30bb7c408e2e3ee7971cbd682ef1485dcd0c82306dbb5aca1e" },
+    { "path": "openspec/changes/user-conversation-persistence/tasks.md", "sha256": "ba6206e527f5fbbaab3839904a0ebd22f3571280877f6dde2c5d2d1152b96a56" }
+  ]
+}
